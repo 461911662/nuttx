@@ -121,9 +121,9 @@ goto End
 echo Missing ^<board-name^>:^<config-name^> argument
 
 :ShowUsage
-echo USAGE: %0 [-d] [-E] [-e] [-b|f] [-a ^<app-dir^>] ^<board-name^>:^<config-name^>
+echo USAGE: %0 [-d] [-E] [-e] [-b^|f] [-a ^<app-dir^>] ^<board-name^>:^<config-name^>
 echo        %0 [-h]
-echo\nWhere:
+echo.&echo Where:
 echo  -d:
 echo    Enables debug output
 echo  -E:
