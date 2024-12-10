@@ -1,5 +1,0 @@
-# Python package requirements for ESP-IDF. These are the so called core features which are installed in all systems.
-
-setuptools
-click
-pyparsing
