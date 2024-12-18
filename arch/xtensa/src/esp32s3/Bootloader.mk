@@ -94,11 +94,19 @@ else ifeq ($(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT),y)
 
 BOOTLOADER_BIN        = $(TOPDIR)/mcuboot-esp32s3.bin
 
+ifneq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
 $(MCUBOOT_SRCDIR): $(BOOTLOADER_DIR)
 	$(Q) echo "Cloning MCUboot"
 	$(Q) git clone --quiet $(MCUBOOT_URL) $(MCUBOOT_SRCDIR)
 	$(Q) git -C "$(MCUBOOT_SRCDIR)" checkout --quiet $(CONFIG_ESP32S3_MCUBOOT_VERSION)
 	$(Q) git -C "$(MCUBOOT_SRCDIR)" submodule --quiet update --init --recursive ext/mbedtls
+else
+BOOTLOADER_TOOLS_PATH = $(TOPDIR)$(DELIM)$(CONFIG_ESPRESSIF_BOOTLOADER_TOOLS_PATH)
+$(MCUBOOT_SRCDIR): $(BOOTLOADER_DIR)
+	$(Q) echo "GEN MCUboot"
+	$(Q) echo "COPY $(CONFIG_ESPRESSIF_BOOTLOADER_TOOLS_PATH) to $(MCUBOOT_SRCDIR)"
+	$(Q) $(call COPYDIR, $(BOOTLOADER_TOOLS_PATH), $(BOOTLOADER_DIR))
+endif
 
 $(BOOTLOADER_BIN): chip/$(ESP_HAL_3RDPARTY_REPO) $(MCUBOOT_SRCDIR) $(BOOTLOADER_CONFIG)
 	$(Q) echo "Building Bootloader"

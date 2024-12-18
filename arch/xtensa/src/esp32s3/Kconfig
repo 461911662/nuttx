@@ -87,6 +87,23 @@ config ESPRESSIF_NUM_CPUS
 	int
 	default 2
 
+config ESPRESSIF_3RDPARTY_OFFLINE
+        bool "3RDPARTY Tools Offline Configure"
+        ---help---
+                Select 3RDPARTY Tools Offline Configure.
+
+config ESPRESSIF_3RDPARTY_TOOLS_PATH
+        string "3RDPARTY Tools Directory"
+	depends on ESPRESSIF_3RDPARTY_OFFLINE
+        ---help---
+                Select 3rd party tools offline directory for the chip.
+
+config ESPRESSIF_BOOTLOADER_TOOLS_PATH
+	string "Bootloader Tools Directory"
+	depends on ESPRESSIF_3RDPARTY_OFFLINE
+	---help---
+		Select bootloader tools offline directory for the chip.
+
 choice ESP32S3_DEFAULT_CPU_FREQ
 	prompt "CPU frequency"
 	default ESP32S3_DEFAULT_CPU_FREQ_240

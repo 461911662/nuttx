@@ -207,6 +207,8 @@ endif
 # Espressif HAL for 3rd Party Platforms
 #############################################################################
 
+ifneq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
+
 # Fetch source files and add them to build
 
 ESP_HAL_3RDPARTY_REPO = esp-hal-3rdparty
@@ -241,6 +243,17 @@ chip/$(ESP_HAL_3RDPARTY_REPO):
 	$(Q) $(call CLONE_ESP_HAL_3RDPARTY_REPO)
 	$(Q) echo "Espressif HAL for 3rd Party Platforms: ${ESP_HAL_3RDPARTY_VERSION}"
 	$(Q) git -C chip/$(ESP_HAL_3RDPARTY_REPO) checkout --quiet $(ESP_HAL_3RDPARTY_VERSION)
+
+else
+
+ESP_HAL_3RDPARTY_REPO = esp-hal-3rdparty
+ESP_HAL_3RDPARTY_REPO_PATH = $(TOPDIR)$(DELIM)$(CONFIG_ESPRESSIF_3RDPARTY_TOOLS_PATH)
+chip/$(ESP_HAL_3RDPARTY_REPO):
+	$(Q) echo "Espressif HAL for 3rd Party Platforms: ${ESP_HAL_3RDPARTY_VERSION}"
+	$(Q) echo "COPY $(CONFIG_ESPRESSIF_3RDPARTY_TOOLS_PATH) to chip/$(ESP_HAL_3RDPARTY_REPO)"
+	$(Q) $(call COPYDIR, $(ESP_HAL_3RDPARTY_REPO_PATH), chip)
+
+endif
 
 # Silent preprocessor warnings
 
