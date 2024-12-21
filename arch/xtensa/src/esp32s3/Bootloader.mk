@@ -46,7 +46,23 @@ $(BOOTLOADER_DIR):
 cfg_en  = echo "$(1)=$(if $(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT),1,y)";
 cfg_val = echo "$(1)=$(2)";
 
+# Commands for colored and formatted output
+
+RED    = \033[1;31m
+YELLOW = \033[1;33m
+BOLD   = \033[1m
+RST    = \033[0m
+
 $(BOOTLOADER_CONFIG): $(TOPDIR)/.config $(BOOTLOADER_DIR)
+ifeq ($(CONFIG_ESP32S3_SECURE_BOOT),y)
+	$(Q) if [ -z "$(ESPSEC_KEYDIR)" ]; then \
+		echo ""; \
+		echo -e "$(RED)bootloader error:$(RST) Missing argument for secure boot keys directory."; \
+		echo "USAGE: make bootloader ESPSEC_KEYDIR=<dir>"; \
+		echo ""; \
+		exit 1; \
+	fi
+endif
 	$(Q) echo "Creating Bootloader configuration"
 	$(Q) { \
 		$(if $(CONFIG_ESP32S3_FLASH_4M),$(call cfg_en,CONFIG_ESPTOOLPY_FLASHSIZE_4MB)) \
@@ -93,6 +109,7 @@ bootloader:
 else ifeq ($(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT),y)
 
 BOOTLOADER_BIN        = $(TOPDIR)/mcuboot-esp32s3.bin
+BOOTLOADER_SIGNED_BIN = $(TOPDIR)/mcuboot-esp32s2.signed.bin
 
 ifneq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
 $(MCUBOOT_SRCDIR): $(BOOTLOADER_DIR)
@@ -119,10 +136,35 @@ $(BOOTLOADER_BIN): chip/$(ESP_HAL_3RDPARTY_REPO) $(MCUBOOT_SRCDIR) $(BOOTLOADER_
 	$(call COPYFILE, $(BOOTLOADER_DIR)/$(BOOTLOADER_OUTDIR)/mcuboot-esp32s3.bin, $(TOPDIR))
 
 bootloader: $(BOOTLOADER_CONFIG) $(BOOTLOADER_BIN)
+ifeq ($(CONFIG_ESP32S3_SECURE_BOOT),y)
+	$(eval KEYDIR := $(TOPDIR)/$(ESPSEC_KEYDIR))
+	$(eval BOOTLOADER_SIGN_KEY := $(abspath $(KEYDIR)/$(subst ",,$(CONFIG_ESP32S3_SECURE_BOOT_BOOTLOADER_SIGNING_KEY))))
+ifeq ($(CONFIG_ESP32S3_SECURE_BOOT_BUILD_SIGNED_BINARIES),y)
+	$(Q) if [ ! -f "$(BOOTLOADER_SIGN_KEY)" ]; then \
+		echo ""; \
+		echo -e "$(RED)bootloader error:$(RST) Bootloader signing key $(BOLD)$(CONFIG_ESP32S3_SECURE_BOOT_BOOTLOADER_SIGNING_KEY)$(RST) does not exist."; \
+		echo "Generate using:"; \
+		echo "    espsecure.py generate_signing_key --version 2 $(CONFIG_ESP32S3_SECURE_BOOT_BOOTLOADER_SIGNING_KEY)"; \
+		echo ""; \
+		exit 1; \
+	fi
+	$(Q) echo "Signing Bootloader"
+	espsecure.py sign_data --version 2 --keyfile $(BOOTLOADER_SIGN_KEY) -o $(BOOTLOADER_SIGNED_BIN) $(BOOTLOADER_BIN)
+else
+	$(Q) echo ""
+	$(Q) echo -e "$(YELLOW)Bootloader not signed. Sign the bootloader before flashing.$(RST)"
+	$(Q) echo "To sign the bootloader, you can use this command:"
+	$(Q) echo "    espsecure.py sign_data --version 2 --keyfile $(BOOTLOADER_SIGN_KEY) -o mcuboot-esp32s2.signed.bin mcuboot-esp32s2.bin"
+	$(Q) echo ""
+endif
+endif
 
 clean_bootloader:
 	$(call DELDIR,$(BOOTLOADER_DIR))
 	$(call DELFILE,$(BOOTLOADER_BIN))
+ifeq ($(CONFIG_ESP32S3_SECURE_BOOT_BUILD_SIGNED_BINARIES),y)
+	$(call DELFILE,$(BOOTLOADER_SIGNED_BIN))
+endif
 
 else ifeq ($(CONFIG_ESP32S3_APP_FORMAT_LEGACY),y)
 

@@ -2723,6 +2723,8 @@ endif # BUILD_PROTECTED
 
 endmenu # Bootloader and Image Configuration
 
+source "arch/xtensa/src/esp32s3/Kconfig.security"
+
 menu "AES accelerate"
 	depends on ESP32S3_AES_ACCELERATOR
 
