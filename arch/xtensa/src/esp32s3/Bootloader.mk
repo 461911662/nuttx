@@ -77,6 +77,14 @@ endif
 		$(if $(CONFIG_ESP32S3_FLASH_FREQ_80M),$(call cfg_en,CONFIG_ESPTOOLPY_FLASHFREQ_80M)) \
 		$(if $(CONFIG_ESP32S3_FLASH_FREQ_40M),$(call cfg_en,CONFIG_ESPTOOLPY_FLASHFREQ_40M)) \
 		$(if $(CONFIG_ESP32S3_FLASH_FREQ_20M),$(call cfg_en,CONFIG_ESPTOOLPY_FLASHFREQ_20M)) \
+		$(if $(CONFIG_ESP32S3_EFUSE_VIRTUAL),$(call cfg_en,CONFIG_EFUSE_VIRTUAL)$(call cfg_en,CONFIG_EFUSE_VIRTUAL_KEEP_IN_FLASH)$(call cfg_en,CONFIG_EFUSE_VIRTUAL_LOG_ALL_WRITES)) \
+		$(if $(CONFIG_ESP32S3_SECURE_BOOT),$(call cfg_en,CONFIG_SECURE_BOOT)$(call cfg_en,CONFIG_SECURE_BOOT_V2_ENABLED)$(call cfg_val,CONFIG_ESP_SIGN_KEY_FILE,$(abspath $(TOPDIR)/$(ESPSEC_KEYDIR)/$(subst ",,$(CONFIG_ESP32S3_SECURE_BOOT_APP_SIGNING_KEY))))) \
+		$(if $(CONFIG_ESP32S3_SECURE_SIGNED_APPS_SCHEME_RSA_2048),$(call cfg_en,CONFIG_ESP_USE_MBEDTLS)$(call cfg_en,CONFIG_ESP_SIGN_RSA)$(call cfg_val,CONFIG_ESP_SIGN_RSA_LEN,2048)) \
+		$(if $(CONFIG_ESP32S3_SECURE_BOOT_ALLOW_JTAG),$(call cfg_en,CONFIG_SECURE_BOOT_ALLOW_JTAG)) \
+		$(if $(CONFIG_ESP32S3_SECURE_BOOT_ALLOW_EFUSE_RD_DIS),$(call cfg_en,CONFIG_SECURE_BOOT_V2_ALLOW_EFUSE_RD_DIS)) \
+		$(if $(CONFIG_ESP32S3_SECURE_DISABLE_ROM_DL_MODE),$(call cfg_en,CONFIG_SECURE_DISABLE_ROM_DL_MODE)) \
+		$(if $(CONFIG_ESP32S3_SECURE_ENABLE_SECURE_ROM_DL_MODE),$(call cfg_en,CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE)) \
+		$(if $(CONFIG_ESP32S3_SECURE_INSECURE_ALLOW_DL_MODE),$(call cfg_en,CONFIG_SECURE_INSECURE_ALLOW_DL_MODE)) \
 	} > $(BOOTLOADER_CONFIG)
 ifeq ($(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT),y)
 	$(Q) { \
@@ -109,7 +117,7 @@ bootloader:
 else ifeq ($(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT),y)
 
 BOOTLOADER_BIN        = $(TOPDIR)/mcuboot-esp32s3.bin
-BOOTLOADER_SIGNED_BIN = $(TOPDIR)/mcuboot-esp32s2.signed.bin
+BOOTLOADER_SIGNED_BIN = $(TOPDIR)/mcuboot-esp32s3.signed.bin
 
 ifneq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
 $(MCUBOOT_SRCDIR): $(BOOTLOADER_DIR)
@@ -154,7 +162,7 @@ else
 	$(Q) echo ""
 	$(Q) echo -e "$(YELLOW)Bootloader not signed. Sign the bootloader before flashing.$(RST)"
 	$(Q) echo "To sign the bootloader, you can use this command:"
-	$(Q) echo "    espsecure.py sign_data --version 2 --keyfile $(BOOTLOADER_SIGN_KEY) -o mcuboot-esp32s2.signed.bin mcuboot-esp32s2.bin"
+	$(Q) echo "    espsecure.py sign_data --version 2 --keyfile $(BOOTLOADER_SIGN_KEY) -o mcuboot-esp32s3.signed.bin mcuboot-esp32s3.bin"
 	$(Q) echo ""
 endif
 endif
