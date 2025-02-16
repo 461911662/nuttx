@@ -30,8 +30,15 @@
 #include <syslog.h>
 
 #include <nuttx/syslog/syslog.h>
+#include <nuttx/spinlock.h>
 
 #include "syslog/syslog.h"
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static volatile spinlock_t g_syslog_lock = SP_UNLOCKED;
 
 /****************************************************************************
  * Public Functions
@@ -96,9 +103,17 @@ void syslog(int priority, FAR const IPTR char *fmt, ...)
 {
   va_list ap;
 
+#ifdef CONFIG_SPINLOCK
+  spin_lock(&g_syslog_lock);
+#endif
+
   /* Let vsyslog do the work */
 
   va_start(ap, fmt);
   vsyslog(priority, fmt, ap);
   va_end(ap);
+
+#ifdef CONFIG_SPINLOCK
+  spin_unlock(&g_syslog_lock);
+#endif
 }
