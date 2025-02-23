@@ -272,7 +272,12 @@ include chip/Bootloader.mk
 
 CHIP_SERIES = $(patsubst "%",%,$(CONFIG_ESPRESSIF_CHIP_SERIES))
 
+ifneq ($(CONFIG_ESP32S3_CUSTOME_CHIP_CFG),y)
 include chip/hal.mk
+else
+ESP_HAL_CUST_CHIP_CFG_PATH := $(patsubst "%",%,$(CONFIG_ESP32S3_CUSTOME_CHIP_CFG_PATH))
+include $(TOPDIR)$(DELIM)$(ESP_HAL_CUST_CHIP_CFG_PATH)$(DELIM)hal.mk
+endif
 
 include common/espressif/Make.defs
 
