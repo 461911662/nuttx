@@ -68,7 +68,7 @@ boss致力于解决工作时间长，工作效率低，员工是牛马等类似�
 
 **硬件平台**：直接使用esp32s3配套的开发板[ESP32-S3-USB-OTG](https://docs.espressif.com/projects/espressif-esp-dev-kits/zh_CN/latest/esp32s3/esp32-s3-usb-otg/index.html)，示意图如下：
 
-![image-20250303221457135](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250303221457135.png)
+![image-20250303221457135](boss-dev_manu/res/image-20250303221457135.png)
 
 **软件平台**：直接选择[nuttx]([461911662/nuttx: Apache NuttX is a mature, real-time embedded operating system (RTOS)](https://github.com/461911662/nuttx))平台，由于乐鑫有自己的软件平台，对第三方平台也有支持，但是还需要在nuttx适配一下此开发板。
 
@@ -159,9 +159,9 @@ make savedefconfig
     usbipd attach --wsl --busid=<BUSID>
     ```
 
-![image-20241126173724332](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20241126173724332.png)
+![image-20241126173724332](boss-dev_manu/res/image-20241126173724332.png)
 
-![image-20241126173757301](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20241126173757301.png)
+![image-20241126173757301](boss-dev_manu/res/image-20241126173757301.png)
 
 * 卸载usbipd（可选）    --- Windows使用
   * 执行命令`winget uninstall usbipd`
@@ -170,7 +170,7 @@ make savedefconfig
 
   linux平台常用的串口驱动有两个ch340(x)，cp210(x)。一般wsl2 ubuntu 20.04自带都包含了，如下：
 
-  ![image-20241126231114843](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20241126231114843.png)
+  ![image-20241126231114843](boss-dev_manu/res/image-20241126231114843.png)
 
   
 
@@ -215,7 +215,7 @@ rm -f mcuboot-esp32s* && make bootloader ESPSEC_KEYDIR=vendor/boss/xtensa/esp32s
 
 * 使用usbipd进行连接外部usb serial或者usb jtag
 
-  ![image-20241127225350348](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20241127225350348.png)
+  ![image-20241127225350348](boss-dev_manu/res/image-20241127225350348.png)
 
 * 烧录
 
@@ -300,13 +300,13 @@ int demo_example(int a, int b)
 
 ---
 
-![image-20250119173415384](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119173415384.png)
+![image-20250119173415384](boss-dev_manu/res/image-20250119173415384.png)
 
 **bit和byte顺序**：
 
 `cpu`的字节序需要配置，默认使用小段字节序。如下分别是32位在大小端情况下的**最高有效位**和**最低有效位**的定义：
 
-![image-20250119174559770](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119174559770.png)
+![image-20250119174559770](boss-dev_manu/res/image-20250119174559770.png)
 
 > **运算符**
 
@@ -314,15 +314,15 @@ int demo_example(int a, int b)
 
 其中规定的符号定义为：v：n‘bit，u：m'bit，t：1'bit
 
-![image-20250119175321659](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119175321659.png)
+![image-20250119175321659](boss-dev_manu/res/image-20250119175321659.png)
 
-![image-20250119224355050](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119224355050.png)
+![image-20250119224355050](boss-dev_manu/res/image-20250119224355050.png)
 
-![image-20250119224415240](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119224415240.png)
+![image-20250119224415240](boss-dev_manu/res/image-20250119224415240.png)
 
-![image-20250119224450466](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119224450466.png)
+![image-20250119224450466](boss-dev_manu/res/image-20250119224450466.png)
 
-![image-20250119224518707](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250119224518707.png)
+![image-20250119224518707](boss-dev_manu/res/image-20250119224518707.png)
 
 **无符号**：(0 ǁ u)
 
@@ -701,11 +701,11 @@ procedure WindowCheck (wr, ws, wt)
 
 栈布局：
 
-![image-20250126153541280](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126153541280.png)
+![image-20250126153541280](boss-dev_manu/res/image-20250126153541280.png)
 
 动态栈（只关注n1 bytes位置，其他不用关注）：
 
-![image-20250126154046470](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126154046470.png)
+![image-20250126154046470](boss-dev_manu/res/image-20250126154046470.png)
 
 **窗口调用协议**：
 
@@ -727,12 +727,12 @@ procedure WindowCheck (wr, ws, wt)
 
 
 
-![image-20250126200248216](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126200248216.png)
+![image-20250126200248216](boss-dev_manu/res/image-20250126200248216.png)
 
 * 除非使能栈帧*宽对齐*，否则栈指针以16字节对齐；
 * fp栈帧指针是可选的，在动态栈中，使用alloc时需要栈帧来指定栈帧大小（栈顶fp-栈底sp）。一般在函数entry之后，alloc申请占空间之前，fp等于sp。
 
-![image-20250126205246691](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126205246691.png)
+![image-20250126205246691](boss-dev_manu/res/image-20250126205246691.png)
 
 在变化窗口中，有以下说明：
 
@@ -740,7 +740,7 @@ procedure WindowCheck (wr, ws, wt)
 * 标签`register-spill area`是窗口协议定义的字节，在overflow场景触发时用来存放*调用者*的低4位寄存器。
 * 标签`Space for Outgoing Arguments`是当前函数调用子函数时，参数不能完全放在窗口寄存器中，剩余参数放在该区域的。
 
-![image-20250126215145719](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126215145719.png)
+![image-20250126215145719](boss-dev_manu/res/image-20250126215145719.png)
 
 在固定窗口中，有以下说明：
 
@@ -748,7 +748,7 @@ procedure WindowCheck (wr, ws, wt)
 
 **2、Call0 ISA**
 
-![image-20250126215818814](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126215818814.png)
+![image-20250126215818814](boss-dev_manu/res/image-20250126215818814.png)
 
 * 没有`register-spill`区域外，其他的栈帧布局与窗口ISA一致。
 * 栈指针以16字节对齐。
@@ -756,9 +756,9 @@ procedure WindowCheck (wr, ws, wt)
 
 **3、数据类型对齐**
 
-![image-20250126220256742](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126220256742.png)
+![image-20250126220256742](boss-dev_manu/res/image-20250126220256742.png)
 
-![image-20250126220332001](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250126220332001.png)
+![image-20250126220332001](boss-dev_manu/res/image-20250126220332001.png)
 
 **4、参数传递在通用寄存器**
 
@@ -781,7 +781,7 @@ procedure WindowCheck (wr, ws, wt)
 
 **6、Boolean类型参数和返回值**
 
-![image-20250127111726785](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250127111726785.png)
+![image-20250127111726785](boss-dev_manu/res/image-20250127111726785.png)
 
 boolean有专门的BR寄存器来传递值。
 
@@ -791,7 +791,7 @@ boolean有专门的BR寄存器来传递值。
 
 **8、栈帧宽对齐**
 
-![image-20250127114750464](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250127114750464.png)
+![image-20250127114750464](boss-dev_manu/res/image-20250127114750464.png)
 
 * 栈指针默认16字节对齐，如果函数中有宽对齐参数（64字节），栈指针可以进行64字节对齐。
 * PADDING应该放在当前栈帧之上。在`Register-Spill`之下。
@@ -892,7 +892,7 @@ boolean有专门的BR寄存器来传递值。
 
 esp32s3中断向量表：
 
-![image-20250213173733788](C:\Users\XIAO\AppData\Roaming\Typora\typora-user-images\image-20250213173733788.png)
+![image-20250213173733788](boss-dev_manu/res/image-20250213173733788.png)
 
 
 
