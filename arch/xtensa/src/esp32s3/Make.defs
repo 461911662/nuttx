@@ -213,6 +213,14 @@ ifeq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
 
 ESP_HAL_3RDPARTY_REPO_PATH = $(TOPDIR)$(DELIM)$(CONFIG_ESPRESSIF_3RDPARTY_TOOLS_PATH)
 chip/$(ESP_HAL_3RDPARTY_REPO):
+ifeq ($(CONFIG_ESP32S3_WIRELESS),y)
+	$(Q) echo "Espressif HAL for 3rd Party Platforms: initializing submodules..."
+	$(Q) git -C $(ESP_HAL_3RDPARTY_REPO_PATH) submodule --quiet update --init $(GIT_DEPTH_PARAMETER) components/mbedtls/mbedtls components/esp_phy/lib components/esp_wifi/lib components/bt/controller/lib_esp32c3_family components/esp_coex/lib
+	$(Q) git -C $(ESP_HAL_3RDPARTY_REPO_PATH)/components/mbedtls/mbedtls reset --quiet --hard
+	$(Q) echo "Applying patches..."
+	$(Q) cd $(ESP_HAL_3RDPARTY_REPO_PATH)/components/mbedtls/mbedtls && git apply ../../../nuttx/patches/components/mbedtls/mbedtls/*.patch
+endif
+
 	$(Q) echo "Espressif HAL for 3rd Party Platforms: ${ESP_HAL_3RDPARTY_VERSION}"
 	$(Q) echo "COPY $(CONFIG_ESPRESSIF_3RDPARTY_TOOLS_PATH) to chip/$(ESP_HAL_3RDPARTY_REPO)"
 	$(Q) $(call COPYDIR, $(ESP_HAL_3RDPARTY_REPO_PATH), chip)
@@ -244,13 +252,6 @@ endif
 include common/espressif/Make.defs
 
 context:: chip/$(ESP_HAL_3RDPARTY_REPO)
-ifeq ($(CONFIG_ESP32S3_WIRELESS),y)
-	$(Q) echo "Espressif HAL for 3rd Party Platforms: initializing submodules..."
-	$(Q) git -C $(ESP_HAL_3RDPARTY_REPO_PATH) submodule --quiet update --init $(GIT_DEPTH_PARAMETER) components/mbedtls/mbedtls components/esp_phy/lib components/esp_wifi/lib components/bt/controller/lib_esp32c3_family components/esp_coex/lib
-	$(Q) git -C $(ESP_HAL_3RDPARTY_REPO_PATH)/components/mbedtls/mbedtls reset --quiet --hard
-	$(Q) echo "Applying patches..."
-	$(Q) cd $(ESP_HAL_3RDPARTY_REPO_PATH)/components/mbedtls/mbedtls && git apply ../../../nuttx/patches/components/mbedtls/mbedtls/*.patch
-endif
 
 else
 context::
