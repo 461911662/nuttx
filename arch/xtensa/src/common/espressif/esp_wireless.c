@@ -32,7 +32,7 @@
 #include <sys/param.h>
 
 #include "xtensa.h"
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #include "hardware/esp32_dport.h"
 #include "hardware/esp32_emac.h"
 #include "hardware/esp32_soc.h"
@@ -77,7 +77,7 @@
 
 /* Software Interrupt */
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  define SWI_IRQ             ESP32_IRQ_CPU_CPU2
 #  define SWI_PERIPH          ESP32_PERIPH_CPU_CPU2
 #  define esp_partition_read  esp32_partition_read
@@ -118,7 +118,7 @@ struct esp_wireless_priv_s
 
   struct list_node sc_list;       /* Semaphore cache list */
   struct list_node qc_list;       /* Queue cache list */
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   struct list_node qc_freelist;   /* List of free queue cache structures */
 #endif
 };
@@ -250,7 +250,7 @@ static phy_country_to_bin_type_t g_country_code_map_type_table[] =
 
 /* Callback function to update WiFi MAC time */
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 wifi_mac_time_update_cb_t g_wifi_mac_time_update_cb = NULL;
 #endif
 
@@ -322,7 +322,7 @@ static int esp_swi_irq(int irq, void *context, void *arg)
   struct esp_queuecache_s *qc_tmp;
   struct esp_wireless_priv_s *priv = &g_esp_wireless_priv;
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   modifyreg32(DPORT_CPU_INTR_FROM_CPU_2_REG, DPORT_CPU_INTR_FROM_CPU_2, 0);
 #else
   modifyreg32(SYSTEM_CPU_INTR_FROM_CPU_2_REG, SYSTEM_CPU_INTR_FROM_CPU_2, 0);
@@ -354,7 +354,7 @@ static int esp_swi_irq(int irq, void *context, void *arg)
         }
 
       list_delete(&qc->node);
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
       list_add_tail(&priv->qc_freelist, &qc->node);
 #endif
     }
@@ -1239,7 +1239,7 @@ IRAM_ATTR void esp_post_semcache(struct esp_semcache_s *sc)
    * are (re)enabled.
    */
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   modifyreg32(DPORT_CPU_INTR_FROM_CPU_2_REG, 0, DPORT_CPU_INTR_FROM_CPU_2);
 #else
   modifyreg32(SYSTEM_CPU_INTR_FROM_CPU_2_REG, 0, SYSTEM_CPU_INTR_FROM_CPU_2);
@@ -1264,7 +1264,7 @@ IRAM_ATTR void esp_post_semcache(struct esp_semcache_s *sc)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 void esp_init_queuecache(struct esp_queuecache_s *qc,
                          struct file *mq_ptr,
                          uint8_t *buffer,
@@ -1313,7 +1313,7 @@ void esp_init_queuecache(struct esp_queuecache_s *qc,
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 IRAM_ATTR void esp_send_queuecache(void *queue, uint8_t *buffer, int size)
 {
   struct esp_wireless_priv_s *priv = &g_esp_wireless_priv;
@@ -1389,7 +1389,7 @@ int esp_wireless_init(void)
       return OK;
     }
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   priv->cpuint = esp_setup_irq(0, SWI_PERIPH, 1, ESP32_CPUINT_LEVEL);
 #elif CONFIG_ARCH_CHIP_ESP32S2
   priv->cpuint = esp_setup_irq(SWI_PERIPH, ESP32S2_INT_PRIO_DEF, 0);
@@ -1410,7 +1410,7 @@ int esp_wireless_init(void)
   ret = irq_attach(SWI_IRQ, esp_swi_irq, NULL);
   if (ret < 0)
     {
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
       esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #elif CONFIG_ARCH_CHIP_ESP32S2
       esp_teardown_irq(SWI_PERIPH, priv->cpuint);
@@ -1425,7 +1425,7 @@ int esp_wireless_init(void)
 
   list_initialize(&priv->sc_list);
   list_initialize(&priv->qc_list);
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   list_initialize(&priv->qc_freelist);
 #endif
   up_enable_irq(SWI_IRQ);
@@ -1466,7 +1466,7 @@ int esp_wireless_deinit(void)
         {
           up_disable_irq(SWI_IRQ);
           irq_detach(SWI_IRQ);
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
           esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #elif CONFIG_ARCH_CHIP_ESP32S2
           esp_teardown_irq(SWI_PERIPH, priv->cpuint);
@@ -1537,13 +1537,13 @@ int32_t esp_wifi_init(const wifi_init_config_t *config)
       return ret;
     }
 
-#if defined(CONFIG_MAC_BB_P) && defined(CONFIG_ARCH_CHIP_ESP32)
+#if defined(CONFIG_MAC_BB_P) && (defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32))
   esp_mac_bb_pd_mem_init();
   esp_wifi_internal_set_mac_sleep(true);
 #endif
   esp_phy_modem_init();
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   g_wifi_mac_time_update_cb = esp_wifi_internal_update_mac_time;
 #endif
 

@@ -50,6 +50,44 @@ config ARCH_CHIP_ESP32
 		"application"), however for most purposes the two CPUs are
 		interchangeable.
 
+config ARCH_CHIP_BOSS1_ESP32
+	bool "Espressif ESP32 COPY"
+	select ARCH_FAMILY_LX6
+	select XTENSA_HAVE_INTERRUPTS
+	select ARCH_HAVE_BOOTLOADER
+	select ARCH_HAVE_FPU
+	select ARCH_HAVE_MPU
+	select ARCH_HAVE_MULTICPU
+	select ARCH_HAVE_RESET
+	select ARCH_HAVE_TESTSET
+	select ARCH_HAVE_TEXT_HEAP
+	select ARCH_VECNOTIRQ
+	select LIBC_PREVENT_STRING_KERNEL
+	select LIBC_ARCH_MEMCPY if BUILD_FLAT
+	select LIBC_ARCH_MEMCHR if BUILD_FLAT
+	select LIBC_ARCH_MEMCMP if BUILD_FLAT
+	select LIBC_ARCH_MEMMOVE if BUILD_FLAT
+	select LIBC_ARCH_MEMSET if BUILD_FLAT
+	select LIBC_ARCH_STRCHR if BUILD_FLAT
+	select LIBC_ARCH_STRCMP if BUILD_FLAT
+	select LIBC_ARCH_STRCPY if BUILD_FLAT
+	select LIBC_ARCH_STRLCPY if BUILD_FLAT
+	select LIBC_ARCH_STRNCPY if BUILD_FLAT
+	select LIBC_ARCH_STRLEN if BUILD_FLAT
+	select LIBC_ARCH_STRNLEN if BUILD_FLAT
+	---help---
+		This is a copy of config from the ESP32 CHIP.
+		The ESP32 is a dual-core system from Espressif with two Harvard
+		architecture Xtensa LX6 CPUs. All embedded memory, external memory
+		and peripherals are located on the data bus and/or the instruction
+		bus of these CPUs. With some minor exceptions, the address mapping
+		of two CPUs is symmetric, meaning they use the same addresses to
+		access the same memory.
+
+		The two CPUs are named "PRO_CPU" and "APP_CPU" (for "protocol" and
+		"application"), however for most purposes the two CPUs are
+		interchangeable.
+
 config ARCH_CHIP_ESP32S2
 	bool "Espressif ESP32-S2"
 	select ARCH_FAMILY_LX7
@@ -225,6 +263,7 @@ config ARCH_FAMILY_LX7
 
 config ARCH_CHIP
 	string
+	default "boss1-esp32" if ARCH_CHIP_BOSS1_ESP32
 	default "esp32" if ARCH_CHIP_ESP32
 	default "esp32s2" if ARCH_CHIP_ESP32S2
 	default "esp32s3" if ARCH_CHIP_ESP32S3
@@ -348,6 +387,10 @@ source "arch/xtensa/src/lx6/Kconfig"
 
 if ARCH_CHIP_ESP32
 source "arch/xtensa/src/esp32/Kconfig"
+endif
+
+if ARCH_CHIP_BOSS1_ESP32
+source "arch/xtensa/src/boss1-esp32/Kconfig"
 endif
 
 source "arch/xtensa/src/lx7/Kconfig"

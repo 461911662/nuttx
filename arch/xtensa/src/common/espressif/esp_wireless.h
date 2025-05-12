@@ -31,7 +31,7 @@
 #include <nuttx/config.h>
 #include <nuttx/list.h>
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #include "xtensa_attr.h"
 #include "esp32_rt_timer.h"
 #elif CONFIG_ARCH_CHIP_ESP32S2
@@ -59,7 +59,7 @@
  * headers
  */
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  ifdef CONFIG_ESP32_SUPPORT_MULTIPLE_PHY_INIT_DATA
 #    undef CONFIG_ESP32_SUPPORT_MULTIPLE_PHY_INIT_DATA_BIN
 #    define CONFIG_ESP32_SUPPORT_MULTIPLE_PHY_INIT_DATA_BIN 1
@@ -329,7 +329,7 @@ void esp_post_semcache(struct esp_semcache_s *sc);
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 void esp_init_queuecache(struct esp_queuecache_s *qc,
                          struct file *mq_ptr,
                          uint8_t *buffer,
@@ -358,7 +358,7 @@ void esp_init_queuecache(struct esp_queuecache_s *qc,
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 void esp_send_queuecache(void *qc, uint8_t *buffer, int size);
 #else
 void esp_send_queuecache(struct esp_queuecache_s *qc,

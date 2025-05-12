@@ -38,7 +38,7 @@
 #include "rom/cache.h"
 #include "spi_flash_mmap.h"
 
-#ifndef CONFIG_ARCH_CHIP_ESP32
+#if !defined(CONFIG_ARCH_CHIP_ESP32) && !defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  include "soc/extmem_reg.h"
 #endif
 
@@ -110,7 +110,7 @@ extern uint8_t _image_drom_size[];
 
 extern int ets_printf(const char *fmt, ...) printf_like(1, 2);
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 extern void cache_read_enable(int cpu);
 extern void cache_read_disable(int cpu);
 extern void cache_flush(int cpu);
@@ -153,7 +153,7 @@ int map_rom_segments(uint32_t app_drom_start, uint32_t app_drom_vaddr,
   uint32_t app_drom_start_aligned = app_drom_start & MMU_FLASH_MASK;
   uint32_t app_drom_vaddr_aligned = app_drom_vaddr & MMU_FLASH_MASK;
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   uint32_t drom_page_count = 0;
   uint32_t irom_page_count = 0;
 #endif
@@ -272,7 +272,7 @@ int map_rom_segments(uint32_t app_drom_start, uint32_t app_drom_vaddr,
       app_drom_size, app_drom_size);
 #endif
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   cache_read_disable(PRO_CPU_NUM);
   cache_flush(PRO_CPU_NUM);
 #  ifdef CONFIG_SMP
@@ -289,7 +289,7 @@ int map_rom_segments(uint32_t app_drom_start, uint32_t app_drom_vaddr,
 
   mmu_hal_unmap_all();
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   drom_page_count = (app_drom_size + SPI_FLASH_MMU_PAGE_SIZE - 1) /
                               SPI_FLASH_MMU_PAGE_SIZE;
   rc  = cache_flash_mmu_set(0, 0, app_drom_vaddr_aligned,
@@ -333,7 +333,7 @@ int map_rom_segments(uint32_t app_drom_start, uint32_t app_drom_vaddr,
 
   /* ------------------Enable Cache----------------------------------- */
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
   cache_read_enable(0);
 #else
   cache_hal_enable(CACHE_TYPE_ALL);

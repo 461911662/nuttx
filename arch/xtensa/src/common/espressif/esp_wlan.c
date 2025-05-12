@@ -51,7 +51,7 @@
 #include "espressif/esp_wifi_utils.h"
 #include "espressif/esp_wireless.h"
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  include "esp32_wifi_adapter.h"
 #  include "esp32_systemreset.h"
 #elif CONFIG_ARCH_CHIP_ESP32S2
@@ -66,7 +66,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  define esp_register_shutdown_handler esp32_register_shutdown_handler
 #  define esp_unregister_shutdown_handler esp32_unregister_shutdown_handler
 #elif CONFIG_ARCH_CHIP_ESP32S2

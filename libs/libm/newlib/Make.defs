@@ -32,6 +32,13 @@ else
   NEWLIB_TARBALL=$(NEWLIB_BASENAME)-$(NEWLIB_VERSION).tar.gz
 endif
 
+ifeq ($(CONFIG_ARCH_CHIP_BOSS1_ESP32),y)
+  NEWLIB_VERSION=esp-4.1.0_20230425
+  NEWLIB_BASENAME=newlib-esp32
+  NEWLIB_URL_BASE=https://github.com/espressif/newlib-esp32/archive
+  NEWLIB_TARBALL=$(NEWLIB_VERSION).tar.gz
+endif
+
 ifeq ($(wildcard newlib/newlib/.git),)
 $(NEWLIB_BASENAME)-$(NEWLIB_VERSION).tar.gz:
 	$(call DOWNLOAD,$(NEWLIB_URL_BASE),$(NEWLIB_TARBALL),$(NEWLIB_BASENAME)-$(NEWLIB_VERSION).tar.gz)

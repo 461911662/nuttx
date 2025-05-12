@@ -42,7 +42,7 @@
 #include <nuttx/mm/circbuf.h>
 
 #include "xtensa.h"
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #include "hardware/esp32_soc.h"
 #include "esp32_gpio.h"
 #include "esp32_irq.h"
@@ -127,7 +127,7 @@
 
 #define rmt_item32_t rmt_symbol_word_t
 
-#ifdef CONFIG_ARCH_CHIP_ESP32
+#if defined(CONFIG_ARCH_CHIP_ESP32) || defined(CONFIG_ARCH_CHIP_BOSS1_ESP32)
 #  define esp_configgpio      esp32_configgpio
 #  define esp_gpio_matrix_out esp32_gpio_matrix_out
 #  define esp_gpio_matrix_in  esp32_gpio_matrix_in
