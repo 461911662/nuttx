@@ -44,6 +44,7 @@
 #  include <nuttx/serial/uart_bth4.h>
 #endif
 
+#include <arch/boss1-esp32/bt_ioctl.h>
 #include "esp32_bt_adapter.h"
 
 /****************************************************************************
@@ -71,6 +72,8 @@ static int esp32_bt_open(struct bt_driver_s *drv);
 static int esp32_bt_send(struct bt_driver_s *drv,
                           enum bt_buf_type_e type,
                           void *data, size_t len);
+static int esp32_bt_ioctl(FAR struct bt_driver_s *btdev, int cmd,
+                    unsigned long arg);
 static void esp32_bt_close(struct bt_driver_s *drv);
 
 static void esp32_bt_send_ready(void);
@@ -87,6 +90,7 @@ static struct esp32_bt_priv_s g_bt_priv =
       .head_reserve = H4_HEADER_SIZE,
       .open         = esp32_bt_open,
       .send         = esp32_bt_send,
+      .ioctl        = esp32_bt_ioctl,
       .close        = esp32_bt_close
     }
 };
@@ -280,6 +284,120 @@ static int esp32_bt_open(struct bt_driver_s *drv)
 }
 
 /****************************************************************************
+ * Name: esp32_bt_poweron
+ *
+ * Description:
+ *   POWER ON ESP32 BT.
+ *
+ * Returned Value:
+ *   OK
+ *
+ ****************************************************************************/
+
+static int esp32_bt_poweron(void)
+{
+  int ret;
+  ret = esp32_bt_controller_init();
+  if (ret)
+  {
+    wlerr("Failed to initialize BT ret=%d\n", ret);
+    return ERROR;
+  }
+  ret = esp32_bt_controller_enable(ESP_BT_MODE_BTDM);
+  if (ret)
+  {
+    wlerr("Failed to Enable BT ret=%d\n", ret);
+    return ERROR;
+  }
+  ret = esp32_vhci_register_callback(&vhci_host_cb);
+  if (ret)
+  {
+    wlerr("Failed to register BT callback ret=%d\n", ret);
+    return ERROR;
+  }
+  return ret;
+}
+
+/****************************************************************************
+ * Name: esp32_bt_poweroff
+ *
+ * Description:
+ *   POWER OFF ESP32 BT.
+ *
+ * Returned Value:
+ *   OK
+ *
+ ****************************************************************************/
+
+static int esp32_bt_poweroff(void)
+{
+  int ret;
+  ret = esp32_bt_controller_disable();
+  if (ret)
+  {
+    wlerr("Failed to Disable BT ret=%d\n", ret);
+    return ERROR;
+  }
+  ret = esp32_bt_controller_deinit();
+  if (ret)
+  {
+    wlerr("Failed to Deinitialize BT ret=%d\n", ret);
+    return ERROR;
+  }
+  return ret;
+}
+
+/****************************************************************************
+ * Name: esp32_bt_ioctl
+ *
+ * Description:
+ *   ESP32 BT ioctl function for BT driver.
+ *
+ * Input Parameters:
+ *   btdev - BT driver pointer
+ *   cmd   - BT operator id
+ *   arg   - BT arguments
+ *
+ * Returned Value:
+ *   OK
+ *
+ ****************************************************************************/
+
+static int esp32_bt_ioctl(FAR struct bt_driver_s *btdev, int cmd,
+                    unsigned long arg)
+{
+  int ret;
+  FAR struct btparam_s *btparam = (FAR struct btparam_s *)((uintptr_t)arg);
+  switch (cmd)
+  {
+    case BIOC_POWERON:
+      ret = esp32_bt_poweron();
+      if (ret)
+      {
+        wlerr("Failed to power on BT ret=%d\n", ret);
+        return ERROR;
+      }
+    case BIOC_POWEROFF:
+      ret = esp32_bt_poweroff();
+      if (ret)
+      {
+        wlerr("Failed to power off BT ret=%d\n", ret);
+        return ERROR;
+      }
+      break;
+    case BIOC_GETSENDOK:
+      btparam->response.is_host_send = esp32_vhci_host_check_send_available();
+      wlinfo("esp32_vhci_host_check_send_available is %s\n", btparam->response.is_host_send ? "TRUE" : "FALSE");
+      break;
+    default:
+      wlerr("NOT Support BT cmd=%x\n", cmd);
+      break;
+  }
+
+  return ret;
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -300,29 +418,6 @@ static int esp32_bt_open(struct bt_driver_s *drv)
 int esp32_bt_initialize(void)
 {
   int ret;
-
-  ret = esp32_bt_controller_init();
-  if (ret)
-    {
-      wlerr("Failed to initialize BT ret=%d\n", ret);
-      return ERROR;
-    }
-
-  ret = esp32_bt_controller_enable(ESP_BT_MODE_BTDM); 
-  //ret = esp32_bt_controller_enable(ESP_BT_MODE_BLE);
-  //ret = esp32_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
-  if (ret)
-    {
-      wlerr("Failed to Enable BT ret=%d\n", ret);
-      return ERROR;
-    }
-
-  ret = esp32_vhci_register_callback(&vhci_host_cb);
-  if (ret)
-    {
-      wlerr("Failed to register BT callback ret=%d\n", ret);
-      return ERROR;
-    }
 
 #if defined(CONFIG_UART_BTH4)
   ret = uart_bth4_register(CONFIG_ESP32_BT_TTY_NAME, &g_bt_priv.drv);
