@@ -54,6 +54,10 @@
 #  include "esp_rom_spiflash.h"
 #endif
 
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+#  include "esp32_spiflash.h"
+#endif
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -264,6 +268,12 @@ static noreturn_function void __esp32_start(void)
 #  ifdef CONFIG_XTENSA_EXTMEM_BSS
      memset(_sbss_extmem, 0, _ebss_extmem - _sbss_extmem);
 #  endif
+
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+  /* Initialize external memory */
+  minfo("move data to 0x%x from 0x%x.\n", (uint32_t)_sdata_extmem, (uint32_t)_sdata_extmem_lma);
+  esp32_spiflash_readdata(((uint32_t)_sdata_extmem_lma)+0x10000, _sdata_extmem, (uint32_t)_edata_extmem_size, false);
+#endif
 
 #endif
 

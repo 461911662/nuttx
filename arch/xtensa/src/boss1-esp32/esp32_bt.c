@@ -145,13 +145,6 @@ static int esp32_bt_recv_cb(uint8_t *data, uint16_t len)
   enum bt_buf_type_e type;
   struct esp32_bt_priv_s *priv = &g_bt_priv;
 
-  wlinfo("len = %d\n", len);
-  wlinfo("host recv pkt: ");
-  for (uint16_t i = 0; i < len; i++)
-    {
-      wlinfo("%02x\n", data[i]);
-    }
-
   switch (data[0])
     {
       case H4_EVT:
@@ -187,6 +180,7 @@ static int esp32_bt_recv_cb(uint8_t *data, uint16_t len)
         {
           wlerr("Failed to receive ret=%d\n", ret);
         }
+      ret = OK;
     }
 
   return ret;
@@ -303,12 +297,15 @@ static int esp32_bt_poweron(void)
     wlerr("Failed to initialize BT ret=%d\n", ret);
     return ERROR;
   }
-  ret = esp32_bt_controller_enable(ESP_BT_MODE_BTDM);
+
+  // ret = esp32_bt_controller_enable(ESP_BT_MODE_BTDM);
+  ret = esp32_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
   if (ret)
   {
     wlerr("Failed to Enable BT ret=%d\n", ret);
     return ERROR;
   }
+
   ret = esp32_vhci_register_callback(&vhci_host_cb);
   if (ret)
   {
@@ -367,6 +364,7 @@ static int esp32_bt_ioctl(FAR struct bt_driver_s *btdev, int cmd,
                     unsigned long arg)
 {
   int ret;
+  // used for flat mode, other is unsupport
   FAR struct btparam_s *btparam = (FAR struct btparam_s *)((uintptr_t)arg);
   switch (cmd)
   {
@@ -377,6 +375,7 @@ static int esp32_bt_ioctl(FAR struct bt_driver_s *btdev, int cmd,
         wlerr("Failed to power on BT ret=%d\n", ret);
         return ERROR;
       }
+      break;
     case BIOC_POWEROFF:
       ret = esp32_bt_poweroff();
       if (ret)
@@ -386,8 +385,7 @@ static int esp32_bt_ioctl(FAR struct bt_driver_s *btdev, int cmd,
       }
       break;
     case BIOC_GETSENDOK:
-      btparam->response.is_host_send = esp32_vhci_host_check_send_available();
-      wlinfo("esp32_vhci_host_check_send_available is %s\n", btparam->response.is_host_send ? "TRUE" : "FALSE");
+      btparam->resp.is_host_send = esp32_vhci_host_check_send_available();
       break;
     default:
       wlerr("NOT Support BT cmd=%x\n", cmd);

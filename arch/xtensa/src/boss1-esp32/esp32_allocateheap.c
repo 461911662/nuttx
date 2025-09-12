@@ -250,6 +250,12 @@ void xtensa_add_region(void)
   start = (void *)CONFIG_HEAP2_BASE;
   size  = CONFIG_HEAP2_SIZE;
 #endif
+
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+  start = (void *)(_edata_extmem);
+  size = CONFIG_HEAP2_SIZE - (size_t)(_edata_extmem - _sbss_extmem);
+#endif
+
   size -= esp_himem_reserved_area_size();
 
   MM_ADDREGION(start, size);

@@ -29,7 +29,7 @@ struct btparam_s
 {
   union {
     bool is_host_send; /* 表示host可以发送数据包 */
-  } response;
+  } resp;
 };
 
 #endif /* __ARCH_XTENSA_BOSS1_ESP32_BTIOCTL_H */

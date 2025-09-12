@@ -43,7 +43,7 @@
 #  define FLASH_SIZE 0x1000000
 #endif
 
-#define SRAM1_IRAM_LEN 0xc000
+#define SRAM1_IRAM_LEN 0xA000
 
 MEMORY
 {

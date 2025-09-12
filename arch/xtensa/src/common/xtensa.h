@@ -181,6 +181,12 @@ extern uint8_t _sheap[];             /* Start of heap */
 extern uint8_t _eheap[];             /* End+1 of heap */
 extern uint8_t _sbss_extmem[];       /* start of external memory bss */
 extern uint8_t _ebss_extmem[];       /* End+1 of external memory bss */
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+extern uint8_t _sdata_extmem[];       /* start of external memory data */
+extern uint8_t _edata_extmem[];       /* End+1 of external memory data */
+extern uint8_t _sdata_extmem_lma[];
+extern uint8_t _edata_extmem_size[];
+#endif
 
 /****************************************************************************
  * Inline Functions

@@ -158,6 +158,19 @@ struct mtd_dev_s *esp32_spiflash_encrypt_get_mtd(void);
 
 bool esp32_flash_encryption_enabled(void);
 
+
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+/*
+* @brief Read data from SPI Flash
+*
+* @param addr - Address to read from
+* @param data - Pointer to data buffer
+* @param len - Length of data to read
+* @param encrypted - Flag indicating whether the data to read is encrypted
+*/
+void esp32_spiflash_readdata(uint32_t addr, void *data, size_t len, bool encrypted);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

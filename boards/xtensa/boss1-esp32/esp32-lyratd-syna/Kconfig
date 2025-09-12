@@ -109,6 +109,12 @@ config ESP32_SPIRAM_SPIWP_SD3_PIN
 
 		For ESP32-PICO chip, the default value of this config should be 7.
 
+config ESP32_APP_DATA_EXTRAM
+	bool "ESP32 APP Data Ext RAM"
+	default n
+	---help---
+		Enable ESP32 APP Data Ext RAM.
+
 endif # ESP32_PSRAM
 
 config ESP32_CUSTOM_BT

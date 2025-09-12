@@ -2748,4 +2748,148 @@ bool esp32_flash_encryption_enabled(void)
   return enabled;
 }
 
+# ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+static int IRAM_ATTR esp32_mmap_single(struct esp32_spiflash_s *priv,
+                                       struct spiflash_map_req *req)
+{
+  int ret;
+  int i;
+  int start_page;
+  int flash_page;
+  int page_cnt;
+  bool flush = false;
+
+  spi_disable_cache(0);
+
+  for (start_page = DROM0_PAGES_START; start_page < DROM0_PAGES_END; ++start_page)
+  {
+    if (PRO_MMU_TABLE[start_page] == INVALID_MMU_VAL) {
+      break;
+      // _info("---------------->start_page: %d\n", start_page);
+    }
+  }
+
+  flash_page = MMU_ADDR2PAGE(req->src_addr);
+  page_cnt = MMU_BYTES2PAGES(MMU_ADDR2OFF(req->src_addr) + req->size);
+
+  if (start_page + page_cnt < DROM0_PAGES_END) {
+    for (i = 0; i < page_cnt; i++) {
+      PRO_MMU_TABLE[start_page + i] = flash_page + i;
+    }
+
+    req->start_page = start_page;
+    req->page_cnt = page_cnt;
+    req->ptr = (void *)(VADDR0_START_ADDR +
+                        start_page * SPI_FLASH_MMU_PAGE_SIZE +
+                        MMU_ADDR2OFF(req->src_addr));
+    flush = true;
+    ret = 0;
+  } else {
+    ret = -ENOBUFS;
+  }
+
+  if (flush) {
+#ifdef CONFIG_ESP32_SPIRAM
+    esp_spiram_writeback_cache();
+#endif
+    cache_flush(0);
+  }
+  spi_enable_cache(0);
+
+  return ret;
+}
+
+static void IRAM_ATTR esp32_ummap_single(struct esp32_spiflash_s *priv,
+                                  const struct spiflash_map_req *req)
+{
+  int i;
+  spi_disable_cache(0);
+
+  for (i = req->start_page; i < req->start_page + req->page_cnt; ++i) {
+    PRO_MMU_TABLE[i] = INVALID_MMU_VAL;
+#ifdef CONFIG_SMP
+    //APP_MMU_TABLE[i] = INVALID_MMU_VAL;
+#endif
+  }
+
+#ifdef CONFIG_ESP32_SPIRAM
+  esp_spiram_writeback_cache();
+#endif
+  cache_flush(0);
+  spi_enable_cache(0);
+}
+
+static int IRAM_ATTR esp32_readdata_encrypted_single(struct esp32_spiflash_s *priv, uint32_t addr,
+                                                     uint8_t *buffer, uint32_t size) {
+  int ret;
+  struct spiflash_map_req req =
+    {
+      .src_addr = addr,
+      .size = size
+    };
+
+  ret = esp32_mmap_single(priv, &req);
+  if (ret)
+    {
+      return ret;
+    }
+
+  memcpy(buffer, req.ptr, size);
+
+  esp32_ummap_single(priv, &req);
+
+  return OK;
+}
+
+static int IRAM_ATTR esp32_readdata_single(struct esp32_spiflash_s *priv,
+                                    uint32_t addr,
+                                    uint8_t *buffer,
+                                    uint32_t size)
+{
+  int ret;
+  uint32_t off = 0;
+  uint32_t bytes;
+  uint32_t tmp_buf[SPI_FLASH_READ_WORDS] = {0};
+
+  esp32_set_read_opt(priv);
+
+  while (size > 0)
+    {
+      bytes = MIN(size, SPI_FLASH_READ_BUF_SIZE);
+
+      spi_disable_cache(0);
+      ret = esp32_readonce(priv, addr, tmp_buf, bytes);
+#ifdef CONFIG_ESP32_SPIRAM
+      esp_spiram_writeback_cache();
+#endif
+      cache_flush(0);
+      spi_enable_cache(0);
+
+      if (ret)
+        {
+          return ret;
+        }
+
+      memcpy(&buffer[off], tmp_buf, bytes);
+      addr += bytes;
+      size -= bytes;
+      off += bytes;
+    }
+
+  return OK;
+}
+
+/*
+ * @details esp32_spiflash_readdata
+ */
+void esp32_spiflash_readdata(uint32_t addr, void *data, size_t len, bool encrypted)
+{
+  if (encrypted) {
+    esp32_readdata_encrypted_single(&g_esp32_spiflash1_encrypt, addr, data, len);
+  } else {
+    esp32_readdata_single(&g_esp32_spiflash1, addr, data, len);
+  }
+}
+#endif
+
 #endif /* CONFIG_ESP32_SPIFLASH */

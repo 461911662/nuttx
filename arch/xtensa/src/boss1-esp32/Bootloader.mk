@@ -105,6 +105,7 @@ ifeq ($(CONFIG_ESP32_APP_FORMAT_MCUBOOT),y)
 		$(call cfg_en,CONFIG_ESP_CONSOLE_UART) \
 		$(if $(CONFIG_UART0_SERIAL_CONSOLE),$(call cfg_val,CONFIG_ESP_CONSOLE_UART_NUM,0)) \
 		$(if $(CONFIG_UART1_SERIAL_CONSOLE),$(call cfg_val,CONFIG_ESP_CONSOLE_UART_NUM,1)) \
+		$(call cfg_en,CONFIG_BOSS1_MCUBOOT_ENABLE) \
 	} >> $(BOOTLOADER_CONFIG)
 else ifeq ($(CONFIG_ESP32_APP_FORMAT_LEGACY),y)
 	$(Q) { \
@@ -124,11 +125,18 @@ else ifeq ($(CONFIG_ESP32_APP_FORMAT_MCUBOOT),y)
 BOOTLOADER_BIN        = $(TOPDIR)/mcuboot-esp32.bin
 BOOTLOADER_SIGNED_BIN = $(TOPDIR)/mcuboot-esp32.signed.bin
 
+ifeq ($(CONFIG_ESPRESSIF_3RDPARTY_OFFLINE),y)
+BOOTLOADER_TOOLS_PATH := $(dir $(TOPDIR)/$(subst ",,$(CONFIG_ESPRESSIF_3RDPARTY_TOOLS_PATH)))/bootloader/mcuboot
+$(MCUBOOT_SRCDIR):
+	$(Q) echo "LINK $@ to $(BOOTLOADER_TOOLS_PATH)"
+	$(Q) $(DIRLINK) $(BOOTLOADER_TOOLS_PATH) $@
+else
 $(MCUBOOT_SRCDIR):
 	$(Q) echo "Cloning MCUboot"
 	$(Q) git clone --quiet $(MCUBOOT_URL) $(MCUBOOT_SRCDIR)
 	$(Q) git -C "$(MCUBOOT_SRCDIR)" checkout --quiet $(CONFIG_ESP32_MCUBOOT_VERSION)
 	$(Q) git -C "$(MCUBOOT_SRCDIR)" submodule --quiet update --init --recursive ext/mbedtls
+endif
 
 $(BOOTLOADER_BIN): chip/$(ESP_HAL_3RDPARTY_REPO) $(MCUBOOT_SRCDIR) $(BOOTLOADER_CONFIG)
 	$(Q) echo "Building Bootloader"

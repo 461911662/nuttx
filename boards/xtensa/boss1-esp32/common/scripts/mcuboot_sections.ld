@@ -18,6 +18,8 @@
  *
  ****************************************************************************/
 
+#include <nuttx/config.h>
+
 /* Default entry point: */
 
 ENTRY(__start);
@@ -199,6 +201,37 @@ SECTIONS
     . = ALIGN (8);
     _bss_start = ABSOLUTE(.);
     _sbss = ABSOLUTE(.);
+    . = ALIGN(4);
+    _bt_controller_bss_start = ABSOLUTE(.);
+    *libble_app.a:(.bss .bss.*)
+    . = ALIGN(4);
+    _bt_controller_bss_end = ABSOLUTE(.);
+    . = ALIGN(4);
+    _bt_controller_common_start = ABSOLUTE(.);
+    *libble_app.a:(COMMON)
+    . = ALIGN(4);
+    _bt_controller_common_end = ABSOLUTE(.);
+    . = ALIGN(4);
+    _bt_bss_start = ABSOLUTE(.);
+    *libbt.a:(.bss .bss.*)
+    . = ALIGN(4);
+    _bt_bss_end = ABSOLUTE(.);
+    . = ALIGN(4);
+    _bt_common_start = ABSOLUTE(.);
+    *libbt.a:(COMMON)
+    . = ALIGN(4);
+    _bt_common_end = ABSOLUTE(.);
+    . = ALIGN(4);
+    _btdm_bss_start = ABSOLUTE(.);
+    *libbtdm_app.a:(.bss .bss.*)
+    . = ALIGN(4);
+    _btdm_bss_end = ABSOLUTE(.);
+    . = ALIGN(4);
+    _btdm_common_start = ABSOLUTE(.);
+    *libbtdm_app.a:(COMMON)
+    . = ALIGN(4);
+    _btdm_common_end = ABSOLUTE(.);
+    . = ALIGN (8);
     *(.dynsbss)
     *(.sbss)
     *(.sbss.*)
@@ -235,8 +268,20 @@ SECTIONS
     /* .data initialized on power-up in ROMed configurations. */
 
     _sdata = ABSOLUTE(.);
+    _bt_data_start = ABSOLUTE(.);
+    *libbt.a:(.data .data.*)
+    . = ALIGN (4);
+    _bt_data_end = ABSOLUTE(.);
+    _btdm_data_start = ABSOLUTE(.);
+    *libbtdm_app.a:(.data .data.*)
+    . = ALIGN (4);
+    _btdm_data_end = ABSOLUTE(.);
+#ifndef CONFIG_ESP32_APP_DATA_EXTRAM
     KEEP (*(.data))
     KEEP (*(.data.*))
+#else
+    *(EXCLUDE_FILE(*libapps.a) .data EXCLUDE_FILE(*libapps.a) .data.*)
+#endif
     KEEP (*(.gnu.linkonce.d.*))
     KEEP (*(.data1))
     KEEP (*(.sdata))
@@ -270,6 +315,19 @@ SECTIONS
     _ebss_extmem = ABSOLUTE(.);
   } >extmem_seg
 
+#ifdef CONFIG_ESP32_APP_DATA_EXTRAM
+  _sdata_extmem_lma = LOADADDR(.extmem.data);
+  _edata_extmem_size = LOADADDR(.extmem.data) + SIZEOF(.extmem.data) - _sdata_extmem_lma;
+  .extmem.data :
+  {
+    . = ALIGN (4);
+    _sdata_extmem = ABSOLUTE(.);
+    KEEP(*libapps.a:*(.data .data.*))
+    . = ALIGN(4);
+    _edata_extmem = ABSOLUTE(.);
+  } >extmem_seg AT>ROM
+#endif
+
   _image_irom_vma = ADDR(.flash.text);
   _image_irom_lma = LOADADDR(.flash.text);
   _image_irom_size = LOADADDR(.flash.text) + SIZEOF(.flash.text) - _image_irom_lma;
@@ -301,6 +359,10 @@ SECTIONS
     *(EXCLUDE_FILE(*libnet80211.a *libpp.a) .wifirxiram EXCLUDE_FILE(*libnet80211.a *libpp.a) .wifirxiram.*)
     *(.wifislpiram .wifislpiram.*)
     *(EXCLUDE_FILE(*libnet80211.a *libpp.a) .wifislprxiram EXCLUDE_FILE(*libnet80211.a *libpp.a) .wifislprxiram.*)
+#ifdef CONFIG_ESP32_WIFI_BT_COEXIST
+    *(.coexiram.*)
+    *(.coexsleepiram.*)
+#endif
 
     . = ALIGN(4);
     _text_end = ABSOLUTE(.);
