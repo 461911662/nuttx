@@ -50,7 +50,7 @@
 #include "hardware/esp32s2_soc.h"
 #include "esp32s2_gpio.h"
 #include "esp32s2_irq.h"
-#elif CONFIG_ARCH_CHIP_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3  || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #include "hardware/esp32s3_soc.h"
 #include "esp32s3_gpio.h"
 #include "esp32s3_irq.h"
@@ -149,7 +149,7 @@
 #  define GPIO_IN_FUNC        INPUT_FUNCTION_2
 #  define ESP_CPUINT_LEVEL    ESP32S2_CPUINT_LEVEL
 
-#elif CONFIG_ARCH_CHIP_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #  define esp_configgpio      esp32s3_configgpio
 #  define esp_gpio_matrix_out esp32s3_gpio_matrix_out
 #  define esp_gpio_matrix_in  esp32s3_gpio_matrix_in

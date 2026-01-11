@@ -11,7 +11,7 @@ config ESP_RMT
 config ESP_MCPWM
 	bool "Motor Control PWM (MCPWM)"
 	default n
-	depends on ARCH_CHIP_ESP32 || ARCH_CHIP_ESP32S3
+	depends on ARCH_CHIP_ESP32 || ARCH_CHIP_ESP32S3 || ARCH_CHIP_BOSS1_ESP32S3
 	---help---
 		Enable support for timer capture and motor control using
 		the Motor Control PWM peripheral.
@@ -19,7 +19,7 @@ config ESP_MCPWM
 config ESPRESSIF_TEMP
 	bool "Internal Temperature Sensor"
 	default n
-	depends on ARCH_CHIP_ESP32S2 || ARCH_CHIP_ESP32S3
+	depends on ARCH_CHIP_ESP32S2 || ARCH_CHIP_ESP32S3 || ARCH_CHIP_BOSS1_ESP32S3
 	---help---
 		A built-in sensor used to measure the chip's internal temperature.
 

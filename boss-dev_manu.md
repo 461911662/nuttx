@@ -172,6 +172,7 @@ make savedefconfig
 
   ![image-20241126231114843](boss-dev_manu/res/image-20241126231114843.png)
 
+  驱动安装：sudo modprobe vhci-hcd
   
 
 ### 没跑走两圈

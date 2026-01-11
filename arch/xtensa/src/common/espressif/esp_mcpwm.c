@@ -46,7 +46,7 @@
 #include "hardware/esp32_soc.h"
 #include "esp32_gpio.h"
 #include "esp32_irq.h"
-#elif CONFIG_ARCH_CHIP_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #include "hardware/esp32s3_soc.h"
 #include "esp32s3_gpio.h"
 #include "esp32s3_irq.h"
@@ -74,7 +74,7 @@
 #  define esp_setup_irq       esp32_setup_irq
 #  define esp_teardown_irq    esp32_teardown_irq
 #  define ESP_CPUINT_LEVEL    ESP32_CPUINT_LEVEL
-#elif CONFIG_ARCH_CHIP_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #  define esp_configgpio      esp32s3_configgpio
 #  define esp_gpio_matrix_in  esp32s3_gpio_matrix_in
 #  define esp_gpio_matrix_out esp32s3_gpio_matrix_out

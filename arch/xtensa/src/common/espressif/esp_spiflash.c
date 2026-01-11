@@ -42,11 +42,11 @@
 #include "hal/spi_flash_ll.h"
 #include "esp_rom_spiflash.h"
 #include "esp32s2_irq.h"
-#ifndef CONFIG_ARCH_CHIP_ESP32S3
+#ifndef CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #include "esp_private/spi_flash_os.h"
 #endif
 
-#ifdef CONFIG_ARCH_CHIP_ESP32S3
+#ifdef CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
 #define esp_intr_noniram_enable esp32s3_irq_noniram_disable
 #endif
 
@@ -139,7 +139,7 @@ spi_mem_dev_t *dev = spimem_flash_ll_get_hw(SPI1_HOST);
 
 void spiflash_start(void);
 void spiflash_end(void);
-#if !CONFIG_ESPRESSIF_SPI_FLASH_USE_ROM_CODE && CONFIG_ARCH_CHIP_ESP32S3
+#if !CONFIG_ESPRESSIF_SPI_FLASH_USE_ROM_CODE && (CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3)
 extern bool spi_flash_check_and_flush_cache(size_t start_addr,
                                             size_t length);
 #endif /* CONFIG_ESPRESSIF_SPI_FLASH_USE_ROM_CODE */
@@ -539,7 +539,7 @@ IRAM_ATTR int spi_flash_erase_range(uint32_t start_address, uint32_t size)
 
   wait_flash_idle();
   disable_flash_write();
-#ifdef CONFIG_ARCH_CHIP_ESP32S3
+#ifdef CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
   spi_flash_check_and_flush_cache(start_address, size);
 #endif
 
@@ -594,7 +594,7 @@ IRAM_ATTR int spi_flash_write(uint32_t dest_addr,
 
   wait_flash_idle();
   disable_flash_write();
-#ifdef CONFIG_ARCH_CHIP_ESP32S3
+#ifdef CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
   spi_flash_check_and_flush_cache(start_address, size);
 #endif
 
@@ -620,7 +620,7 @@ IRAM_ATTR int spi_flash_write(uint32_t dest_addr,
 
 int esp_spiflash_init(void)
 {
-#ifdef CONFIG_ARCH_CHIP_ESP32S3
+#ifdef CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
   extern void spi_flash_guard_set(const struct spiflash_guard_funcs *);
 #endif
 

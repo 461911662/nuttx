@@ -135,6 +135,40 @@ config ARCH_CHIP_ESP32S3
 		802.11 b/g/n Wi-Fi and Bluetooth 5 (LE) connectivity that provides long-range
 		support.
 endif
+config ARCH_CHIP_BOSS1_ESP32S3
+	bool "COPY Espressif ESP32-S3 for BOSS1"
+	select ARCH_FAMILY_LX7
+	select XTENSA_HAVE_INTERRUPTS
+	select ARCH_HAVE_BOOTLOADER if !ESPRESSIF_SIMPLE_BOOT
+	select ARCH_HAVE_COPY_SECTION
+	select ARCH_HAVE_FPU
+	select ARCH_HAVE_MPU
+	select ARCH_HAVE_MULTICPU
+	select ARCH_HAVE_RESET
+	select ARCH_HAVE_TEXT_HEAP
+	select ARCH_HAVE_TEXT_HEAP_SEPARATE_DATA_ADDRESS
+	select ARCH_HAVE_TEXT_HEAP_WORD_ALIGNED_READ
+	select ARCH_HAVE_TESTSET
+	select ARCH_VECNOTIRQ
+	select LIBC_PREVENT_STRING_KERNEL
+	select LIBC_ARCH_ATOMIC
+	select LIBC_ARCH_MEMCPY if BUILD_FLAT
+	select LIBC_ARCH_MEMCHR if BUILD_FLAT
+	select LIBC_ARCH_MEMCMP if BUILD_FLAT
+	select LIBC_ARCH_MEMMOVE if BUILD_FLAT
+	select LIBC_ARCH_MEMSET if BUILD_FLAT
+	select LIBC_ARCH_STRCHR if BUILD_FLAT
+	select LIBC_ARCH_STRCMP if BUILD_FLAT
+	select LIBC_ARCH_STRCPY if BUILD_FLAT
+	select LIBC_ARCH_STRLCPY if BUILD_FLAT
+	select LIBC_ARCH_STRNCPY if BUILD_FLAT
+	select LIBC_ARCH_STRLEN if BUILD_FLAT
+	select LIBC_ARCH_STRNLEN if BUILD_FLAT
+	---help---
+		COPY ESP32-S3 is a dual-core Xtensa LX7 MCU, capable of running at 240 MHz.
+		Apart from its 512 KB of internal SRAM, it also comes with integrated 2.4 GHz,
+		802.11 b/g/n Wi-Fi and Bluetooth 5 (LE) connectivity that provides long-range
+		support.
 
 config ARCH_CHIP_XTENSA_CUSTOM
 	bool "Custom XTENSA chip"
@@ -228,6 +262,7 @@ config ARCH_CHIP
 	default "esp32" if ARCH_CHIP_ESP32
 	default "esp32s2" if ARCH_CHIP_ESP32S2
 	default "esp32s3" if ARCH_CHIP_ESP32S3
+	default "boss1-esp32s3" if ARCH_CHIP_BOSS1_ESP32S3
 
 config XTENSA_CP_LAZY
 	bool "Lazy co-processor state restoration"
@@ -358,6 +393,10 @@ endif
 
 if ARCH_CHIP_ESP32S3
 source "arch/xtensa/src/esp32s3/Kconfig"
+endif
+
+if ARCH_CHIP_BOSS1_ESP32S3
+source "arch/xtensa/src/boss1-esp32s3/Kconfig"
 endif
 
 endif # ARCH_XTENSA
