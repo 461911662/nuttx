@@ -40,31 +40,31 @@
 #include <nuttx/himem/himem.h>
 #include <arch/board/board.h>
 
-#ifdef CONFIG_ESP32S3_TIMER
+#ifdef CONFIG_BOSS1_ESP32S3_TIMER
 #  include "esp32s3_board_tim.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_WIFI
+#ifdef CONFIG_BOSS1_ESP32S3_WIFI
 #  include "esp32s3_board_wlan.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_BLE
+#ifdef CONFIG_BOSS1_ESP32S3_BLE
 #  include "esp32s3_ble.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_BOSS1_ESP32S3_WIFI_BT_COEXIST
 #  include "esp32s3_wifi_adapter.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_RT_TIMER
+#ifdef CONFIG_BOSS1_ESP32S3_RT_TIMER
 #  include "esp32s3_rt_timer.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_I2C
+#ifdef CONFIG_BOSS1_ESP32S3_I2C
 #  include "esp32s3_i2c.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_I2S
+#ifdef CONFIG_BOSS1_ESP32S3_I2S
 #  include "esp32s3_i2s.h"
 #endif
 
@@ -84,15 +84,15 @@
 #include <nuttx/video/fb.h>
 #endif
 
-#ifdef CONFIG_ESP32S3_EFUSE
+#ifdef CONFIG_BOSS1_ESP32S3_EFUSE
 #  include "esp32s3_efuse.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC
 #  include "esp32s3_ledc.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_PARTITION_TABLE
+#ifdef CONFIG_BOSS1_ESP32S3_PARTITION_TABLE
 #  include "esp32s3_partition.h"
 #endif
 
@@ -104,20 +104,20 @@
 #  include "esp32s3_board_mcpwm.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_SPI
+#ifdef CONFIG_BOSS1_ESP32S3_SPI
 #include "esp32s3_spi.h"
 #include "esp32s3_board_spidev.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_SDMMC
+#ifdef CONFIG_BOSS1_ESP32S3_SDMMC
 #include "esp32s3_board_sdmmc.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR
+#ifdef CONFIG_BOSS1_ESP32S3_AES_ACCELERATOR
 #  include "esp32s3_aes.h"
 #endif
 
-#ifdef CONFIG_ESP32S3_ADC
+#ifdef CONFIG_BOSS1_ESP32S3_ADC
 #include "esp32s3_board_adc.h"
 #endif
 
@@ -155,14 +155,14 @@ extern int start_app_by_cpu(uint8_t pid); // from esp32s3_start_app.c file.
 int esp32s3_bringup(void)
 {
   int ret;
-#if (defined(CONFIG_ESP32S3_I2S0) && !defined(CONFIG_AUDIO_CS4344)) || \
-    defined(CONFIG_ESP32S3_I2S1)
+#if (defined(CONFIG_BOSS1_ESP32S3_I2S0) && !defined(CONFIG_AUDIO_CS4344)) || \
+    defined(CONFIG_BOSS1_ESP32S3_I2S1)
   bool i2s_enable_tx;
   bool i2s_enable_rx;
 #endif
 
-#if defined(CONFIG_ESP32S3_SPIRAM) && \
-    defined(CONFIG_ESP32S3_SPIRAM_BANKSWITCH_ENABLE)
+#if defined(CONFIG_BOSS1_ESP32S3_SPIRAM) && \
+    defined(CONFIG_BOSS1_ESP32S3_SPIRAM_BANKSWITCH_ENABLE)
   ret = esp_himem_init();
   if (ret < 0)
     {
@@ -170,8 +170,8 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#if defined(CONFIG_ESP32S3_SPI) && defined(CONFIG_SPI_DRIVER)
-  #ifdef CONFIG_ESP32S3_SPI2
+#if defined(CONFIG_BOSS1_ESP32S3_SPI) && defined(CONFIG_SPI_DRIVER)
+  #ifdef CONFIG_BOSS1_ESP32S3_SPI2
   ret = board_spidev_initialize(ESP32S3_SPI2);
   if (ret < 0)
     {
@@ -179,7 +179,7 @@ int esp32s3_bringup(void)
     }
   #endif
 
-  #ifdef CONFIG_ESP32S3_SPI3
+  #ifdef CONFIG_BOSS1_ESP32S3_SPI3
   ret = board_spidev_initialize(ESP32S3_SPI3);
   if (ret < 0)
     {
@@ -188,7 +188,7 @@ int esp32s3_bringup(void)
   #endif
 #endif
 
-#if defined(CONFIG_ESP32S3_EFUSE)
+#if defined(CONFIG_BOSS1_ESP32S3_EFUSE)
   ret = esp32s3_efuse_initialize("/dev/efuse");
   if (ret < 0)
     {
@@ -217,7 +217,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC
   ret = esp32s3_pwm_setup();
   if (ret < 0)
     {
@@ -225,7 +225,7 @@ int esp32s3_bringup(void)
     }
 #endif /* CONFIG_ESP32S3_LEDC */
 
-#ifdef CONFIG_ESP32S3_TIMER
+#ifdef CONFIG_BOSS1_ESP32S3_TIMER
   /* Configure general purpose timers */
 
   ret = board_tim_init();
@@ -235,7 +235,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_BOSS1_ESP32S3_SPIFLASH
   ret = board_spiflash_init();
   if (ret)
     {
@@ -243,7 +243,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_PARTITION_TABLE
+#ifdef CONFIG_BOSS1_ESP32S3_PARTITION_TABLE
   ret = esp32s3_partition_init();
   if (ret < 0)
     {
@@ -252,7 +252,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_RT_TIMER
+#ifdef CONFIG_BOSS1_ESP32S3_RT_TIMER
   ret = esp32s3_rt_timer_init();
   if (ret < 0)
     {
@@ -315,7 +315,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_TWAI
+#ifdef CONFIG_BOSS1_ESP32S3_TWAI
 
   /* Initialize TWAI and register the TWAI driver. */
 
@@ -337,7 +337,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_I2S
+#ifdef CONFIG_BOSS1_ESP32S3_I2S
 
 #ifdef CONFIG_AUDIO_CS4344
 
@@ -350,13 +350,13 @@ int esp32s3_bringup(void)
     }
 #else
 
-#ifdef CONFIG_ESP32S3_I2S0_TX
+#ifdef CONFIG_BOSS1_ESP32S3_I2S0_TX
   i2s_enable_tx = true;
 #else
   i2s_enable_tx = false;
 #endif /* CONFIG_ESP32S3_I2S0_TX */
 
-#ifdef CONFIG_ESP32S3_I2S0_RX
+#ifdef CONFIG_BOSS1_ESP32S3_I2S0_RX
   i2s_enable_rx = true;
 #else
   i2s_enable_rx = false;
@@ -371,15 +371,15 @@ int esp32s3_bringup(void)
     }
 #endif /* CONFIG_AUDIO_CS4344 */
 
-#ifdef CONFIG_ESP32S3_I2S1
+#ifdef CONFIG_BOSS1_ESP32S3_I2S1
 
-#ifdef CONFIG_ESP32S3_I2S1_TX
+#ifdef CONFIG_BOSS1_ESP32S3_I2S1_TX
   i2s_enable_tx = true;
 #else
   i2s_enable_tx = false;
 #endif /* CONFIG_ESP32S3_I2S1_TX */
 
-#ifdef CONFIG_ESP32S3_I2S1_RX
+#ifdef CONFIG_BOSS1_ESP32S3_I2S1_RX
   i2s_enable_rx = true;
 #else
   i2s_enable_rx = false;
@@ -416,9 +416,9 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_WIRELESS
+#ifdef CONFIG_BOSS1_ESP32S3_WIRELESS
 
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_BOSS1_ESP32S3_WIFI_BT_COEXIST
   ret = esp32s3_wifi_bt_coexist_init();
   if (ret)
     {
@@ -426,7 +426,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_BLE
+#ifdef CONFIG_BOSS1_ESP32S3_BLE
   ret = esp32s3_ble_initialize();
   if (ret)
     {
@@ -434,7 +434,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_WIFI
+#ifdef CONFIG_BOSS1_ESP32S3_WIFI
   ret = board_wlan_init();
   if (ret < 0)
     {
@@ -482,7 +482,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_SDMMC
+#ifdef CONFIG_BOSS1_ESP32S3_SDMMC
   ret = board_sdmmc_initialize();
   if (ret < 0)
     {
@@ -496,7 +496,7 @@ int esp32s3_bringup(void)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize AES: %d\n", ret);
     }
-#ifdef CONFIG_ESP32S3_AES_ACCELERATOR_TEST
+#ifdef CONFIG_BOSS1_ESP32S3_AES_ACCELERATOR_TEST
   else
     {
       esp32s3_aes_test();
@@ -504,7 +504,7 @@ int esp32s3_bringup(void)
 #endif
 #endif
 
-#ifdef CONFIG_ESP32S3_ADC
+#ifdef CONFIG_BOSS1_ESP32S3_ADC
   /* Configure ADC */
 
   ret = board_adc_init();
@@ -514,7 +514,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP_MCPWM_CAPTURE
+#ifdef CONFIG_BOSS1_ESP_MCPWM_CAPTURE
   ret = board_capture_initialize();
   if (ret < 0)
     {
@@ -522,7 +522,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP_MCPWM_MOTOR_BDC
+#ifdef CONFIG_BOSS1_ESP_MCPWM_MOTOR_BDC
   ret = board_motor_initialize();
   if (ret < 0)
     {

@@ -29,7 +29,7 @@ endif #ARCH_BOARD_BOSS1_ESP32S3
 
 if ESP32S3_BOSS1_V1_0
 
-config ESP32S3_STORAGE_MTD_OFFSET
+config BOSS1_ESP32S3_STORAGE_MTD_OFFSET
 	hex "Storage MTD base address in SPI Flash"
 	default 0x180000 if !ESP32S3_HAVE_OTA_PARTITION
 	default 0x250000 if ESP32S3_HAVE_OTA_PARTITION
@@ -37,7 +37,7 @@ config ESP32S3_STORAGE_MTD_OFFSET
 	---help---
 		MTD base address in SPI Flash.
 
-config ESP32S3_STORAGE_MTD_SIZE
+config BOSS1_ESP32S3_STORAGE_MTD_SIZE
 	hex "Storage MTD size in SPI Flash"
 	default 0x100000
 	range 0x0 0x400000 if ESP32S3_FLASH_4M
@@ -48,9 +48,9 @@ config ESP32S3_STORAGE_MTD_SIZE
 	---help---
 		MTD size in SPI Flash.
 
-choice ESP32S3_SPIFLASH_FS
+choice BOSS1_ESP32S3_SPIFLASH_FS
 	prompt "Mount SPI Flash MTD on bring-up"
-	default ESP32S3_SPIFLASH_SMARTFS
+	default BOSS1_ESP32S3_SPIFLASH_SMARTFS
 	depends on ESP32S3_MTD
 	optional
 	---help---
@@ -58,26 +58,26 @@ choice ESP32S3_SPIFLASH_FS
 		bring-up.
 		If not selected, the MTD will be registered as a device node on /dev.
 
-config ESP32S3_SPIFLASH_SMARTFS
+config BOSS1_ESP32S3_SPIFLASH_SMARTFS
 	bool "SmartFS"
 	select FS_SMARTFS
 	select MTD_SMART
 
-config ESP32S3_SPIFLASH_NXFFS
+config BOSS1_ESP32S3_SPIFLASH_NXFFS
 	bool "NXFFS"
 	select FS_NXFFS
 
-config ESP32S3_SPIFLASH_SPIFFS
+config BOSS1_ESP32S3_SPIFLASH_SPIFFS
 	bool "SPIFFS"
 	select FS_SPIFFS
 
-config ESP32S3_SPIFLASH_LITTLEFS
+config BOSS1_ESP32S3_SPIFLASH_LITTLEFS
 	bool "LittleFS"
 	select FS_LITTLEFS
 
-endchoice # ESP32S3_SPIFLASH_FS
+endchoice # BOSS1_ESP32S3_SPIFLASH_FS
 
-config ESP32S3_SPI2_3WIRE_HALF
+config BOSS1_ESP32S3_SPI2_3WIRE_HALF
 	bool "ENABLE CS SCLK MOSI pin for SPI2 transport."
 	depends on ESP32S3_SPI2
 	default false
@@ -110,7 +110,7 @@ config PM_SLEEP_WAKEUP_NSEC
 
 endif # PM
 
-config ESP32S3_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE
+config BOSS1_ESP32S3_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE
 	bool "Skip write-protection of DIS_CACHE (DIS_ICACHE, DIS_DCACHE)"
 	default n
 	help
@@ -128,7 +128,7 @@ config ESP32S3_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE
 		DIS_FORCE_DOWNLOAD, DIS_USB_OTG, DIS_TWAI, DIS_APP_CPU, DIS_PAD_JTAG,
 		DIS_DOWNLOAD_MANUAL_ENCRYPT, DIS_USB_JTAG, DIS_USB_SERIAL_JTAG, STRAP_JTAG_SEL, USB_PHY_SEL.
 
-config ESP32S3_EFUSE_WRRD_CLOSE
+config BOSS1_ESP32S3_EFUSE_WRRD_CLOSE
 	bool "EFUSE_WR_DIS && EFUSE_RD_DIS is closed for Development."
 	default N
 	help
@@ -137,7 +137,7 @@ config ESP32S3_EFUSE_WRRD_CLOSE
 
 		It is strick that write efuse EFUSE_WR_DIS && EFUSE_RD_DIS.
 
-config ESP32S3_EFUSE_VIRTUAL
+config BOSS1_ESP32S3_EFUSE_VIRTUAL
 	bool "Simulate eFuse operations in RAM"
 	default n
 	help
@@ -151,7 +151,7 @@ config ESP32S3_EFUSE_VIRTUAL
 
 		During startup, the eFuses are copied into RAM. This mode is useful for fast tests.
 
-config ESP32S3_EFUSE_VIRTUAL_KEEP_IN_FLASH
+config BOSS1_ESP32S3_EFUSE_VIRTUAL_KEEP_IN_FLASH
 	bool "Keep eFuses in flash"
 	depends on ESP32S3_EFUSE_VIRTUAL
 	help
@@ -164,7 +164,7 @@ config ESP32S3_EFUSE_VIRTUAL_KEEP_IN_FLASH
 		This mode is useful when need to keep changes after reboot
 		(testing secure_boot and flash_encryption).
 
-config ESP32S3_EFUSE_VIRTUAL_LOG_ALL_WRITES
+config BOSS1_ESP32S3_EFUSE_VIRTUAL_LOG_ALL_WRITES
 	bool "Log all virtual writes"
 	depends on ESP32S3_EFUSE_VIRTUAL
 	help

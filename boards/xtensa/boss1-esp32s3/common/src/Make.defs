@@ -20,7 +20,7 @@
 
 ifeq ($(CONFIG_ARCH_ESP32S3_BOARD_COMMON),y)
 
-ifeq ($(CONFIG_ESP32S3_TIMER),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_TIMER),y)
   CSRCS += esp32s3_board_tim.c
 endif
 
@@ -28,7 +28,7 @@ ifeq ($(CONFIG_WATCHDOG),y)
   CSRCS += esp32s3_board_wdt.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_SPIFLASH),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_SPIFLASH),y)
   CSRCS += esp32s3_board_spiflash.c
 endif
 
@@ -36,7 +36,7 @@ ifeq ($(CONFIG_SPI_DRIVER),y)
   CSRCS += esp32s3_board_spidev.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_WIFI),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_WIFI),y)
   CSRCS += esp32s3_board_wlan.c
 endif
 
@@ -44,7 +44,7 @@ ifeq ($(CONFIG_I2C_DRIVER),y)
   CSRCS += esp32s3_board_i2c.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_I2S),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_I2S),y)
   CSRCS += esp32s3_board_i2s.c
 endif
 
@@ -60,11 +60,11 @@ ifeq ($(CONFIG_SENSORS_BMP180),y)
   CSRCS += esp32s3_board_bmp180.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_OTG),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_OTG),y)
   CSRCS += esp32s3_board_usb.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_ADC),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_ADC),y)
   CSRCS += esp32s3_board_adc.c
 endif
 
@@ -80,7 +80,7 @@ ifeq ($(CONFIG_ESP_MCPWM),y)
   CSRCS += esp32s3_board_mcpwm.c
 endif
 
-ifeq ($(CONFIG_ESP32S3_SDMMC),y)
+ifeq ($(CONFIG_BOSS1_ESP32S3_SDMMC),y)
   CSRCS += esp32s3_board_sdmmc.c
 endif
 

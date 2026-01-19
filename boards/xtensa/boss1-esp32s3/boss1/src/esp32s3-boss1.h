@@ -127,7 +127,7 @@ int esp32s3_gpio_init(void);
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_BOSS1_ESP32S3_SPIFLASH
 int board_spiflash_init(void);
 #endif
 
@@ -186,7 +186,7 @@ int board_bmp180_initialize(int devno, int busno);
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESP32S3_I2S
+#ifdef CONFIG_BOSS1_ESP32S3_I2S
 int board_i2sdev_initialize(int port, bool enable_tx, bool enable_rx);
 #endif
 
@@ -231,11 +231,11 @@ int esp32s3_djoy_initialize(void);
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ESP32S3_LEDC
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC
 int esp32s3_pwm_setup(void);
 #endif
 
-#ifdef CONFIG_ESP32S3_TWAI
+#ifdef CONFIG_BOSS1_ESP32S3_TWAI
 int esp32s3_twai_setup(void);
 #endif
 
