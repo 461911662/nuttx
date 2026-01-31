@@ -36,7 +36,7 @@
 #include <arch/board/board_memorymap.h>
 #endif
 
-#include <arch/esp32s3/memory_layout.h>
+#include <arch/boss1-esp32s3/memory_layout.h>
 #include "xtensa.h"
 #include "hardware/esp32s3_rom_layout.h"
 #ifdef CONFIG_BOSS1_ESP32S3_SPIRAM

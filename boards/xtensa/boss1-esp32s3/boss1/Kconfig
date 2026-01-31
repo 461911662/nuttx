@@ -22,6 +22,18 @@ config ESP32S3_BOSS1_V1_0
                 ESP32-S3-DevKitC-1 version may be based either on ESP32-S3-WROOM-1/1U or
                 ESP32-S3-WROOM-2/2U.
 
+config ESP32S3_BOSS1_V1_0_0
+	bool "ESP32-S3-Boss1 v1.0.0"
+	depends on ARCH_CHIP_BOSS1_ESP32S3WROOM1N16R8
+	select ARCH_HAVE_LEDS
+	select ARCH_HAVE_BUTTONS
+	select ARCH_HAVE_IRQBUTTONS if BOSS1_ESP32S3_GPIO_IRQ
+	---help---
+                CX-ESP32S3 开发板是基于 ESP32-S3-WROOM-1 N16R8 官方模组设计的一款面向 AIOT 应用的开发板，
+                模块具有 16MB Flash 以及 8MB Psram，满足大容量需求，另外开发板选择了 ESP32S3 这一款芯片作
+                为核心，除了具有丰富的 IO 口资源外，在屏驱动、语音识别、常用外设、Wifi 性能方面也具有强大的
+                性能，内部还额外增加用于加速神经网络计算和信号处理等工作的向量指令，特别适合做 AIOT 的开发。
+
 endchoice
 
 endif #ARCH_BOARD_BOSS1_ESP32S3
@@ -178,14 +190,34 @@ config START_APP_BY_CPU
 
 endif # ESP32S3_BOSS1_V1_0
 
-comment "Esp32S3-Common Options"
+if ESP32S3_BOSS1_V1_0_0
 
-config ARCH_ESP32S3_BOARD_COMMON
-	bool "Board common logic"
-	default y
+if PM
+
+config PM_ALARM_SEC
+	int "PM_STANDBY delay (seconds)"
+	default 15
 	---help---
-		Board common logic located in each board/common folder.
+		Number of seconds to wait in PM_STANDBY before going to PM_STANDBY mode.
 
-if ARCH_ESP32S3_BOARD_COMMON
-source "vendor/boss/xtensa/esp32s3/common/Kconfig"
-endif
+config PM_ALARM_NSEC
+	int "PM_STANDBY delay (nanoseconds)"
+	default 0
+	---help---
+		Number of additional nanoseconds to wait in PM_STANDBY before going to PM_STANDBY mode.
+
+config PM_SLEEP_WAKEUP_SEC
+	int "PM_SLEEP delay (seconds)"
+	default 20
+	---help---
+		Number of seconds to wait in PM_SLEEP.
+
+config PM_SLEEP_WAKEUP_NSEC
+	int "PM_SLEEP delay (nanoseconds)"
+	default 0
+	---help---
+		Number of additional nanoseconds to wait in PM_SLEEP.
+
+endif # PM
+
+endif # ESP32S3_BOSS1_V1_0_0

@@ -3,7 +3,7 @@
 # see the file kconfig-language.txt in the NuttX tools repository.
 #
 
-config ESP32S3_MERGE_BINS
+config BOSS1_ESP32S3_MERGE_BINS
 	bool "Merge raw binary files into a single file"
 	default n
 	---help---
@@ -12,7 +12,7 @@ config ESP32S3_MERGE_BINS
 		This is only useful when the path to binary files (e.g. bootloader)
 		is provided via the ESPTOOL_BINDIR variable.
 
-config ESP32S3_SPEED_UP_ISR
+config BOSS1_ESP32S3_SPEED_UP_ISR
 	bool "Speed up ISR"
 	default n
 	---help---
