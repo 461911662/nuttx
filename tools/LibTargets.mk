@@ -174,11 +174,10 @@ staging$(DELIM)libarch$(LIBEXT): $(ARCH_SRC)$(DELIM)libarch$(LIBEXT)
 
 ifeq ($(CONFIG_BUILD_FLAT),y)
 libs$(DELIM)libc$(DELIM)libc$(LIBEXT): pass2dep
-	$(Q) $(MAKE) -C libs$(DELIM)libc libc$(LIBEXT) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
 else
 libs$(DELIM)libc$(DELIM)libc$(LIBEXT): pass1dep
-	$(Q) $(MAKE) -C libs$(DELIM)libc libc$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
 endif
+	$(Q) $(MAKE) -C libs$(DELIM)libc libc$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
 
 staging$(DELIM)libc$(LIBEXT): libs$(DELIM)libc$(DELIM)libc$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
@@ -205,22 +204,16 @@ staging$(DELIM)libnx$(LIBEXT): libs$(DELIM)libnx$(DELIM)libnx$(LIBEXT)
 
 ifeq ($(CONFIG_BUILD_FLAT),y)
 mm$(DELIM)libmm$(LIBEXT): pass2dep
-	$(Q) $(MAKE) -C mm libmm$(LIBEXT) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
 else
 mm$(DELIM)libmm$(LIBEXT): pass1dep
-	$(Q) $(MAKE) -C mm libmm$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
 endif
+	$(Q) $(MAKE) -C mm libmm$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
 
 staging$(DELIM)libmm$(LIBEXT): mm$(DELIM)libmm$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
 
-ifeq ($(CONFIG_BUILD_FLAT),y)
-libs$(DELIM)libxx$(DELIM)libxx$(LIBEXT): pass2dep
-	$(Q) $(MAKE) -C libs$(DELIM)libxx libxx$(LIBEXT) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
-else
 libs$(DELIM)libxx$(DELIM)libxx$(LIBEXT): pass1dep
 	$(Q) $(MAKE) -C libs$(DELIM)libxx libxx$(LIBEXT) EXTRAFLAGS="$(EXTRAFLAGS)"
-endif
 
 staging$(DELIM)libxx$(LIBEXT): libs$(DELIM)libxx$(DELIM)libxx$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
@@ -233,11 +226,10 @@ staging$(DELIM)libdsp$(LIBEXT): libs$(DELIM)libdsp$(DELIM)libdsp$(LIBEXT)
 
 ifeq ($(CONFIG_BUILD_FLAT),y)
 $(APPDIR)$(DELIM)libapps$(LIBEXT): pass2dep
-	$(Q) $(MAKE) -C $(APPDIR) EXTRAFLAGS="$(KDEFINE) $(EXTRAFLAGS)"
 else
 $(APPDIR)$(DELIM)libapps$(LIBEXT): pass1dep
-	$(Q) $(MAKE) -C $(APPDIR) EXTRAFLAGS="$(EXTRAFLAGS)"
 endif
+	$(Q) $(MAKE) -C $(APPDIR) EXTRAFLAGS="$(EXTRAFLAGS)"
 
 staging$(DELIM)libapps$(LIBEXT): $(APPDIR)$(DELIM)libapps$(LIBEXT)
 	$(Q) $(call INSTALL_LIB,$<,$@)
