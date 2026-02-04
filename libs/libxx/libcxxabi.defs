@@ -28,6 +28,7 @@ libcxxabi-$(LIBCXXABI_VERSION).src.tar.xz:
 	$(call DOWNLOAD,https://github.com/llvm/llvm-project/releases/download/llvmorg-$(LIBCXXABI_VERSION),libcxxabi-$(LIBCXXABI_VERSION).src.tar.xz)
 
 libcxxabi: libcxxabi-$(LIBCXXABI_VERSION).src.tar.xz
+	$(Q) flock libcxxabi.lock stat libcxxabi-$(LIBCXXABI_VERSION).src.tar.xz > /dev/null 2>&1
 	$(Q) tar -xf libcxxabi-$(LIBCXXABI_VERSION).src.tar.xz
 	$(Q) mv libcxxabi-$(LIBCXXABI_VERSION).src libcxxabi
 	$(Q) patch -p0 < 0001-libcxxabi-Fix-build-warnings-generated-by-CMake-comp.patch
@@ -44,6 +45,7 @@ context:: $(TOPDIR)/include/libcxxabi
 distclean::
 	$(Q) $(DIRUNLINK) $(TOPDIR)/include/libcxxabi
 ifeq ($(wildcard libcxxabi/.git),)
+	$(Q) $(DELFILE) libcxxabi.lock
 	$(Q) $(DELFILE) libcxxabi-$(LIBCXX_VERSION).src.tar.xz
 	$(call DELDIR, libcxxabi)
 endif

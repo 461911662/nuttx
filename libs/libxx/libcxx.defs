@@ -28,6 +28,7 @@ libcxx-$(LIBCXX_VERSION).src.tar.xz:
 	$(call DOWNLOAD,https://github.com/llvm/llvm-project/releases/download/llvmorg-$(LIBCXX_VERSION),libcxx-$(LIBCXX_VERSION).src.tar.xz)
 
 libcxx: libcxx-$(LIBCXX_VERSION).src.tar.xz
+	$(Q) flock libcxx.lock stat libcxx-$(LIBCXX_VERSION).src.tar.xz > /dev/null 2>&1
 	$(Q) tar -xf libcxx-$(LIBCXX_VERSION).src.tar.xz \
 	         --exclude libcxx-$(LIBCXX_VERSION).src/test/std/pstl
 	$(Q) mv libcxx-$(LIBCXX_VERSION).src libcxx
@@ -46,6 +47,7 @@ context:: $(TOPDIR)/include/libcxx
 distclean::
 	$(Q) $(DIRUNLINK) $(TOPDIR)/include/libcxx
 ifeq ($(wildcard libcxx/.git),)
+	$(Q) $(DELFILE) libcxx.lock
 	$(Q) $(DELFILE) libcxx-$(LIBCXX_VERSION).src.tar.xz
 	$(call DELDIR, libcxx)
 endif
