@@ -56,7 +56,7 @@ int esp32s3_pwm_setup(void)
   int ret;
   struct pwm_lowerhalf_s *pwm;
 
-#ifdef CONFIG_ESP32S3_LEDC_TIM0
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC_TIM0
   pwm = esp32s3_ledc_init(0);
   if (!pwm)
     {
@@ -74,7 +74,7 @@ int esp32s3_pwm_setup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC_TIM1
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC_TIM1
   pwm = esp32s3_ledc_init(1);
   if (!pwm)
     {
@@ -92,7 +92,7 @@ int esp32s3_pwm_setup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC_TIM2
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC_TIM2
   pwm = esp32s3_ledc_init(2);
   if (!pwm)
     {
@@ -110,7 +110,7 @@ int esp32s3_pwm_setup(void)
     }
 #endif
 
-#ifdef CONFIG_ESP32S3_LEDC_TIM3
+#ifdef CONFIG_BOSS1_ESP32S3_LEDC_TIM3
   pwm = esp32s3_ledc_init(3);
   if (!pwm)
     {

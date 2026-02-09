@@ -1,5 +1,5 @@
 /****************************************************************************
- * arch/xtensa/src/esp32s3/esp32s3_ledc.c
+ * arch/xtensa/src/boss1-esp32s3/esp32s3_ledc.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -35,11 +35,13 @@
 #include "esp32s3_clockconfig.h"
 #include "esp32s3_gpio.h"
 #include "esp32s3_ledc.h"
+#include "esp32s3_pwm.h"
 
 #include "xtensa.h"
 #include "hardware/esp32s3_ledc.h"
 #include "hardware/esp32s3_system.h"
 #include "hardware/esp32s3_gpio_sigmap.h"
+#include "esp32s3_irq.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -150,13 +152,17 @@
  * Private Types
  ****************************************************************************/
 
-/* LEDC timer channel configuration */
+/* LEDC timer channel configuration (BOSS1 specific with fade support) */
 
 struct esp32s3_ledc_chan_s
 {
   const uint8_t num;                    /* Timer channel ID */
   const uint8_t pin;                    /* Timer channel GPIO pin number */
   uint16_t duty;                        /* Timer channel current duty */
+  uint16_t target_duty;                 /* Target duty for fade */
+  uint32_t duty_time;                   /* Fade time in ms */
+  bool auto_reverse;                    /* Auto reverse when fade ends */
+  bool fade_direction;                  /* Internal: current fade direction */
 };
 
 /* This structure represents the state of one LEDC timer */
@@ -172,6 +178,9 @@ struct esp32s3_ledc_s
 
   uint32_t frequency;                   /* Timer current frequency */
   uint32_t reload;                      /* Timer current reload */
+
+  /* Interrupt data */
+  int8_t cpuint;                        /* Allocated CPU interrupt number, -1 if not allocated */
 };
 
 /****************************************************************************
@@ -185,6 +194,7 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
 static int pwm_stop(struct pwm_lowerhalf_s *dev);
 static int pwm_ioctl(struct pwm_lowerhalf_s *dev, int cmd,
                      unsigned long arg);
+static int ledc_chan_irqhandler(int irq, FAR void *context, FAR void *arg);
 
 /****************************************************************************
  * Private Data
@@ -256,7 +266,8 @@ static struct esp32s3_ledc_s g_pwm0dev =
   .ops         = &g_pwmops,
   .num         = 0,
   .channels    = LEDC_TIM0_CHANS,
-  .chans       = &g_ledc_chans[LEDC_TIM0_CHANS_OFF]
+  .chans       = &g_ledc_chans[LEDC_TIM0_CHANS_OFF],
+  .cpuint      = -1
 };
 #endif /* CONFIG_BOSS1_ESP32S3_LEDC_TIM0 */
 
@@ -268,7 +279,8 @@ static struct esp32s3_ledc_s g_pwm1dev =
   .ops         = &g_pwmops,
   .num         = 1,
   .channels    = LEDC_TIM1_CHANS,
-  .chans       = &g_ledc_chans[LEDC_TIM1_CHANS_OFF]
+  .chans       = &g_ledc_chans[LEDC_TIM1_CHANS_OFF],
+  .cpuint      = -1
 };
 #endif /* CONFIG_BOSS1_ESP32S3_LEDC_TIM1 */
 
@@ -280,7 +292,8 @@ static struct esp32s3_ledc_s g_pwm2dev =
   .ops         = &g_pwmops,
   .num         = 2,
   .channels    = LEDC_TIM2_CHANS,
-  .chans       = &g_ledc_chans[LEDC_TIM2_CHANS_OFF]
+  .chans       = &g_ledc_chans[LEDC_TIM2_CHANS_OFF],
+  .cpuint      = -1
 };
 #endif /* CONFIG_BOSS1_ESP32S3_LEDC_TIM2 */
 
@@ -292,7 +305,8 @@ static struct esp32s3_ledc_s g_pwm3dev =
   .ops         = &g_pwmops,
   .num         = 3,
   .channels    = LEDC_TIM3_CHANS,
-  .chans       = &g_ledc_chans[LEDC_TIM3_CHANS_OFF]
+  .chans       = &g_ledc_chans[LEDC_TIM3_CHANS_OFF],
+  .cpuint      = -1
 };
 #endif /* CONFIG_BOSS1_ESP32S3_LEDC_TIM3 */
 
@@ -625,6 +639,9 @@ static int pwm_setup(struct pwm_lowerhalf_s *dev)
 
   ledc_enable_clk();
 
+  /* Initialize cpuint to -1 (not allocated) */
+  priv->cpuint = -1;
+
   /* Setup channel GPIO pins */
 
   for (int i = 0; i < priv->channels; i++)
@@ -636,6 +653,11 @@ static int pwm_setup(struct pwm_lowerhalf_s *dev)
       esp32s3_gpio_matrix_out(priv->chans[i].pin,
                               LEDC_LS_SIG_OUT0_IDX + priv->chans[i].num,
                               0, 0);
+
+      /* Initialize fade state */
+      priv->chans[i].auto_reverse = false;
+      priv->chans[i].target_duty = 0;
+      priv->chans[i].duty_time = 0;
     }
 
   return 0;
@@ -677,6 +699,18 @@ static int pwm_shutdown(struct pwm_lowerhalf_s *dev)
   for (int i = 0; i < channels; i++)
     {
       priv->chans[i].duty = 0;
+      priv->chans[i].auto_reverse = false;
+      priv->chans[i].target_duty = 0;
+      priv->chans[i].duty_time = 0;
+    }
+
+  /* Detach and free LEDC interrupt */
+  if (priv->cpuint >= 0)
+    {
+      irq_detach(BOSS1_ESP32S3_IRQ_LEDC);
+      esp32s3_teardown_irq(0, BOSS1_ESP32S3_PERIPH_LEDC, priv->cpuint);
+      priv->cpuint = -1;
+      pwminfo("LEDC interrupt detached and freed\n");
     }
 
   ledc_disable_clk();
@@ -711,13 +745,16 @@ static int pwm_start(struct pwm_lowerhalf_s *dev,
 
   pwminfo("PWM timer%d\n", priv->num);
 
-  /* Update timer with given PWM timer frequency */
+   /* Update timer with given PWM timer frequency */
 
-  if (priv->frequency != info->frequency)
-    {
-      priv->frequency = info->frequency;
-      setup_timer(priv);
-    }
+   pwminfo("freq: info=%u priv=%u\n", info->frequency, priv->frequency);
+
+   if (priv->frequency != info->frequency)
+     {
+       pwminfo("Calling setup_timer\n");
+       priv->frequency = info->frequency;
+       setup_timer(priv);
+     }
 
   /* Update timer with given PWM channel duty */
 
@@ -795,13 +832,171 @@ static int pwm_stop(struct pwm_lowerhalf_s *dev)
 static int pwm_ioctl(struct pwm_lowerhalf_s *dev, int cmd,
                      unsigned long arg)
 {
-#ifdef CONFIG_DEBUG_PWM_INFO
   struct esp32s3_ledc_s *priv = (struct esp32s3_ledc_s *)dev;
+  irqstate_t flags;
+  int ret = OK;
 
-  pwminfo("PWM timer%d\n", priv->num);
-#endif
+  pwminfo("PWM timer%d cmd=%d\n", priv->num, cmd);
 
-  return -ENOTTY;
+  switch (cmd)
+    {
+      /* PWMIOC_START_FADE - Start fade on the channel */
+
+      case PWMIOC_START_FADE:
+        {
+          struct pwm_fade_s *fade = (struct pwm_fade_s *)arg;
+          uint8_t ch = fade->channel;
+
+          if (ch >= priv->channels)
+            {
+              pwmerr("ERROR: Invalid channel %d\n", ch);
+              return -EINVAL;
+            }
+
+          struct esp32s3_ledc_chan_s *chan = &priv->chans[ch];
+
+          pwminfo("START_FADE: ch=%u, auto_rev=%d\n",
+                  ch, fade->auto_reverse);
+          pwminfo("  target_duty=%u, duty_time=%u\n",
+                  (unsigned)fade->target_duty, (unsigned)fade->duty_time);
+
+          flags = enter_critical_section();
+
+          chan->auto_reverse = fade->auto_reverse;
+          chan->duty_time = fade->duty_time;
+
+          uint32_t current_reg = getreg32(LEDC_CHAN_REG(LEDC_CH0_DUTY_R_REG, ch)) >> 4;
+          uint32_t target_reg = b16toi(fade->target_duty * priv->reload + b16HALF);
+          bool fade_inc = (target_reg > current_reg);
+          chan->fade_direction = fade_inc;
+          chan->target_duty = target_reg;
+
+          // sync current_reg -> duty_reg
+          SET_CHAN_REG(chan, LEDC_CH0_DUTY_REG, current_reg << 4);
+          SET_CHAN_BITS(chan, LEDC_CH0_CONF0_REG, LEDC_PARA_UP_CH0);
+
+          uint32_t duty_change = (fade_inc ?
+            (target_reg - current_reg) :
+            (current_reg - target_reg));
+
+          uint32_t num;
+          uint32_t scale;
+          uint32_t cycle;
+
+          if (duty_change == 0)
+            {
+              num = 1;
+              scale = 1;
+              cycle = 1;
+            }
+          else if (chan->duty_time >= duty_change)
+            {
+              num = duty_change;
+              scale = 1;
+              cycle = chan->duty_time / duty_change;
+            }
+          else
+            {
+              num = chan->duty_time;
+              scale = duty_change / chan->duty_time;
+              cycle = 1;
+            }
+
+          pwminfo("START_FADE: ch=%u dir=%s change=%u n=%u s=%u c=%u\n",
+                  ch, fade_inc ? "RISE" : "FALL",
+                  (unsigned)duty_change, (unsigned)num, (unsigned)scale, (unsigned)cycle);
+
+          SET_CHAN_REG(chan, LEDC_CH0_CONF1_REG, 0);
+
+          uint32_t conf1_reg = LEDC_DUTY_START_CH0 |
+                                (fade_inc ? LEDC_DUTY_INC_CH0 : 0) |
+                                (num << LEDC_DUTY_NUM_CH0_S) |
+                                (cycle << LEDC_DUTY_CYCLE_CH0_S) |
+                                (scale << LEDC_DUTY_SCALE_CH0_S);
+
+          SET_CHAN_REG(chan, LEDC_CH0_CONF1_REG, conf1_reg);
+          SET_CHAN_BITS(chan, LEDC_CH0_CONF0_REG, LEDC_PARA_UP_CH0);
+
+           /* Install interrupt handler and enable if auto_reverse is enabled */
+           if (fade->auto_reverse && priv->cpuint < 0)
+             {
+               /* Allocate CPU interrupt */
+               int cpuint = esp32s3_setup_irq(0, BOSS1_ESP32S3_PERIPH_LEDC, 1,
+                                             BOSS1_ESP32S3_CPUINT_FLAG_IRAM);
+               if (cpuint < 0)
+                 {
+                   pwmerr("ERROR: Failed to setup LEDC IRQ: %d\n", cpuint);
+                   leave_critical_section(flags);
+                   return cpuint;
+                 }
+
+               priv->cpuint = cpuint;
+
+               /* Attach interrupt handler */
+               ret = irq_attach(BOSS1_ESP32S3_IRQ_LEDC, ledc_chan_irqhandler, priv);
+               if (ret < 0)
+                 {
+                   pwmerr("ERROR: Failed to attach LEDC IRQ: %d\n", ret);
+                   esp32s3_teardown_irq(0, BOSS1_ESP32S3_PERIPH_LEDC, priv->cpuint);
+                   priv->cpuint = -1;
+                   leave_critical_section(flags);
+                   return ret;
+                 }
+
+               /* Clear interrupt flag for this channel */
+               setbits(LEDC_DUTY_CHNG_END_CH0_INT_CLR << ch, LEDC_INT_CLR_REG);
+
+               /* Enable CPU interrupt */
+               up_enable_irq(BOSS1_ESP32S3_IRQ_LEDC);
+
+               /* Enable LEDC hardware interrupt for this channel */
+               uint32_t int_ena = getreg32(LEDC_INT_ENA_REG);
+               int_ena |= (LEDC_DUTY_CHNG_END_CH0_INT_ENA << ch);
+               putreg32(int_ena, LEDC_INT_ENA_REG);
+             }
+
+           leave_critical_section(flags);
+         }
+         break;
+
+      /* PWMIOC_STOP_FADE - Disable interrupt, detach, and stop fade */
+
+      case PWMIOC_STOP_FADE:
+        {
+          uint8_t ch = (uint8_t)arg;
+
+          if (ch >= priv->channels)
+            {
+              pwmerr("ERROR: Invalid channel %d\n", ch);
+              return -EINVAL;
+            }
+
+          pwminfo("STOP_FADE: ch=%d\n", ch);
+
+          SET_CHAN_REG(&priv->chans[ch], LEDC_CH0_CONF1_REG, 0);
+
+          SET_CHAN_BITS(&priv->chans[ch], LEDC_CH0_CONF0_REG, LEDC_PARA_UP_CH0);
+
+          priv->chans[ch].auto_reverse = false;
+          priv->chans[ch].target_duty = 0;
+          priv->chans[ch].duty_time = 0;
+
+          /* Detach and free interrupt if previously allocated */
+          if (priv->cpuint >= 0)
+            {
+              irq_detach(BOSS1_ESP32S3_IRQ_LEDC);
+              esp32s3_teardown_irq(0, BOSS1_ESP32S3_PERIPH_LEDC, priv->cpuint);
+              priv->cpuint = -1;
+            }
+        }
+        break;
+
+      default:
+        ret = -ENOTTY;
+        break;
+    }
+
+  return ret;
 }
 
 /****************************************************************************
@@ -862,4 +1057,103 @@ struct pwm_lowerhalf_s *esp32s3_ledc_init(int timer)
     }
 
   return (struct pwm_lowerhalf_s *)lower;
+}
+
+/****************************************************************************
+ * Name: ledc_chan_irqhandler
+ *
+ * Description:
+ *   LEDC channel interrupt handler for duty change end.
+ *   Handles auto-reverse functionality when fade completes.
+ *
+ ****************************************************************************/
+
+static int IRAM_ATTR ledc_chan_irqhandler(int irq, FAR void *context, FAR void *arg)
+{
+  struct esp32s3_ledc_s *priv = (struct esp32s3_ledc_s *)arg;
+  if (priv == NULL) {
+    pwmerr("ERROR: LEDC IRQ handler called with NULL arg\n");
+    return 0;
+  }
+
+  /* Read masked interrupt status */
+  uint32_t int_st = getreg32(LEDC_INT_ST_REG);
+
+  if (int_st == 0) {
+    return 0;
+  }
+
+  // pwminfo("LEDC int_st=0x%08x\n", int_st);
+
+  for (int ch = 0; ch < priv->channels; ch++)
+    {
+      /* Check if this channel triggered DUTY_CHNG_END interrupt */
+      if ((int_st & (LEDC_DUTY_CHNG_END_CH0_INT_ST << ch)) == 0)
+        {
+          continue;
+        }
+
+      struct esp32s3_ledc_chan_s *chan = &priv->chans[ch];
+      SET_CHAN_REG(chan, LEDC_CH0_CONF1_REG, 0);
+
+      // pwminfo("IRQ: ch=%d auto_rev=%d\n", ch, chan->auto_reverse);
+
+      if (chan->auto_reverse)
+        {
+          uint32_t current_reg = getreg32(LEDC_CHAN_REG(LEDC_CH0_DUTY_R_REG, ch)) >> 4;
+          uint32_t target_reg = chan->fade_direction ? 0 :
+            b16toi(chan->target_duty * priv->reload + b16HALF);
+          chan->fade_direction = !chan->fade_direction;
+
+          // pwminfo("AUTO_REVERSE: %s -> %s cur=%u tgt=%u\n",
+          //        chan->fade_direction ? "FALL" : "RISE",
+          //        chan->fade_direction ? "RISE" : "FALL",
+          //        (unsigned)current_reg, (unsigned)target_reg);
+
+          SET_CHAN_REG(chan, LEDC_CH0_DUTY_REG, current_reg << 4);
+          SET_CHAN_BITS(chan, LEDC_CH0_CONF0_REG, LEDC_PARA_UP_CH0);
+
+          uint32_t duty_change = (target_reg > current_reg) ?
+            (target_reg - current_reg) : (current_reg - target_reg);
+
+          uint32_t num;
+          uint32_t scale;
+          uint32_t cycle;
+
+          if (duty_change == 0)
+            {
+              num = 1;
+              scale = 1;
+              cycle = 1;
+            }
+          else if (chan->duty_time >= duty_change)
+            {
+              num = duty_change;
+              scale = 1;
+              cycle = chan->duty_time / duty_change;
+            }
+          else
+            {
+              num = chan->duty_time;
+              scale = duty_change / chan->duty_time;
+              cycle = 1;
+            }
+
+          //  pwminfo("AUTO_REVERSE: n=%u s=%u c=%u\n",
+          //         (unsigned)num, (unsigned)scale, (unsigned)cycle);
+
+          uint32_t conf1_reg = LEDC_DUTY_START_CH0 |
+                                (chan->fade_direction ? LEDC_DUTY_INC_CH0 : 0) |
+                                (num << LEDC_DUTY_NUM_CH0_S) |
+                                (cycle << LEDC_DUTY_CYCLE_CH0_S) |
+                                (scale << LEDC_DUTY_SCALE_CH0_S);
+
+          SET_CHAN_REG(chan, LEDC_CH0_CONF1_REG, conf1_reg);
+          SET_CHAN_BITS(chan, LEDC_CH0_CONF0_REG, LEDC_PARA_UP_CH0);
+        }
+      /* Clear interrupt flag for this channel */
+      setbits(LEDC_DUTY_CHNG_END_CH0_INT_CLR << ch, LEDC_INT_CLR_REG);
+    }
+
+  return 0;
 }
