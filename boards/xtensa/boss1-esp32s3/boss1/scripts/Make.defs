@@ -48,6 +48,10 @@ ifneq ($(CONFIG_DEBUG_NOOPT),y)
   ARCHOPTIMIZATION += -fno-strength-reduce
 endif
 
+ifeq ($(CONFIG_ARCH_INSTRUMENT_ALL),y)
+  ARCHOPTIMIZATION += -finstrument-functions-exclude-file-list=libcxx
+endif
+
 ARCHPICFLAGS = -fpic
 
 CFLAGS := $(ARCHCFLAGS) $(ARCHOPTIMIZATION) $(ARCHCPUFLAGS) $(ARCHINCLUDES) $(ARCHDEFINES) $(EXTRAFLAGS)
