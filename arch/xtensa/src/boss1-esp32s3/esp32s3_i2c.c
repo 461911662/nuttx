@@ -1015,7 +1015,27 @@ static int i2c_transfer(struct i2c_master_s *dev, struct i2c_msg_s *msgs,
 
       i2c_init_clock(priv, msgs[i].frequency);
 
-      if ((msgs[i].flags & I2C_M_NOSTART) != 0)
+      if (msgs[i].length == 0)
+        {
+          /* Zero-byte transfer for device detection (I2C scan).
+           * Send START + address only, wait for ACK/NACK.
+           * No data phase, just detect if device exists.
+           *
+           * NOTE: This code path is only for interrupt mode.
+           * Polling mode is not supported yet because it requires
+           * different handling in i2c_polling_waitdone() to properly
+           * detect ACK/NACK for zero-byte transfers.
+           *
+           * TODO: Add polling mode support for zero-byte transfers.
+           */
+
+          i2c_tracereset(priv);
+          i2c_traceevent(priv, I2CEVENT_SENDADDR, msgs[i].addr,
+                         getreg32(I2C_SR_REG(priv->id)));
+          i2c_sendstart(priv);
+          priv->i2cstate = I2CSTATE_STOP;
+        }
+      else if ((msgs[i].flags & I2C_M_NOSTART) != 0)
         {
           i2c_traceevent(priv, I2CEVENT_SENDBYTE, priv->bytes,
                          getreg32(I2C_SR_REG(priv->id)));
