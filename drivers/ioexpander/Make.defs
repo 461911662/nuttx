@@ -48,6 +48,10 @@ ifeq ($(CONFIG_IOEXPANDER_PCA9555),y)
   CSRCS += pca9555.c
 endif
 
+ifeq ($(CONFIG_IOEXPANDER_XL9555),y)
+  CSRCS += xl9555.c
+endif
+
 ifeq ($(CONFIG_IOEXPANDER_PCA9538),y)
   CSRCS += pca9538.c
 endif

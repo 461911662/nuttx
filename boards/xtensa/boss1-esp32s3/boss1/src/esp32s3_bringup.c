@@ -326,6 +326,14 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_BOSS1_ESP32S3_XL9555
+  ret = esp32s3_xl9555_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "Failed to initialize XL9555: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_SENSORS_BMP180
   /* Try to register BMP180 device in I2C0 */
 

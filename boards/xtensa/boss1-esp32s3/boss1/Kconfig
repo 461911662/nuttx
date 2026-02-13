@@ -220,4 +220,111 @@ config PM_SLEEP_WAKEUP_NSEC
 
 endif # PM
 
+config BOSS1_ESP32S3_XL9555
+    bool "XL9555 IO Expander support"
+    default n
+    depends on BOSS1_ESP32S3_I2C && BOSS1_ESP32S3_GPIO_IRQ
+    select IOEXPANDER_XL9555
+    ---help---
+        Enable XL9555 IO Expander on BOSS1 board.
+
+if BOSS1_ESP32S3_XL9555
+
+choice BOSS1_ESP32S3_XL9555_I2C_PORT
+    prompt "I2C port"
+    default BOSS1_ESP32S3_XL9555_I2C0
+
+config BOSS1_ESP32S3_XL9555_I2C0
+    bool "I2C0"
+
+config BOSS1_ESP32S3_XL9555_I2C1
+    bool "I2C1"
+endchoice
+
+config BOSS1_ESP32S3_XL9555_IRQ_PIN
+    int "Interrupt GPIO pin (-1 to disable)"
+    default -1
+    range -1 48
+    ---help---
+        GPIO pin for XL9555 interrupt (-1 to disable interrupt mode).
+
+choice BOSS1_ESP32S3_XL9555_IRQ_TYPE
+    prompt "Interrupt trigger type"
+    depends on BOSS1_ESP32S3_XL9555_IRQ_PIN >= 0
+    default BOSS1_ESP32S3_XL9555_IRQ_FALLING
+
+config BOSS1_ESP32S3_XL9555_IRQ_RISING
+    bool "Rising edge"
+
+config BOSS1_ESP32S3_XL9555_IRQ_FALLING
+    bool "Falling edge"
+
+config BOSS1_ESP32S3_XL9555_IRQ_CHANGE
+    bool "Both edges"
+
+config BOSS1_ESP32S3_XL9555_IRQ_LOW
+    bool "Low level"
+
+config BOSS1_ESP32S3_XL9555_IRQ_HIGH
+    bool "High level"
+endchoice
+
+config BOSS1_ESP32S3_XL9555_ADDRESS
+    hex "XL9555 I2C address"
+    default 0x20
+    range 0x08 0x77
+    ---help---
+        I2C address of XL9555 (0x08 - 0x77).
+        The address is determined by A0, A1, A2 pins.
+        Common values: 0x20-0x27 based on pin configuration.
+
+config BOSS1_ESP32S3_XL9555_FREQUENCY
+    int "XL9555 I2C frequency (Hz)"
+    default 400000
+    range 100000 1000000
+    ---help---
+        I2C bus frequency for XL9555 communication.
+        Typical values: 100000 (100kHz) or 400000 (400kHz).
+
+if BOSS1_ESP32S3_XL9555_IRQ_PIN >= 0
+
+config BOSS1_ESP32S3_XL9555_INT_ENABLE
+    bool "Enable XL9555 interrupt support"
+    default y
+    ---help---
+        Enable interrupt support for XL9555.
+
+if BOSS1_ESP32S3_XL9555_INT_ENABLE
+
+config BOSS1_ESP32S3_XL9555_INT_NCALLBACKS
+    int "Number of interrupt callbacks"
+    default 4
+    range 1 8
+    ---help---
+        Maximum number of interrupt callbacks that can be registered.
+
+choice BOSS1_ESP32S3_XL9555_INT_WORK
+    prompt "Interrupt work queue"
+    default BOSS1_ESP32S3_XL9555_INT_HPWORK
+
+config BOSS1_ESP32S3_XL9555_INT_HPWORK
+    bool "High priority work queue"
+
+config BOSS1_ESP32S3_XL9555_INT_LPWORK
+    bool "Low priority work queue"
+
+endchoice
+
+endif # BOSS1_ESP32S3_XL9555_INT_ENABLE
+
+endif # BOSS1_ESP32S3_XL9555_IRQ_PIN >= 0
+
+config BOSS1_ESP32S3_XL9555_CHARDEV
+    bool "Enable XL9555 character device"
+    default n
+    ---help---
+        Register a character device (/dev/xl95550) for user-space access to XL9555 IO expander.
+
+endif
+
 endif # ESP32S3_BOSS1_V1_0_0

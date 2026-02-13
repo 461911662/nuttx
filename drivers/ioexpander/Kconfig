@@ -419,6 +419,40 @@ config PCF8575_MULTIPLE
 
 endif # IOEXPANDER_PCF8575
 
+config IOEXPANDER_XL9555
+    bool "XL9555 I2C IO expander"
+    default n
+    depends on I2C
+    ---help---
+        Enable support for the XL9555 IO Expander
+        (16-bit I2C I/O expander with interrupt)
+
+if IOEXPANDER_XL9555
+
+config XL9555_MULTIPLE
+    bool "Multiple XL9555 Devices"
+    default n
+    ---help---
+        Can be defined to support multiple XL9555 devices.
+
+config XL9555_SHADOW_MODE
+    bool "Use Shadow Mode instead of Read-Modify-Write Operations"
+    default n
+    ---help---
+        This setting enables a mode where the output and pin
+        configuration registers are held in RAM.
+        With this we do not need to read back the output register
+        every time we want to change one pin.
+
+config XL9555_RETRY
+    bool "Retry to send commands and data at I2C communication errors"
+    default n
+    ---help---
+        Retry to send commands and data if a I2C-communication
+        error occurs (eg. caused by EMC).
+
+endif # IOEXPANDER_XL9555
+
 config IOEXPANDER_SX1509
 	bool "SX1509 I2C IO expander"
 	default n

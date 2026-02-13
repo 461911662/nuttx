@@ -61,6 +61,10 @@ ifeq ($(CONFIG_START_APP_BY_CPU),y)
 CSRCS += esp32s3_start_app.c
 endif
 
+ifeq ($(CONFIG_BOSS1_ESP32S3_XL9555),y)
+CSRCS += esp32s3_xl9555.c
+endif
+
 DEPPATH += --dep-path board
 VPATH += :board
 CFLAGS += ${INCDIR_PREFIX}$(TOPDIR)$(DELIM)arch$(DELIM)$(CONFIG_ARCH)$(DELIM)src$(DELIM)board$(DELIM)board

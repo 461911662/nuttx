@@ -54,6 +54,10 @@ if(CONFIG_IOEXPANDER)
     list(APPEND SRCS pcf8575.c)
   endif()
 
+  if(CONFIG_IOEXPANDER_XL9555)
+    list(APPEND SRCS xl9555.c)
+  endif()
+
   if(CONFIG_IOEXPANDER_MCP23X17)
     list(APPEND SRCS mcp23x17.c)
   endif()

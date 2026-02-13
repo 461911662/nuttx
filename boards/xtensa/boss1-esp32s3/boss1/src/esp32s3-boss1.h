@@ -167,6 +167,24 @@ int board_bmp180_initialize(int devno, int busno);
 #endif
 
 /****************************************************************************
+ * Name: esp32s3_xl9555_initialize
+ *
+ * Description:
+ *   Initialize and register the XL9555 I/O expander driver.
+ *   This function configures the XL9555 16-bit I2C I/O expander,
+ *   sets up GPIO interrupts, and optionally registers a character device.
+ *
+ * Returned Value:
+ *   Zero (OK) is returned on success; A negated errno value is returned
+ *   to indicate the nature of any failure.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_BOSS1_ESP32S3_XL9555
+int esp32s3_xl9555_initialize(void);
+#endif
+
+/****************************************************************************
  * Name: board_i2sdev_initialize
  *
  * Description:

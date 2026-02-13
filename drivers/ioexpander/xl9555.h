@@ -1,5 +1,5 @@
 /****************************************************************************
- * boards/xtensa/esp32s3/common/src/esp32s3_board_i2c.c
+ * drivers/ioexpander/xl9555.h
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -18,76 +18,53 @@
  *
  ****************************************************************************/
 
+#ifndef __DRIVERS_IOEXPANDER_XL9555_H
+#define __DRIVERS_IOEXPANDER_XL9555_H
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
 
-#include <debug.h>
-#include <errno.h>
-#include <sys/types.h>
+#if defined(CONFIG_IOEXPANDER) && defined(CONFIG_IOEXPANDER_XL9555)
 
+#include <nuttx/irq.h>
 #include <nuttx/i2c/i2c_master.h>
-
-#include "esp32s3_i2c.h"
-
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
-
-static int i2c_driver_init(int bus)
-{
-  struct i2c_master_s *i2c;
-  int ret;
-
-  i2c = esp32s3_i2cbus_initialize(bus);
-  if (i2c == NULL)
-    {
-      i2cerr("Failed to get I2C%d interface\n", bus);
-      return -ENODEV;
-    }
-
-  ret = i2c_register(i2c, bus);
-  if (ret < 0)
-    {
-      i2cerr("Failed to register I2C%d driver: %d\n", bus, ret);
-      esp32s3_i2cbus_uninitialize(i2c);
-    }
-
-  return ret;
-}
+#include <nuttx/ioexpander/ioexpander.h>
+#include <nuttx/kmalloc.h>
+#include <nuttx/mutex.h>
 
 /****************************************************************************
- * Name: board_i2c_init
- *
- * Description:
- *   Configure the I2C driver.
- *
- * Returned Value:
- *   Zero (OK) is returned on success; A negated errno value is returned
- *   to indicate the nature of any failure.
- *
+ * Public Types
  ****************************************************************************/
 
-int board_i2c_init(void)
+struct xl9555_config_s
 {
-  int ret = OK;
+  uint8_t address;
+  uint32_t frequency;
+};
 
-#ifdef CONFIG_BOSS1_ESP32S3_I2C0
-  ret = i2c_driver_init(BOSS1_ESP32S3_I2C0);
-  if (ret != OK)
-    {
-      goto done;
-    }
+struct xl9555_dev_s
+{
+  struct ioexpander_dev_s      dev;
+#ifdef CONFIG_XL9555_SHADOW_MODE
+  uint8_t                      sreg[8];
 #endif
+#ifdef CONFIG_XL9555_MULTIPLE
+  FAR struct xl9555_dev_s     *flink;
+#endif
+  FAR struct xl9555_config_s  *config;
+  FAR struct i2c_master_s     *i2c;
+  mutex_t                      lock;
+};
 
-#ifdef CONFIG_BOSS1_ESP32S3_I2C1
-  ret = i2c_driver_init(BOSS1_ESP32S3_I2C1);
-#endif
+/****************************************************************************
+ * Public Function Prototypes
+ ****************************************************************************/
 
-#ifdef CONFIG_BOSS1_ESP32S3_I2C0
-done:
-#endif
-  return ret;
-}
+FAR struct xl9555_dev_s *xl9555_initialize(FAR struct i2c_master_s *dev,
+                                           FAR struct xl9555_config_s *config);
+
+#endif /* CONFIG_IOEXPANDER && CONFIG_IOEXPANDER_XL9555 */
+#endif /* __DRIVERS_IOEXPANDER_XL9555_H */
