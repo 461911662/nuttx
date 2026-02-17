@@ -7,20 +7,20 @@ if ARCH_BOARD_BOSS1_ESP32S3
 
 choice
 	prompt "ESP32-S3-Boss1 v1.0 version"
-	default ESP32S3_BOSS1_V1_0
+	default ESP32S3_BOSS1_V1_0_0
 
-config ESP32S3_BOSS1_V1_0
-	bool "ESP32-S3-Boss1 v1.0"
-	depends on ARCH_CHIP_BOSS1_ESP32S3WROOM1N4 || ARCH_CHIP_BOSS1_ESP32S3MINI1N8 || ARCH_CHIP_BOSS1_ESP32S3WROOM2N16R8V || ARCH_CHIP_BOSS1_ESP32S3WROOM2N32R8V || ARCH_CHIP_BOSS1_ESP32S3CUSTOM
-	select ARCH_HAVE_LEDS
-	select ARCH_HAVE_BUTTONS
-	select ARCH_HAVE_IRQBUTTONS if BOSS1_ESP32S3_GPIO_IRQ
-	---help---
-                The ESP32-S3 DevKit features the ESP32-S3 CPU with dual Xtensa LX7 cores.
-                It comes in two flavors, the ESP32-S3-DevKitM-1 and the ESP32-S3-DevKitC-1.
-                The ESP32-S3-DevKitM-1 version contains the ESP32-S3-MINI-1/1U module and the
-                ESP32-S3-DevKitC-1 version may be based either on ESP32-S3-WROOM-1/1U or
-                ESP32-S3-WROOM-2/2U.
+# config ESP32S3_BOSS1_V1_0
+# 	bool "ESP32-S3-Boss1 v1.0"
+# 	depends on ARCH_CHIP_BOSS1_ESP32S3WROOM1N4 || ARCH_CHIP_BOSS1_ESP32S3MINI1N8 || ARCH_CHIP_BOSS1_ESP32S3WROOM2N16R8V || ARCH_CHIP_BOSS1_ESP32S3WROOM2N32R8V || ARCH_CHIP_BOSS1_ESP32S3CUSTOM
+# 	select ARCH_HAVE_LEDS
+# 	select ARCH_HAVE_BUTTONS
+# 	select ARCH_HAVE_IRQBUTTONS if BOSS1_ESP32S3_GPIO_IRQ
+# 	---help---
+#                 The ESP32-S3 DevKit features the ESP32-S3 CPU with dual Xtensa LX7 cores.
+#                 It comes in two flavors, the ESP32-S3-DevKitM-1 and the ESP32-S3-DevKitC-1.
+#                 The ESP32-S3-DevKitM-1 version contains the ESP32-S3-MINI-1/1U module and the
+#                 ESP32-S3-DevKitC-1 version may be based either on ESP32-S3-WROOM-1/1U or
+#                 ESP32-S3-WROOM-2/2U.
 
 config ESP32S3_BOSS1_V1_0_0
 	bool "ESP32-S3-Boss1 v1.0.0"
@@ -39,156 +39,156 @@ endchoice
 endif #ARCH_BOARD_BOSS1_ESP32S3
 
 
-if ESP32S3_BOSS1_V1_0
+# if ESP32S3_BOSS1_V1_0
 
-config BOSS1_ESP32S3_STORAGE_MTD_OFFSET
-	hex "Storage MTD base address in SPI Flash"
-	default 0x180000 if !ESP32S3_HAVE_OTA_PARTITION
-	default 0x250000 if ESP32S3_HAVE_OTA_PARTITION
-	depends on ESP32S3_MTD
-	---help---
-		MTD base address in SPI Flash.
+# config BOSS1_ESP32S3_STORAGE_MTD_OFFSET
+# 	hex "Storage MTD base address in SPI Flash"
+# 	default 0x180000 if !ESP32S3_HAVE_OTA_PARTITION
+# 	default 0x250000 if ESP32S3_HAVE_OTA_PARTITION
+# 	depends on ESP32S3_MTD
+# 	---help---
+# 		MTD base address in SPI Flash.
 
-config BOSS1_ESP32S3_STORAGE_MTD_SIZE
-	hex "Storage MTD size in SPI Flash"
-	default 0x100000
-	range 0x0 0x400000 if ESP32S3_FLASH_4M
-	range 0x0 0x800000 if ESP32S3_FLASH_8M
-	range 0x0 0x1000000 if ESP32S3_FLASH_16M
-	range 0x0 0x2000000 if ESP32S3_FLASH_32M
-	depends on ESP32S3_MTD
-	---help---
-		MTD size in SPI Flash.
+# config BOSS1_ESP32S3_STORAGE_MTD_SIZE
+# 	hex "Storage MTD size in SPI Flash"
+# 	default 0x100000
+# 	range 0x0 0x400000 if ESP32S3_FLASH_4M
+# 	range 0x0 0x800000 if ESP32S3_FLASH_8M
+# 	range 0x0 0x1000000 if ESP32S3_FLASH_16M
+# 	range 0x0 0x2000000 if ESP32S3_FLASH_32M
+# 	depends on ESP32S3_MTD
+# 	---help---
+# 		MTD size in SPI Flash.
 
-choice BOSS1_ESP32S3_SPIFLASH_FS
-	prompt "Mount SPI Flash MTD on bring-up"
-	default BOSS1_ESP32S3_SPIFLASH_SMARTFS
-	depends on ESP32S3_MTD
-	optional
-	---help---
-		Mount the SPI Flash MTD with the selected File System format on board
-		bring-up.
-		If not selected, the MTD will be registered as a device node on /dev.
+# choice BOSS1_ESP32S3_SPIFLASH_FS
+# 	prompt "Mount SPI Flash MTD on bring-up"
+# 	default BOSS1_ESP32S3_SPIFLASH_SMARTFS
+# 	depends on ESP32S3_MTD
+# 	optional
+# 	---help---
+# 		Mount the SPI Flash MTD with the selected File System format on board
+# 		bring-up.
+# 		If not selected, the MTD will be registered as a device node on /dev.
 
-config BOSS1_ESP32S3_SPIFLASH_SMARTFS
-	bool "SmartFS"
-	select FS_SMARTFS
-	select MTD_SMART
+# config BOSS1_ESP32S3_SPIFLASH_SMARTFS
+# 	bool "SmartFS"
+# 	select FS_SMARTFS
+# 	select MTD_SMART
 
-config BOSS1_ESP32S3_SPIFLASH_NXFFS
-	bool "NXFFS"
-	select FS_NXFFS
+# config BOSS1_ESP32S3_SPIFLASH_NXFFS
+# 	bool "NXFFS"
+# 	select FS_NXFFS
 
-config BOSS1_ESP32S3_SPIFLASH_SPIFFS
-	bool "SPIFFS"
-	select FS_SPIFFS
+# config BOSS1_ESP32S3_SPIFLASH_SPIFFS
+# 	bool "SPIFFS"
+# 	select FS_SPIFFS
 
-config BOSS1_ESP32S3_SPIFLASH_LITTLEFS
-	bool "LittleFS"
-	select FS_LITTLEFS
+# config BOSS1_ESP32S3_SPIFLASH_LITTLEFS
+# 	bool "LittleFS"
+# 	select FS_LITTLEFS
 
-endchoice # BOSS1_ESP32S3_SPIFLASH_FS
+# endchoice # BOSS1_ESP32S3_SPIFLASH_FS
 
-config BOSS1_ESP32S3_SPI2_3WIRE_HALF
-	bool "ENABLE CS SCLK MOSI pin for SPI2 transport."
-	depends on ESP32S3_SPI2
-	default false
+# config BOSS1_ESP32S3_SPI2_3WIRE_HALF
+# 	bool "ENABLE CS SCLK MOSI pin for SPI2 transport."
+# 	depends on ESP32S3_SPI2
+# 	default false
 
-if PM
+# if PM
 
-config PM_ALARM_SEC
-	int "PM_STANDBY delay (seconds)"
-	default 15
-	---help---
-		Number of seconds to wait in PM_STANDBY before going to PM_STANDBY mode.
+# config PM_ALARM_SEC
+# 	int "PM_STANDBY delay (seconds)"
+# 	default 15
+# 	---help---
+# 		Number of seconds to wait in PM_STANDBY before going to PM_STANDBY mode.
 
-config PM_ALARM_NSEC
-	int "PM_STANDBY delay (nanoseconds)"
-	default 0
-	---help---
-		Number of additional nanoseconds to wait in PM_STANDBY before going to PM_STANDBY mode.
+# config PM_ALARM_NSEC
+# 	int "PM_STANDBY delay (nanoseconds)"
+# 	default 0
+# 	---help---
+# 		Number of additional nanoseconds to wait in PM_STANDBY before going to PM_STANDBY mode.
 
-config PM_SLEEP_WAKEUP_SEC
-	int "PM_SLEEP delay (seconds)"
-	default 20
-	---help---
-		Number of seconds to wait in PM_SLEEP.
+# config PM_SLEEP_WAKEUP_SEC
+# 	int "PM_SLEEP delay (seconds)"
+# 	default 20
+# 	---help---
+# 		Number of seconds to wait in PM_SLEEP.
 
-config PM_SLEEP_WAKEUP_NSEC
-	int "PM_SLEEP delay (nanoseconds)"
-	default 0
-	---help---
-		Number of additional nanoseconds to wait in PM_SLEEP.
+# config PM_SLEEP_WAKEUP_NSEC
+# 	int "PM_SLEEP delay (nanoseconds)"
+# 	default 0
+# 	---help---
+# 		Number of additional nanoseconds to wait in PM_SLEEP.
 
-endif # PM
+# endif # PM
 
-config BOSS1_ESP32S3_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE
-	bool "Skip write-protection of DIS_CACHE (DIS_ICACHE, DIS_DCACHE)"
-	default n
-	help
-		If not set (default, recommended), on the first boot the bootloader will burn the write-protection of
-		DIS_CACHE(for ESP32) or DIS_ICACHE/DIS_DCACHE(for other chips) eFuse when Flash Encryption is enabled.
-		Write protection for cache disable efuse prevents the chip from being blocked if it is set by accident.
-		App and bootloader use cache so disabling it makes the chip useless for IDF.
-		Due to other eFuses are linked with the same write protection bit (see the list below) then
-		write-protection will not be done if these SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC,
-		SECURE_BOOT_ALLOW_JTAG or SECURE_FLASH_UART_BOOTLOADER_ALLOW_CACHE options are selected
-		to give a chance to turn on the chip into the release mode later.
+# config BOSS1_ESP32S3_SECURE_FLASH_SKIP_WRITE_PROTECTION_CACHE
+# 	bool "Skip write-protection of DIS_CACHE (DIS_ICACHE, DIS_DCACHE)"
+# 	default n
+# 	help
+# 		If not set (default, recommended), on the first boot the bootloader will burn the write-protection of
+# 		DIS_CACHE(for ESP32) or DIS_ICACHE/DIS_DCACHE(for other chips) eFuse when Flash Encryption is enabled.
+# 		Write protection for cache disable efuse prevents the chip from being blocked if it is set by accident.
+# 		App and bootloader use cache so disabling it makes the chip useless for IDF.
+# 		Due to other eFuses are linked with the same write protection bit (see the list below) then
+# 		write-protection will not be done if these SECURE_FLASH_UART_BOOTLOADER_ALLOW_ENC,
+# 		SECURE_BOOT_ALLOW_JTAG or SECURE_FLASH_UART_BOOTLOADER_ALLOW_CACHE options are selected
+# 		to give a chance to turn on the chip into the release mode later.
 
-		List of eFuses with the same write protection bit:
-		ESP32-S3: DIS_ICACHE, DIS_DCACHE, DIS_DOWNLOAD_ICACHE, DIS_DOWNLOAD_DCACHE,
-		DIS_FORCE_DOWNLOAD, DIS_USB_OTG, DIS_TWAI, DIS_APP_CPU, DIS_PAD_JTAG,
-		DIS_DOWNLOAD_MANUAL_ENCRYPT, DIS_USB_JTAG, DIS_USB_SERIAL_JTAG, STRAP_JTAG_SEL, USB_PHY_SEL.
+# 		List of eFuses with the same write protection bit:
+# 		ESP32-S3: DIS_ICACHE, DIS_DCACHE, DIS_DOWNLOAD_ICACHE, DIS_DOWNLOAD_DCACHE,
+# 		DIS_FORCE_DOWNLOAD, DIS_USB_OTG, DIS_TWAI, DIS_APP_CPU, DIS_PAD_JTAG,
+# 		DIS_DOWNLOAD_MANUAL_ENCRYPT, DIS_USB_JTAG, DIS_USB_SERIAL_JTAG, STRAP_JTAG_SEL, USB_PHY_SEL.
 
-config BOSS1_ESP32S3_EFUSE_WRRD_CLOSE
-	bool "EFUSE_WR_DIS && EFUSE_RD_DIS is closed for Development."
-	default N
-	help
-		If "n" - EFUSE_WR_DIS && EFUSE_RD_DIS is permanently write to efuse.
-		If "y" - EFUSE_WR_DIS && EFUSE_RD_DIS is write to efuse. and can rewrite.
+# config BOSS1_ESP32S3_EFUSE_WRRD_CLOSE
+# 	bool "EFUSE_WR_DIS && EFUSE_RD_DIS is closed for Development."
+# 	default N
+# 	help
+# 		If "n" - EFUSE_WR_DIS && EFUSE_RD_DIS is permanently write to efuse.
+# 		If "y" - EFUSE_WR_DIS && EFUSE_RD_DIS is write to efuse. and can rewrite.
 
-		It is strick that write efuse EFUSE_WR_DIS && EFUSE_RD_DIS.
+# 		It is strick that write efuse EFUSE_WR_DIS && EFUSE_RD_DIS.
 
-config BOSS1_ESP32S3_EFUSE_VIRTUAL
-	bool "Simulate eFuse operations in RAM"
-	default n
-	help
-		If "n" - No virtual mode. All eFuse operations are real and use eFuse registers.
-		If "y" - The virtual mode is enabled and all eFuse operations (read and write) are redirected
-		to RAM instead of eFuse registers, all permanent changes (via eFuse) are disabled.
-		Log output will state changes that would be applied, but they will not be.
+# config BOSS1_ESP32S3_EFUSE_VIRTUAL
+# 	bool "Simulate eFuse operations in RAM"
+# 	default n
+# 	help
+# 		If "n" - No virtual mode. All eFuse operations are real and use eFuse registers.
+# 		If "y" - The virtual mode is enabled and all eFuse operations (read and write) are redirected
+# 		to RAM instead of eFuse registers, all permanent changes (via eFuse) are disabled.
+# 		Log output will state changes that would be applied, but they will not be.
 
-		If it is "y", then SECURE_FLASH_ENCRYPTION_MODE_RELEASE cannot be used.
-		Because the EFUSE VIRT mode is for testing only.
+# 		If it is "y", then SECURE_FLASH_ENCRYPTION_MODE_RELEASE cannot be used.
+# 		Because the EFUSE VIRT mode is for testing only.
 
-		During startup, the eFuses are copied into RAM. This mode is useful for fast tests.
+# 		During startup, the eFuses are copied into RAM. This mode is useful for fast tests.
 
-config BOSS1_ESP32S3_EFUSE_VIRTUAL_KEEP_IN_FLASH
-	bool "Keep eFuses in flash"
-	depends on ESP32S3_EFUSE_VIRTUAL
-	help
-		In addition to the "Simulate eFuse operations in RAM" option, this option just adds
-		a feature to keep eFuses after reboots in flash memory. To use this mode the partition_table
-		should have the `efuse` partition. partition.csv: "efuse_em, data, efuse,   ,   0x2000,"
+# config BOSS1_ESP32S3_EFUSE_VIRTUAL_KEEP_IN_FLASH
+# 	bool "Keep eFuses in flash"
+# 	depends on ESP32S3_EFUSE_VIRTUAL
+# 	help
+# 		In addition to the "Simulate eFuse operations in RAM" option, this option just adds
+# 		a feature to keep eFuses after reboots in flash memory. To use this mode the partition_table
+# 		should have the `efuse` partition. partition.csv: "efuse_em, data, efuse,   ,   0x2000,"
 
-		During startup, the eFuses are copied from flash or,
-		in case if flash is empty, from real eFuse to RAM and then update flash.
-		This mode is useful when need to keep changes after reboot
-		(testing secure_boot and flash_encryption).
+# 		During startup, the eFuses are copied from flash or,
+# 		in case if flash is empty, from real eFuse to RAM and then update flash.
+# 		This mode is useful when need to keep changes after reboot
+# 		(testing secure_boot and flash_encryption).
 
-config BOSS1_ESP32S3_EFUSE_VIRTUAL_LOG_ALL_WRITES
-	bool "Log all virtual writes"
-	depends on ESP32S3_EFUSE_VIRTUAL
-	help
-		If enabled, log efuse burns. This shows changes that would be made.
+# config BOSS1_ESP32S3_EFUSE_VIRTUAL_LOG_ALL_WRITES
+# 	bool "Log all virtual writes"
+# 	depends on ESP32S3_EFUSE_VIRTUAL
+# 	help
+# 		If enabled, log efuse burns. This shows changes that would be made.
 
-config START_APP_BY_CPU
-	bool "startup application by special process"
-	default n
-	help
-		If enable, application will startup from special process.
+# config START_APP_BY_CPU
+# 	bool "startup application by special process"
+# 	default n
+# 	help
+# 		If enable, application will startup from special process.
 
-endif # ESP32S3_BOSS1_V1_0
+# endif # ESP32S3_BOSS1_V1_0
 
 if ESP32S3_BOSS1_V1_0_0
 
