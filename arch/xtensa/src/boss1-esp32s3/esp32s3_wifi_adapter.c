@@ -127,6 +127,9 @@
 
 #define ESP_MAX_PRIORITIES (25)
 
+/* Define PHY_SIG_NO */
+#define WIFI_SIG_NO (SIGRTMIN + 10)
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -2256,7 +2259,10 @@ static void esp_evt_work_cb(void *arg)
       notify = &g_wifi_notify[evt_adpt->id];
       if (notify->assigned)
         {
-          notify->event.sigev_value.sival_ptr = evt_adpt->buf;
+          wlinfo("evt_adpt->id=%d, event=%d\n", evt_adpt->id, notify->event.sigev_value.sival_int);
+          if (notify->event.sigev_signo != WIFI_SIG_NO) {
+            notify->event.sigev_value.sival_ptr = evt_adpt->buf;
+          }
 
           ret = nxsig_notification(notify->pid, &notify->event,
                                    SI_QUEUE, &notify->work);
@@ -4542,60 +4548,61 @@ int esp_wifi_notify_subscribe(pid_t pid, struct sigevent *event)
 
   esp_wifi_lock(true);
 
+  if (event->sigev_signo == WIFI_SIG_NO) {
+    // user subscribe event map
+    id = esp_event_id_map(event->sigev_value.sival_int);
+    if (id < 0) {
+      wlerr("No process event %d\n", event->sigev_value.sival_int);
+      goto ERR;
+    }
+  } else {
+    // old event map
+    id = esp_event_id_map(event->sigev_signo);
+    if (id < 0)
+    {
+      wlerr("No process event %d\n", event->sigev_signo);
+      goto ERR;
+    }
+  }
+
   if (event->sigev_notify == SIGEV_SIGNAL)
     {
-      id = esp_event_id_map(event->sigev_signo);
-      if (id < 0)
+      notify = &g_wifi_notify[id];
+
+      if (notify->assigned)
         {
-          wlerr("No process event %d\n", event->sigev_signo);
+          wlerr("sigev_signo %d has subscribed\n",
+                event->sigev_signo);
         }
       else
         {
-          notify = &g_wifi_notify[id];
-
-          if (notify->assigned)
+          if (pid == 0)
             {
-              wlerr("sigev_signo %d has subscribed\n",
-                    event->sigev_signo);
+              pid = nxsched_gettid();
+              wlinfo("Actual PID=%d\n", pid);
             }
-          else
-            {
-              if (pid == 0)
-                {
-                  pid = nxsched_gettid();
-                  wlinfo("Actual PID=%d\n", pid);
-                }
 
-              notify->pid = pid;
-              notify->event = *event;
-              notify->assigned = true;
+          notify->pid = pid;
+          notify->event = *event;
+          notify->assigned = true;
 
-              ret = 0;
-            }
+          ret = 0;
         }
     }
   else if (event->sigev_notify == SIGEV_NONE)
     {
-      id = esp_event_id_map(event->sigev_signo);
-      if (id < 0)
+      notify = &g_wifi_notify[id];
+
+      if (!notify->assigned)
         {
-          wlerr("No process event %d\n", event->sigev_signo);
+          wlerr("sigev_signo %d has not subscribed\n",
+                event->sigev_signo);
         }
       else
         {
-          notify = &g_wifi_notify[id];
+          notify->assigned = false;
 
-          if (!notify->assigned)
-            {
-              wlerr("sigev_signo %d has not subscribed\n",
-                    event->sigev_signo);
-            }
-          else
-            {
-              notify->assigned = false;
-
-              ret = 0;
-            }
+          ret = 0;
         }
     }
   else
@@ -4603,6 +4610,7 @@ int esp_wifi_notify_subscribe(pid_t pid, struct sigevent *event)
       wlerr("sigev_notify %d is invalid\n", event->sigev_signo);
     }
 
+ERR:
   esp_wifi_lock(false);
 
   return ret;
@@ -5965,6 +5973,8 @@ int esp_wifi_softap_start(void)
   int ret;
   wifi_mode_t mode;
 
+    wlinfo("esp_wifi_softap_start------\n");
+
   esp_wifi_lock(true);
 
   ret = esp_wifi_stop();
@@ -6029,6 +6039,8 @@ int esp_wifi_softap_stop(void)
   int ret;
 
   esp_wifi_lock(true);
+
+  wlinfo("esp_wifi_softap_stop------\n");
 
   ret = esp_wifi_stop();
   if (ret)
