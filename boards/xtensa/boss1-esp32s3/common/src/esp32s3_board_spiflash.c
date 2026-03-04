@@ -203,6 +203,14 @@ static int setup_spiffs(const char *path, struct mtd_dev_s *mtd,
 
   if (mnt_pt != NULL)
     {
+      /* Create mount point directory if needed */
+
+      ret = mkdir(mnt_pt, 0755);
+      if (ret < 0 && ret != -EEXIST)
+        {
+          syslog(LOG_WARNING, "WARNING: Failed to create mount point: %d\n", ret);
+        }
+
       ret = nx_mount(path, mnt_pt, "spiffs", 0, NULL);
       if (ret < 0)
         {
@@ -333,6 +341,83 @@ static int init_storage_partition(void)
   return ret;
 }
 
+#ifdef CONFIG_BOSS1_ESP32S3_ETC_MTD
+/****************************************************************************
+ * Name: init_etc_partition
+ *
+ * Description:
+ *   Initialize partition for /etc directory.
+ *
+ * Returned Value:
+ *   Zero on success; a negated errno value on failure.
+ *
+ ****************************************************************************/
+
+static int init_etc_partition(void)
+{
+  int ret = OK;
+  struct mtd_dev_s *mtd;
+
+  mtd = esp32s3_spiflash_alloc_mtdpart(CONFIG_BOSS1_ESP32S3_ETC_MTD_OFFSET,
+                                        CONFIG_BOSS1_ESP32S3_ETC_MTD_SIZE,
+                                        false);
+  if (!mtd)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to alloc MTD partition for /etc\n");
+      return ERROR;
+    }
+
+#if defined(CONFIG_BOSS1_ESP32S3_SPIFLASH_SMARTFS)
+
+  ret = setup_smartfs(1, mtd, "/etc");
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to setup smartfs for /etc\n");
+      return ret;
+    }
+
+#elif defined(CONFIG_BOSS1_ESP32S3_SPIFLASH_NXFFS)
+
+  ret = setup_nxffs(mtd, "/etc");
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to setup nxffs for /etc\n");
+      return ret;
+    }
+
+#elif defined(CONFIG_BOSS1_ESP32S3_SPIFLASH_LITTLEFS)
+
+  ret = setup_littlefs("/dev/esp32s3flash2", mtd, "/etc", 0755);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to setup littlefs for /etc\n");
+      return ret;
+    }
+
+#elif defined(CONFIG_BOSS1_ESP32S3_SPIFLASH_SPIFFS)
+
+  ret = setup_spiffs("/dev/esp32s3flash2", mtd, "/etc", 0755);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to setup spiffs for /etc\n");
+      return ret;
+    }
+
+#else
+
+  ret = register_mtddriver("/dev/esp32s3flash2", mtd, 0755, NULL);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to register MTD for /etc: %d\n", ret);
+      return ret;
+    }
+
+#endif
+
+  return ret;
+}
+#endif
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -360,6 +445,14 @@ int board_spiflash_init(void)
     {
       return ret;
     }
+
+#ifdef CONFIG_BOSS1_ESP32S3_ETC_MTD
+  ret = init_etc_partition();
+  if (ret < 0)
+    {
+      return ret;
+    }
+#endif
 
   return ret;
 }

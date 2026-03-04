@@ -227,7 +227,7 @@
 /* Get task name from tcb */
 
 #if CONFIG_TASK_NAME_SIZE > 0
-#  define get_task_name(tcb)         ((tcb)->name)
+#  define get_task_name(tcb)         (tcb ? (tcb)->name : "<invalid name>")
 #else
 #  define get_task_name(tcb)         "<noname>"
 #endif

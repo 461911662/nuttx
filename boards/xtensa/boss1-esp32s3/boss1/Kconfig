@@ -192,6 +192,82 @@ endif #ARCH_BOARD_BOSS1_ESP32S3
 
 if ESP32S3_BOSS1_V1_0_0
 
+config BOSS1_ESP32S3_ETC_MTD
+	bool "Enable /etc MTD partition on SPI Flash"
+	depends on BOSS1_ESP32S3_MTD
+	default n
+	---help---
+		Enable a separate MTD partition for /etc directory.
+		This partition will be mounted at /etc and used to store
+		password files and other configuration data.
+
+config BOSS1_ESP32S3_ETC_MTD_OFFSET
+	hex "ETC MTD base address in SPI Flash"
+	default 0x180000 if !BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	default 0x250000 if BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	depends on BOSS1_ESP32S3_ETC_MTD
+	---help---
+		MTD base address in SPI Flash for /etc partition.
+
+config BOSS1_ESP32S3_ETC_MTD_SIZE
+	hex "ETC MTD size in SPI Flash"
+	default 0x10000
+	range 0x0 0x10000
+	depends on BOSS1_ESP32S3_ETC_MTD
+	---help---
+		MTD size in SPI Flash for /etc partition.
+
+config BOSS1_ESP32S3_STORAGE_MTD_OFFSET
+	hex "Storage MTD base address in SPI Flash"
+	default 0x190000 if BOSS1_ESP32S3_ETC_MTD && !BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	default 0x260000 if BOSS1_ESP32S3_ETC_MTD && BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	default 0x180000 if !BOSS1_ESP32S3_ETC_MTD && !BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	default 0x250000 if !BOSS1_ESP32S3_ETC_MTD && BOSS1_ESP32S3_HAVE_OTA_PARTITION
+	depends on BOSS1_ESP32S3_MTD
+	---help---
+		MTD base address in SPI Flash.
+
+config BOSS1_ESP32S3_STORAGE_MTD_SIZE
+	hex "Storage MTD size in SPI Flash"
+	default 0xF0000 if BOSS1_ESP32S3_ETC_MTD
+	default 0x100000 if !BOSS1_ESP32S3_ETC_MTD
+	range 0x0 0x400000 if BOSS1_ESP32S3_FLASH_4M
+	range 0x0 0x800000 if BOSS1_ESP32S3_FLASH_8M
+	range 0x0 0x1000000 if BOSS1_ESP32S3_FLASH_16M
+	range 0x0 0x2000000 if BOSS1_ESP32S3_FLASH_32M
+	depends on BOSS1_ESP32S3_MTD
+	---help---
+		MTD size in SPI Flash.
+
+choice BOSS1_ESP32S3_SPIFLASH_FS
+	prompt "Mount SPI Flash MTD on bring-up"
+	default BOSS1_ESP32S3_SPIFLASH_SMARTFS
+	depends on BOSS1_ESP32S3_MTD
+	optional
+	---help---
+		Mount the SPI Flash MTD with the selected File System format on board
+		bring-up.
+		If not selected, the MTD will be registered as a device node on /dev.
+
+config BOSS1_ESP32S3_SPIFLASH_SMARTFS
+	bool "SmartFS"
+	select FS_SMARTFS
+	select MTD_SMART
+
+config BOSS1_ESP32S3_SPIFLASH_NXFFS
+	bool "NXFFS"
+	select FS_NXFFS
+
+config BOSS1_ESP32S3_SPIFLASH_SPIFFS
+	bool "SPIFFS"
+	select FS_SPIFFS
+
+config BOSS1_ESP32S3_SPIFLASH_LITTLEFS
+	bool "LittleFS"
+	select FS_LITTLEFS
+
+endchoice # BOSS1_ESP32S3_SPIFLASH_FS
+
 if PM
 
 config PM_ALARM_SEC
