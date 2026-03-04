@@ -454,14 +454,12 @@ SECTIONS
 
   .flash.rodata_noload (NOLOAD) :
   {
-    /*
-      This is a symbol marking the flash.rodata end, this can be
-      used for mmu driver to maintain virtual address
-      We don't need to include the noload rodata in this section
-    */
+    /* This is a symbol marking the flash.rodata end, this can be
+     * used for mmu driver to maintain virtual address
+     * We don't need to include the noload rodata in this section
+     */
     _rodata_reserved_end = ABSOLUTE(.);
     . = ALIGN (4);
-    mapping[rodata_noload]
   } >drom0_0_seg
 
   _image_irom_vma = ADDR(.flash.text);
