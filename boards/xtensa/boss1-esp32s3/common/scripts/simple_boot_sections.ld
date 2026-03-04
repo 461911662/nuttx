@@ -454,14 +454,12 @@ SECTIONS
 
   .flash.rodata_noload (NOLOAD) :
   {
-    /*
-      This is a symbol marking the flash.rodata end, this can be
-      used for mmu driver to maintain virtual address
-      We don't need to include the noload rodata in this section
-    */
+    /* This is a symbol marking the flash.rodata end, this can be
+     * used for mmu driver to maintain virtual address
+     * We don't need to include the noload rodata in this section
+     */
     _rodata_reserved_end = ABSOLUTE(.);
     . = ALIGN (4);
-    mapping[rodata_noload]
   } >drom0_0_seg
 
   _image_irom_vma = ADDR(.flash.text);
@@ -535,6 +533,18 @@ SECTIONS
     . = ALIGN(4);
     _iram_end = ABSOLUTE(.);
   } >iram0_0_seg
+
+#ifdef CONFIG_XTENSA_EXTMEM_BSS
+  /* External memory bss, from any global variable with EXT_RAM_ATTR attribute */
+
+  .extmem.bss (NOLOAD) :
+  {
+    _sbss_extmem = ABSOLUTE(.);
+    *(.extmem.bss .extmem.bss.*)
+    . = ALIGN(4);
+    _ebss_extmem = ABSOLUTE(.);
+  } >extmem_seg
+#endif
 
   .rtc.text :
   {
