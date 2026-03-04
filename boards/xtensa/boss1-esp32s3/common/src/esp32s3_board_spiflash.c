@@ -203,14 +203,6 @@ static int setup_spiffs(const char *path, struct mtd_dev_s *mtd,
 
   if (mnt_pt != NULL)
     {
-      /* Create mount point directory if needed */
-
-      ret = mkdir(mnt_pt, 0755);
-      if (ret < 0 && ret != -EEXIST)
-        {
-          syslog(LOG_WARNING, "WARNING: Failed to create mount point: %d\n", ret);
-        }
-
       ret = nx_mount(path, mnt_pt, "spiffs", 0, NULL);
       if (ret < 0)
         {
