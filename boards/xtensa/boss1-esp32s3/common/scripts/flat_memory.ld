@@ -182,6 +182,12 @@ MEMORY
 
   rtc_slow_seg(RW)  :    org = 0x50000000 + CONFIG_BOSS1_ESP32S3_ULP_COPROC_RESERVE_MEM,
                          len = 0x2000 - CONFIG_BOSS1_ESP32S3_ULP_COPROC_RESERVE_MEM
+
+#ifdef CONFIG_XTENSA_EXTMEM_BSS
+  /* External memory, including data and text */
+
+  extmem_seg (RWX) :     org = 0x3c400000, len = 0x400000
+#endif /* CONFIG_XTENSA_EXTMEM_BSS */
 }
 
 #ifdef CONFIG_BOSS1_ESP32S3_RUN_IRAM

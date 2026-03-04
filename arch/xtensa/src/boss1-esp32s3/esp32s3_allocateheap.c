@@ -221,7 +221,11 @@ void xtensa_add_region(void)
     }
 
 #if defined(CONFIG_BOSS1_ESP32S3_SPIRAM_COMMON_HEAP) && !defined(MM_USER_HEAP_EXTRAM)
+#ifdef CONFIG_XTENSA_EXTMEM_BSS
+  start = (void *)(_ebss_extmem);
+#else
   start = (void *)esp_spiram_allocable_vaddr_start();
+#endif
   end = (void *)(esp_spiram_allocable_vaddr_end() -
                  esp_himem_reserved_area_size());
   size  = (size_t)(end - start);

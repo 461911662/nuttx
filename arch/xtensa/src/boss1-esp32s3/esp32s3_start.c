@@ -404,6 +404,13 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
       esp_spiram_init_cache();
       esp_spiram_test();
     }
+
+  /* Set external memory bss section to zero */
+
+#  ifdef CONFIG_XTENSA_EXTMEM_BSS
+     memset(_sbss_extmem, 0, _ebss_extmem - _sbss_extmem);
+#  endif
+
 #endif
 
   /* Setup the syscall table needed by the ROM code */
