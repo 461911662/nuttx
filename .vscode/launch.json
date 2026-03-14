@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "OpenOCD Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/nuttx",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/home/liangliang/wk/tools/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb",
+            "miDebuggerServerAddress": "localhost:3333",
+            "stopAtEntry": true,
+            "setupCommands": [
+                { "text": "set confirm off" },
+                { "text": "set remotetimeout 60" },
+                { "text": "set remote hardware-watchpoint-limit 2" }
+            ],
+            "preLaunchTask": "Start OpenOCD",
+            "postDebugTask": "Stop OpenOCD",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

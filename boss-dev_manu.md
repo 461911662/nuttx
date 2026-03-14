@@ -1203,3 +1203,411 @@ clean_context：此目标是distclean目标的一部分，用于移除所有由c
 
 `nuttx`系统的学习文档在`${TOPDIR}/Documentation/index.rst`。
 
+
+## GDB调试
+
+NuttX 支持两种硬件调试方式：
+- **GDB + OpenOCD**：硬件调试，需要 ESP32-S3 开发板
+- **GDB + QEMU**：模拟器调试，不需要硬件
+
+### 调试原理
+
+#### 1. GDB + OpenOCD（硬件调试）
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│   VSCode        │         │   OpenOCD       │
+│   (GDB Client)  │◄───────►│ (GDB Server)    │
+│                 │  网络   │   端口 3333      │
+│   launch.json   │         │                 │
+└─────────────────┘         └────────┬────────┘
+                                     │
+                              ┌──────┴──────┐
+                              │   USB/JTAG  │
+                              ├─────────────┤
+                              │   硬件      │
+                              │  ESP32-S3   │
+                              └─────────────┘
+```
+
+#### 2. GDB + QEMU（模拟器调试）
+
+```
+┌─────────────────┐         ┌─────────────────┐
+│   VSCode        │         │   QEMU          │
+│   (GDB Client)  │◄───────►│ (GDB Server)    │
+│                 │  网络   │   端口 3333      │
+│   launch.json   │         │                 │
+└─────────────────┘         └────────┬────────┘
+                                     │
+                              ┌──────┴──────┐
+                              │   软件模拟   │
+                              │  Xtensa CPU │
+                              │   内存/外设  │
+                              └─────────────┘
+```
+
+#### 3. 两种方式对比
+
+| 特性 | GDB + OpenOCD | GDB + QEMU |
+|------|---------------|------------|
+| **需要硬件** | ✅ 是 | ❌ 否 |
+| **调试真实性** | 真实硬件 | 模拟环境 |
+| **速度** | 较慢（JTAG） | 较快 |
+| **外设支持** | 全部外设 | 部分外设 |
+| **适合场景** | 驱动/底层调试 | 应用/快速验证 |
+
+---
+
+### 一、GDB + OpenOCD（硬件调试）
+
+本文档介绍如何使用 VSCode + OpenOCD 进行 ESP32-S3 硬件调试。
+
+#### 1.1 工具链路径
+
+| 工具 | 路径 |
+|------|------|
+| **GDB** | `~/.boss/tools/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb` |
+| **OpenOCD** | `~/.boss/tools/openocd-esp32/bin/openocd` |
+
+#### 1.2 硬件连接
+
+1. 将 ESP32-S3 通过 USB 连接到电脑
+2. 按住 **BOOT** 按钮，按一下 **RST** 复位，进入下载模式
+
+#### 1.3 配置文件
+
+##### 1.3.1 .vscode/launch.json
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "OpenOCD Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/nuttx",
+            "MIMode": "gdb",
+            "miDebuggerPath": "~/.boss/tools/xtensa-esp-elf-gdb/bin/xtensa-esp32s3-elf-gdb",
+            "miDebuggerServerAddress": "localhost:3333",
+            "stopAtEntry": true,
+            "setupCommands": [
+                { "text": "set confirm off" },
+                { "text": "set remotetimeout 60" },
+                { "text": "set remote hardware-watchpoint-limit 2" }
+            ],
+            "preLaunchTask": "Start OpenOCD",
+            "postDebugTask": "Stop OpenOCD",
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
+```
+
+**launch.json 调用流程：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  用户按下 F5 (Start Debugging)                              │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  1. preLaunchTask: "Start OpenOCD"                         │
+│     → 启动 tasks.json 中的 OpenOCD 任务                     │
+│     → OpenOCD 监听 3333 端口                               │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  2. 启动 GDB (miDebuggerPath)                              │
+│     → xtensa-esp32s3-elf-gdb                                │
+│     → 连接目标 (miDebuggerServerAddress: localhost:3333)   │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  3. 执行 setupCommands                                      │
+│     → set confirm off                                       │
+│     → set remotetimeout 60                                   │
+│     → set remote hardware-watchpoint-limit 2                │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  4. 加载程序 (program)                                       │
+│     → nuttx                                                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  5. stopAtEntry: true                                       │
+│     → 程序在入口点暂停，进入调试界面                         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**配置项说明：**
+
+| 配置项 | 作用 |
+|--------|------|
+| `type: cppdbg` | VSCode C/C++ 调试扩展类型 |
+| `MIMode: gdb` | 使用 GDB 机器接口协议 |
+| `miDebuggerPath` | GDB 可执行文件路径 |
+| `miDebuggerServerAddress` | GDB Server 地址（OpenOCD/QEMU） |
+| `preLaunchTask` | 调试前执行的任务（启动 OpenOCD） |
+| `postDebugTask` | 调试结束后执行的任务（停止 OpenOCD） |
+| `setupCommands` | GDB 连接后执行的命令 |
+
+**配置说明：**
+
+| 配置项 | 说明 |
+|--------|------|
+| `type: cppdbg` | 使用 C/C++ 调试扩展 |
+| `MIMode: gdb` | 使用 GDB 作为调试引擎 |
+| `stopAtEntry: true` | 程序在入口点暂停 |
+| `preLaunchTask` | 调试前启动 OpenOCD |
+| `postDebugTask` | 调试结束后停止 OpenOCD |
+
+##### 1.3.2 .vscode/tasks.json
+
+```json
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start OpenOCD",
+            "type": "shell",
+            "command": "~/.boss/tools/openocd-esp32/bin/openocd -c 'set ESP_RTOS hwthread; set ESP_FLASH_SIZE 0' -s ~/.boss/tools/openocd-esp32/share/openocd/scripts -f board/esp32s3-builtin.cfg",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "openocd",
+                "pattern": {
+                    "regexp": "^.*$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Open On-Chip Debugger",
+                    "endsPattern": "Listening on port"
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Stop OpenOCD",
+            "type": "shell",
+            "command": "pkill -f openocd || true",
+            "group": "none"
+        }
+    ]
+}
+```
+
+**tasks.json 作用：**
+
+tasks.json 用于定义 VSCode 中的任务，在调试过程中由 launch.json 的 `preLaunchTask` 和 `postDebugTask` 调用。
+
+**tasks.json 调用流程：**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  launch.json 中配置                                        │
+│  "preLaunchTask": "Start OpenOCD"                        │
+│  "postDebugTask": "Stop OpenOCD"                         │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. preLaunchTask: "Start OpenOCD"                        │
+│     → 启动 OpenOCD 进程                                    │
+│     → 等待 OpenOCD 输出 "Listening on port"               │
+│     → 继续 launch.json 下一步                             │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. GDB 连接调试...                                       │
+│     → 设置断点、单步调试等                                  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. postDebugTask: "Stop OpenOCD"                         │
+│     → 执行 "pkill -f openocd"                             │
+│     → 关闭 OpenOCD 进程                                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**配置项说明：**
+
+| 配置项 | 作用 |
+|--------|------|
+| `label` | 任务名称，供 launch.json 调用 |
+| `type: shell` | 执行 shell 命令 |
+| `command` | 要执行的命令 |
+| `isBackground: true` | 后台运行任务 |
+| `problemMatcher` | 解析输出，识别错误/结束状态 |
+| `background.beginsPattern` | 任务开始的输出标识 |
+| `background.endsPattern` | 任务结束的输出标识 |
+| `group.kind: build` | 任务分组，isDefault=true 可用 Ctrl+Shift+B 快速调用 |
+
+##### 1.3.3 .vscode/c_cpp_properties.json
+
+```json
+{
+    "configurations": [
+        {
+            "name": "NuttX-ESP32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/vendor/boss/app/boss1-app/include"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}
+```
+
+**c_cpp_properties.json 作用：**
+
+c_cpp_properties.json 用于配置 VSCode 的 C/C++ IntelliSense（智能提示）功能，与调试无关，但可以提升编码体验。
+
+**配置项说明：**
+
+| 配置项 | 作用 |
+|--------|------|
+| `name` | 配置名称，可在 VSCode 右下角切换 |
+| `includePath` | 头文件搜索路径，用于 IntelliSense |
+| `defines` | 预定义宏，用于 IntelliSense 解析 |
+| `cStandard` | C 语言标准 |
+| `cppStandard` | C++ 语言标准 |
+| `intelliSenseMode` | IntelliSense 引擎 |
+
+**调用时机：**
+
+```
+编辑代码时 → IntelliSense 分析代码 → 提供代码补全/错误提示
+```
+
+##### 1.3.4 .vscode/settings.json
+
+```json
+{
+    "Codegeex.RepoIndex": true,
+    "C_Cpp.errorSquiggles": "disabled",
+    "C_Cpp.dimInactiveBlocks": false
+}
+```
+
+**settings.json 作用：**
+
+settings.json 是 VSCode 的全局设置文件，用于配置编辑器和扩展的行为。
+
+**配置项说明：**
+
+| 配置项 | 作用 |
+|--------|------|
+| `Codegeex.RepoIndex` | 开启 Codegeex 代码索引 |
+| `C_Cpp.errorSquiggles` | 禁用 C/C++ 扩展的错误波浪线 |
+| `C_Cpp.dimInactiveBlocks` | 不淡化非活动代码块 |
+
+**调用时机：**
+
+```
+VSCode 启动时 → 加载 settings.json → 应用各项设置
+```
+
+#### 1.4 调试步骤
+
+##### 1.4.1 启动调试
+
+1. 确保 ESP32-S3 硬件已连接
+2. 在 VSCode 中按 **F5** 或点击 "Start Debugging"
+3. 等待 OpenOCD 启动并连接硬件
+
+##### 1.4.2 设置断点和执行命令
+
+调试启动后，在 VSCode 底部的 **DEBUG CONSOLE** 中输入命令：
+
+| 操作 | Debug Console 命令 | 说明 |
+|------|-------------------|------|
+| 设置断点 | `-exec break <函数名>` | 例如: `-exec break nx_start` |
+| 继续运行 | `-exec continue` 或 `-exec c` | 继续执行到断点 |
+| 单步执行 | `-exec next` 或 `-exec n` | 单步跳过 |
+| 步入函数 | `-exec step` 或 `-exec s` | 单步步入 |
+| 查看变量 | `-exec print <变量名>` | 查看变量值 |
+| 查看寄存器 | `-exec info registers` | 查看寄存器 |
+| 查看内存 | `-exec x/<格式> <地址>` | 查看内存 |
+
+##### 1.4.3 调试操作
+
+| VSCode 操作 | 说明 |
+|------------|------|
+| 设置断点 | 点击代码行号左侧 |
+| 继续运行 | 调试工具栏 "Continue" 或 F5 |
+| 单步跳过 | 调试工具栏 "Step Over" 或 F10 |
+| 单步步入 | 调试工具栏 "Step Into" 或 F11 |
+| 单步步出 | 调试工具栏 "Step Out" 或 Shift+F11 |
+| 查看变量 | "变量" 面板 |
+| 查看内存 | "内存" 面板 |
+
+##### 1.4.4 停止调试
+
+按调试工具栏的 "停止" 按钮，OpenOCD 会自动关闭。
+
+#### 1.5 问题排查
+
+##### 1.5.1 OpenOCD 无法识别设备
+
+```
+Error: esp_usb_jtag: could not find or open device!
+```
+
+**解决方法：**
+- 检查 USB 是否连接
+- 按住 BOOT + RST 进入下载模式
+- 添加 udev 规则（见下文）
+
+##### 1.5.2 权限问题
+
+需要 sudo 权限运行 OpenOCD：
+
+```bash
+# 方式1：使用 pkexec（会弹出密码输入）
+pkexec ~/.boss/tools/openocd-esp32/bin/openocd ...
+
+# 方式2：配置 udev 规则（一次性解决）
+sudo nano /etc/udev/rules.d/99-esp32s3.rules
+```
+
+添加内容：
+```
+SUBSYSTEM=="usb", ATTR{idVendor}=="303a", ATTR{idProduct}=="1001", MODE="0666", GROUP="dialout"
+```
+
+重新加载：
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+##### 1.5.3 setupCommands 说明
+
+VSCode cppdbg 扩展通过 MI (Machine Interface) 协议与 GDB 通信，某些命令（如 `monitor`）不完全兼容。因此建议：
+
+- **launch.json 中的 setupCommands**：只保留基本配置
+- **调试时使用 Debug Console**：手动输入 `-exec` 命令
+
+---
+
+### 二、GDB + QEMU（模拟器调试）
+
+（待补充）
+

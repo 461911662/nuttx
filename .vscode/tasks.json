@@ -1,0 +1,32 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Start OpenOCD",
+            "type": "shell",
+            "command": "/home/liangliang/wk/tools/openocd-esp32/bin/openocd -c 'set ESP_RTOS hwthread; set ESP_FLASH_SIZE 0' -s /home/liangliang/wk/tools/openocd-esp32/share/openocd/scripts -f board/esp32s3-builtin.cfg",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "openocd",
+                "pattern": {
+                    "regexp": "^.*$"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "Open On-Chip Debugger",
+                    "endsPattern": "Listening on port"
+                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Stop OpenOCD",
+            "type": "shell",
+            "command": "pkill -f openocd || true",
+            "group": "none"
+        }
+    ]
+}
