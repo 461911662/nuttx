@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/lcd/ssd1680.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -277,7 +279,7 @@ static const struct lcd_dev_s g_lcd_epaper_dev =
   .setpower     = ssd1680_setpower,
 
   /* setcontrast could be implemented in future by changing
-   * dispalys voltage and LUT table
+   * displays voltage and LUT table
    */
 };
 
@@ -455,7 +457,7 @@ static void ssd1680_reset(struct ssd1680_dev_s *priv)
     {
       lcdinfo("Hardware reset\n");
       priv->board_priv->set_rst(false);
-      nxsig_usleep(10);
+      nxsched_usleep(10);
       priv->board_priv->set_rst(true);
     }
   else
@@ -509,7 +511,7 @@ static int ssd1680_setpower(FAR struct lcd_dev_s *dev, int power)
 
           lcdinfo("Set Pwr Ctrl Linepower ON\n");
           priv->board_priv->set_vcc(true);
-          nxsig_usleep(10000);
+          nxsched_usleep(10000);
         }
       else
         {
@@ -932,12 +934,12 @@ static int ssd1680_busy_wait(FAR struct ssd1680_dev_s *priv)
     {
       while (priv->board_priv->check_busy() && max_wait_time-- > 0)
         {
-          nxsig_usleep(1000);
+          nxsched_usleep(1000);
         }
     }
   else
     {
-      nxsig_usleep(max_wait_time * 1000);
+      nxsched_usleep(max_wait_time * 1000);
     }
 
   if (max_wait_time == 0)

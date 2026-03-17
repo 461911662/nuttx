@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_addrenv_perms.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,9 +33,10 @@
 #include <nuttx/arch.h>
 #include <nuttx/pgalloc.h>
 
+#include <arch/barriers.h>
+
 #include <sys/mman.h>
 
-#include "barriers.h"
 #include "pgalloc.h"
 #include "arm64_arch.h"
 #include "arm64_mmu.h"

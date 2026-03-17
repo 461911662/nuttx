@@ -53,6 +53,7 @@
 
 #include <sys/param.h>
 
+#include <nuttx/irq.h>
 #include <nuttx/clock.h>
 #include <nuttx/init.h>
 #include <nuttx/fs/fs.h>
@@ -345,7 +346,7 @@ static FAR const char *getnum(FAR const char *strp, FAR int *nump,
 static FAR const char *getsecs(FAR const char *strp,
               FAR int_fast32_t *secsp);
 static FAR const char *getoffset(FAR const char *strp,
-              FAR int_fast32_t *offsetp);
+              FAR int_fast32_t *poffset);
 static FAR const char *getrule(FAR const char *strp,
               FAR struct rule_s *rulep);
 static void gmtload(FAR struct state_s *sp);
@@ -391,7 +392,7 @@ static int  tzparse(FAR const char *name, FAR struct state_s *sp,
 
 static inline void tz_lock(FAR rmutex_t *lock)
 {
-#ifndef __KERNEL__
+#if defined(__KERNEL__) || defined(CONFIG_BUILD_FLAT)
   if (up_interrupt_context() || (sched_idletask() && OSINIT_IDLELOOP()))
     {
       return;
@@ -403,7 +404,7 @@ static inline void tz_lock(FAR rmutex_t *lock)
 
 static inline void tz_unlock(FAR rmutex_t *lock)
 {
-#ifndef __KERNEL__
+#if defined(__KERNEL__) || defined(CONFIG_BUILD_FLAT)
   if (up_interrupt_context() || (sched_idletask() && OSINIT_IDLELOOP()))
     {
       return;
@@ -1273,7 +1274,7 @@ static FAR const char *getsecs(FAR const char *strp,
  */
 
 static FAR const char *getoffset(FAR const char *strp,
-                                 FAR int_fast32_t *offsetp)
+                                 FAR int_fast32_t *poffset)
 {
   int neg = FALSE;
 
@@ -1287,7 +1288,7 @@ static FAR const char *getoffset(FAR const char *strp,
       ++strp;
     }
 
-  strp = getsecs(strp, offsetp);
+  strp = getsecs(strp, poffset);
   if (strp == NULL)
     {
       return NULL; /* illegal time */
@@ -1295,7 +1296,7 @@ static FAR const char *getoffset(FAR const char *strp,
 
   if (neg)
     {
-      *offsetp = -*offsetp;
+      *poffset = -*poffset;
     }
 
   return strp;
@@ -1388,7 +1389,7 @@ static int_fast32_t transtime(int year,
                               FAR const struct rule_s *rulep,
                               int_fast32_t offset)
 {
-  int leapyear;
+  int leap_year;
   int_fast32_t value;
   int i;
   int d;
@@ -1399,7 +1400,7 @@ static int_fast32_t transtime(int year,
   int dow;
 
   value = 0;
-  leapyear = isleap(year);
+  leap_year = isleap(year);
   switch (rulep->r_type)
     {
     case JULIAN_DAY:
@@ -1412,7 +1413,7 @@ static int_fast32_t transtime(int year,
        */
 
       value = (rulep->r_day - 1) * SECSPERDAY;
-      if (leapyear && rulep->r_day >= 60)
+      if (leap_year && rulep->r_day >= 60)
         {
           value += SECSPERDAY;
         }
@@ -1460,7 +1461,7 @@ static int_fast32_t transtime(int year,
 
       for (i = 1; i < rulep->r_week; ++i)
         {
-          if (d + DAYSPERWEEK >= g_mon_lengths[leapyear][rulep->r_mon - 1])
+          if (d + DAYSPERWEEK >= g_mon_lengths[leap_year][rulep->r_mon - 1])
             {
               break;
             }
@@ -1473,7 +1474,7 @@ static int_fast32_t transtime(int year,
       value = d * SECSPERDAY;
       for (i = 0; i < rulep->r_mon - 1; ++i)
         {
-          value += g_mon_lengths[leapyear][i] * SECSPERDAY;
+          value += g_mon_lengths[leap_year][i] * SECSPERDAY;
         }
       break;
     }

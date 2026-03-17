@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/power/pm/activity_governor.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,7 +56,7 @@
 #define TIME_SLICE_TICKS ((CONFIG_PM_GOVERNOR_SLICEMS * CLOCKS_PER_SEC) /  1000)
 
 /****************************************************************************
- * Private Type Declarations
+ * Private Types
  ****************************************************************************/
 
 struct pm_domain_state_s
@@ -103,20 +105,23 @@ struct pm_domain_state_s
 
 struct pm_activity_governor_s
 {
-  /* Threshold time slice count to enter the next low power consdumption
-   * state. Indexing is next state 0:IDLE, 1: STANDBY, 2: SLEEP.
+  /* Threshold time slice count to enter the next lower power consumption
+   * state.  This array is indexed by next state:
+   * 0: IDLE, 1: STANDBY, 2: SLEEP.
    */
 
   const uint32_t pmcount[3];
 
-  /* Threshold activity values to enter into the next lower power consumption
-   * state. Indexing is next state 0:IDLE, 1:STANDBY, 2:SLEEP.
+  /* Threshold activity values to enter the next lower power consumption
+   * state.  This array is indexed by next state:
+   * 0: IDLE, 1: STANDBY, 2: SLEEP.
    */
 
   const int32_t pmenterthresh[3];
 
-  /* Threshold activity values to leave the current low power consdumption
-   * state. Indexing is current state 0:IDLE, 1: STANDBY, 2: SLEEP.
+  /* Threshold activity values to leave the current power consumption
+   * state.  This array is indexed by current state:
+   * 0: IDLE, 1: STANDBY, 2: SLEEP.
    */
 
   const int32_t pmexitthresh[3];

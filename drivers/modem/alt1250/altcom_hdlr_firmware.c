@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/modem/alt1250/altcom_hdlr_firmware.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -246,8 +248,8 @@ int32_t altcom_fwcommon_pkt_parse(FAR struct alt1250_dev_s *dev,
   FAR struct apicmd_cmddat_fw_deltaupcommres_s *in =
     (FAR struct apicmd_cmddat_fw_deltaupcommres_s *)pktbuf;
 
-  /* Negative value in result_cmd means an error is occured.
-   * Zero indicates command successed or size of injected data
+  /* Negative value in result_cmd means an error is occurred.
+   * Zero indicates command succeeded or size of injected data
    */
 
   result_cmd = altcom_geterrcode(in->api_result);

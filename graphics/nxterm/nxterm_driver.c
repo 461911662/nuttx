@@ -70,7 +70,9 @@ const struct file_operations g_nxterm_drvrops =
   nxterm_ioctl,   /* ioctl */
   NULL,           /* mmap */
   NULL,           /* truncate */
-  nxterm_poll     /* poll */
+  nxterm_poll,    /* poll */
+  NULL,           /* readv */
+  NULL            /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , nxterm_unlink /* unlink */
 #endif
@@ -88,7 +90,9 @@ const struct file_operations g_nxterm_drvrops =
   nxterm_ioctl,   /* ioctl */
   NULL,           /* mmap */
   NULL,           /* truncate */
-  NULL            /* poll */
+  NULL,           /* poll */
+  NULL,           /* readv */
+  NULL            /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , nxterm_unlink /* unlink */
 #endif
@@ -229,7 +233,7 @@ static ssize_t nxterm_write(FAR struct file *filep, FAR const char *buffer,
 
       do
         {
-          /* Is the character part of a VT100 escape sequnce? */
+          /* Is the character part of a VT100 escape sequence? */
 
           state = nxterm_vt100(priv, ch);
           switch (state)
@@ -308,7 +312,7 @@ static int nxterm_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 {
   /* NOTE:  We don't need driver context here because the NXTERM handle
    * provided within each of the NXTERM IOCTL command data.  Mutual
-   * exclusion is similar managed by the IOCTL cmmand handler.
+   * exclusion is similar managed by the IOCTL command handler.
    *
    * This permits the IOCTL to be called in abnormal context (such as
    * from boardctl())
@@ -374,7 +378,7 @@ static int nxterm_unlink(FAR struct inode *inode)
  *
  * NOTE:  We don't need driver context here because the NXTERM handle
  * provided within each of the NXTERM IOCTL command data.  Mutual
- * exclusion is similar managed by the IOCTL cmmand handler.
+ * exclusion is similar managed by the IOCTL command handler.
  *
  * This permits the IOCTL to be called in abnormal context (such as
  * from boardctl())

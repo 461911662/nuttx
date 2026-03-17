@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/serial/uart_16550.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,7 @@
 #include <errno.h>
 #include <debug.h>
 
+#include <nuttx/spinlock.h>
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/clk/clk.h>
@@ -105,6 +108,8 @@ static void u16550_dmarxfree(FAR struct uart_dev_s *dev);
 static void u16550_dmarxconfig(FAR struct uart_dev_s *dev);
 #endif
 static void u16550_send(FAR struct uart_dev_s *dev, int ch);
+static ssize_t u16550_sendbuf(struct uart_dev_s *dev,
+                              const void *buffer, size_t size);
 static void u16550_txint(FAR struct uart_dev_s *dev, bool enable);
 static bool u16550_txready(FAR struct uart_dev_s *dev);
 static bool u16550_txempty(FAR struct uart_dev_s *dev);
@@ -151,6 +156,7 @@ static const struct uart_ops_s g_uart_ops =
   .txint          = u16550_txint,
   .txready        = u16550_txready,
   .txempty        = u16550_txempty,
+  .sendbuf        = u16550_sendbuf,
 };
 
 /* I/O buffers */
@@ -760,7 +766,16 @@ static inline void u16550_enablebreaks(FAR struct u16550_s *priv,
 #ifndef CONFIG_16550_SUPRESS_CONFIG
 static inline uint32_t u16550_divisor(FAR struct u16550_s *priv)
 {
-  return (priv->uartclk + (priv->baud << 3)) / (priv->baud << 4);
+  uint32_t base = 16 * priv->baud;
+  uint32_t quot = priv->uartclk / base;
+  uint32_t rem  = priv->uartclk % base;
+  uint32_t frac = ((rem << CONFIG_16550_DLF_SIZE) + base / 2) / base;
+
+#if CONFIG_16550_DLF_SIZE != 0
+  return quot | (frac << 16);
+#else
+  return quot + frac;
+#endif
 }
 #endif
 
@@ -778,7 +793,7 @@ static int u16550_setup(FAR struct uart_dev_s *dev)
 {
 #ifndef CONFIG_16550_SUPRESS_CONFIG
   FAR struct u16550_s *priv = (FAR struct u16550_s *)dev->priv;
-  uint16_t div;
+  uint32_t div;
   uint32_t lcr;
 #if defined(CONFIG_SERIAL_IFLOWCONTROL) || defined(CONFIG_SERIAL_OFLOWCONTROL) || \
     defined(CONFIG_16550_SET_MCR_OUT2)
@@ -855,7 +870,10 @@ static int u16550_setup(FAR struct uart_dev_s *dev)
   /* Set the BAUD divisor */
 
   div = u16550_divisor(priv);
-  u16550_serialout(priv, UART_DLM_OFFSET, div >> 8);
+#if CONFIG_16550_DLF_SIZE != 0
+  u16550_serialout(priv, UART_DLF_OFFSET, (div >> 16) & 0xff);
+#endif
+  u16550_serialout(priv, UART_DLM_OFFSET, (div >>  8) & 0xff);
   u16550_serialout(priv, UART_DLL_OFFSET, div & 0xff);
 
 #ifdef CONFIG_16550_WAIT_LCR
@@ -1554,6 +1572,26 @@ static void u16550_send(struct uart_dev_s *dev, int ch)
 }
 
 /****************************************************************************
+ * Name: u16550_sendbuf
+ *
+ * Description:
+ *   This method will send a buffer of bytes on the UART
+ *
+ ****************************************************************************/
+
+static ssize_t u16550_sendbuf(struct uart_dev_s *dev,
+                              const void *buffer, size_t size)
+{
+  for (size_t i = 0; i < size; i++)
+    {
+      while (!u16550_txready(dev));
+      u16550_send(dev, ((const unsigned char *)buffer)[i]);
+    }
+
+  return (ssize_t)size;
+}
+
+/****************************************************************************
  * Name: u16550_txint
  *
  * Description:
@@ -1573,9 +1611,14 @@ static void u16550_txint(struct uart_dev_s *dev, bool enable)
     }
 #endif
 
-  flags = enter_critical_section();
   if (enable)
     {
+#ifdef CONFIG_16550_POLLING
+      /* In polling mode, we loop until the buffer is empty */
+
+      uart_xmitchars(dev);
+#else
+      flags = enter_critical_section();
       priv->ier |= UART_IER_ETBEI;
       u16550_serialout(priv, UART_IER_OFFSET, priv->ier);
 
@@ -1584,14 +1627,16 @@ static void u16550_txint(struct uart_dev_s *dev, bool enable)
        */
 
       uart_xmitchars(dev);
+      leave_critical_section(flags);
+#endif
     }
   else
     {
+      flags = enter_critical_section();
       priv->ier &= ~UART_IER_ETBEI;
       u16550_serialout(priv, UART_IER_OFFSET, priv->ier);
+      leave_critical_section(flags);
     }
-
-  leave_critical_section(flags);
 }
 
 /****************************************************************************
@@ -1631,7 +1676,7 @@ static bool u16550_txempty(struct uart_dev_s *dev)
  *
  * Description:
  *   Performs the low level UART initialization early in debug so that the
- *   serial console will be available during bootup.  This must be called
+ *   serial console will be available during boot up.  This must be called
  *   before uart_serialinit.
  *
  *   NOTE: Configuration of the CONSOLE UART was performed by uart_lowsetup()
@@ -1688,22 +1733,11 @@ void u16550_serialinit(void)
  ****************************************************************************/
 
 #ifdef HAVE_16550_CONSOLE
-int up_putc(int ch)
+void up_putc(int ch)
 {
   FAR struct u16550_s *priv = (FAR struct u16550_s *)CONSOLE_DEV.priv;
 
-  /* Check for LF */
-
-  if (ch == '\n')
-    {
-      /* Add CR */
-
-      u16550_putc(priv, '\r');
-    }
-
   u16550_putc(priv, ch);
-
-  return ch;
 }
 #endif
 

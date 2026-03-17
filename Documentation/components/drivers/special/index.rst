@@ -32,10 +32,11 @@ following section.
   i3c.rst
   ioexpander.rst
   lcd.rst
-  mtd.rst
+  mtd/index.rst
   regmap.rst
   reset.rst
-  rptun.rst
+  rpmsg/index.rst
+  rptun/index.rst
   rwbuffer.rst
   sensors.rst
   segger.rst
@@ -49,9 +50,12 @@ following section.
   usrsock.rst
   mmcsd.rst
   net/index.rst
+  pci/index.rst
   pinctrl.rst
   pipes.rst
   power/index.rst
-  virtio.rst
+  ptp.rst
+  vhost/index.rst
+  virtio/index.rst
   video.rst
   wireless.rst

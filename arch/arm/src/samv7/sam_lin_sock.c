@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/samv7/sam_lin_sock.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -425,6 +427,8 @@ static int sam_lin_ifup(struct net_driver_s *dev)
                      UART_INT_LINID | UART_INT_LINERR);
     }
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -467,6 +471,8 @@ static int sam_lin_ifdown(struct net_driver_s *dev)
           priv->tx_cache[i].can_id = 0;
         }
     }
+
+  netdev_carrier_off(dev);
 
   return OK;
 }
@@ -796,7 +802,7 @@ static int sam_lin_netdev_ioctl(struct net_driver_s *dev, int cmd,
 }
 #endif /* CONFIG_NETDEV_IOCTL */
 
-static int sam_interrupt(int irq, void *context, FAR void *arg)
+static int sam_interrupt(int irq, void *context, void *arg)
 {
   struct sam_lin_s *priv = (struct sam_lin_s *)arg;
   uint32_t pending;
@@ -1162,7 +1168,7 @@ static void sam_lin_errinterrupt_work(void *arg)
 
       if ((priv->sr & UART_INT_LINBE) != 0)
         {
-          /* Buss error */
+          /* Bus error */
 
           errbits |= CAN_ERR_BUSERROR;
         }

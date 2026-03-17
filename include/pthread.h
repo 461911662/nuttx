@@ -49,7 +49,7 @@
  * SP_LOCKED and SP_UNLOCKED must constants of type spinlock_t.
  */
 
-#  include <arch/spinlock.h>
+#  include <nuttx/spinlock_type.h>
 #endif
 
 /****************************************************************************
@@ -107,6 +107,7 @@
 
 #define PTHREAD_STACK_MIN             CONFIG_PTHREAD_STACK_MIN
 #define PTHREAD_STACK_DEFAULT         CONFIG_PTHREAD_STACK_DEFAULT
+#define PTHREAD_GUARD_DEFAULT         CONFIG_PTHREAD_GUARDSIZE_DEFAULT
 
 /* Values for the pthread inheritsched attribute */
 
@@ -237,6 +238,7 @@ struct pthread_attr_s
 
   FAR void  *stackaddr;        /* Address of memory to be used as stack */
   size_t stacksize;            /* Size of the stack allocated for the pthread */
+  size_t guardsize;            /* Size of the guard area for the pthread's stack */
 
 #ifdef CONFIG_SCHED_SPORADIC
   struct timespec repl_period; /* Replenishment period */
@@ -269,6 +271,7 @@ struct pthread_cond_s
 {
   sem_t sem;
   clockid_t clockid;
+  int wait_count;
 };
 
 #ifndef __PTHREAD_COND_T_DEFINED
@@ -332,25 +335,46 @@ typedef struct pthread_mutex_s pthread_mutex_t;
 #  endif
 #endif
 
+#ifdef CONFIG_PTHREAD_MUTEX_DEFAULT_PRIO_INHERIT
+#  define PTHREAD_MUTEX_DEFAULT_PRIO_INHERIT SEM_PRIO_INHERIT
+#else
+#  define PTHREAD_MUTEX_DEFAULT_PRIO_INHERIT 0
+#endif
+
+#ifdef CONFIG_PTHREAD_MUTEX_DEFAULT_PRIO_PROTECT
+#  define PTHREAD_MUTEX_DEFAULT_PRIO_PROTECT SEM_PRIO_PROTECT
+#else
+#  define PTHREAD_MUTEX_DEFAULT_PRIO_PROTECT 0
+#endif
+
+#define PTHREAD_MUTEX_DEFAULT_PRIO_FLAGS (PTHREAD_MUTEX_DEFAULT_PRIO_INHERIT | \
+                                          PTHREAD_MUTEX_DEFAULT_PRIO_PROTECT)
+
+#define PTHREAD_NXMUTEX_INITIALIZER  {                                    \
+    NXSEM_INITIALIZER(NXSEM_NO_MHOLDER,                                   \
+                      SEM_TYPE_MUTEX | PTHREAD_MUTEX_DEFAULT_PRIO_FLAGS)}
+#define PTHREAD_NXRMUTEX_INITIALIZER {PTHREAD_NXMUTEX_INITIALIZER, 0}
+
 #if defined(CONFIG_PTHREAD_MUTEX_TYPES) && !defined(CONFIG_PTHREAD_MUTEX_UNSAFE)
 #  define PTHREAD_MUTEX_INITIALIZER {NULL, __PTHREAD_MUTEX_DEFAULT_FLAGS, \
                                      PTHREAD_MUTEX_DEFAULT, \
-                                     NXRMUTEX_INITIALIZER}
+                                     PTHREAD_NXRMUTEX_INITIALIZER}
+
 #  define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP \
                                     {NULL, __PTHREAD_MUTEX_DEFAULT_FLAGS, \
                                      PTHREAD_MUTEX_RECURSIVE, \
-                                     NXRMUTEX_INITIALIZER,}
+                                     PTHREAD_NXRMUTEX_INITIALIZER,}
 #elif defined(CONFIG_PTHREAD_MUTEX_TYPES)
 #  define PTHREAD_MUTEX_INITIALIZER {PTHREAD_MUTEX_DEFAULT, \
-                                     NXRMUTEX_INITIALIZER,}
+                                     PTHREAD_NXRMUTEX_INITIALIZER,}
 #  define PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP \
                                     {PTHREAD_MUTEX_RECURSIVE, \
-                                     NXRMUTEX_INITIALIZER}
+                                     PTHREAD_NXRMUTEX_INITIALIZER}
 #elif !defined(CONFIG_PTHREAD_MUTEX_UNSAFE)
 #  define PTHREAD_MUTEX_INITIALIZER {NULL, __PTHREAD_MUTEX_DEFAULT_FLAGS,\
-                                     NXMUTEX_INITIALIZER}
+                                     PTHREAD_NXMUTEX_INITIALIZER}
 #else
-#  define PTHREAD_MUTEX_INITIALIZER {NXMUTEX_INITIALIZER}
+#  define PTHREAD_MUTEX_INITIALIZER {PTHREAD_NXMUTEX_INITIALIZER}
 #endif
 
 struct pthread_barrierattr_s
@@ -367,6 +391,8 @@ struct pthread_barrier_s
 {
   sem_t        sem;
   unsigned int count;
+  unsigned int wait_count;
+  mutex_t      mutex;
 };
 
 #ifndef __PTHREAD_BARRIER_T_DEFINED
@@ -376,7 +402,7 @@ typedef struct pthread_barrier_s pthread_barrier_t;
 
 struct pthread_once_s
 {
-  bool done;
+  volatile bool done;
   pthread_mutex_t mutex;
 };
 
@@ -426,7 +452,7 @@ struct pthread_spinlock_s
 #  ifndef __PTHREAD_SPINLOCK_T_DEFINED
 /* It is referenced via this standard type */
 
-typedef FAR struct pthread_spinlock_s pthread_spinlock_t;
+typedef struct pthread_spinlock_s pthread_spinlock_t;
 #    define __PTHREAD_SPINLOCK_T_DEFINED 1
 #  endif
 #endif /* CONFIG_PTHREAD_SPINLOCKS */
@@ -505,6 +531,12 @@ int pthread_attr_getstack(FAR const pthread_attr_t *attr,
 int pthread_attr_setscope(FAR pthread_attr_t *attr, int scope);
 int pthread_attr_getscope(FAR const pthread_attr_t *attr, FAR int *scope);
 
+/* Set/get guardsize attribute in thread attributes object */
+
+int pthread_attr_setguardsize(FAR pthread_attr_t *attr, size_t guardsize);
+int pthread_attr_getguardsize(FAR const pthread_attr_t *attr,
+                              FAR size_t *guardsize);
+
 /* Set or get the name of a thread */
 
 int pthread_setname_np(pthread_t thread, FAR const char *name);
@@ -572,7 +604,7 @@ pid_t pthread_gettid_np(pthread_t thread);
 
 /* Compare two thread IDs. */
 
-#define pthread_equal(t1,t2) ((t1) == (t2))
+int pthread_equal(pthread_t t1, pthread_t t2);
 
 /* Thread scheduling parameters */
 
@@ -593,6 +625,11 @@ int pthread_getaffinity_np(pthread_t thread, size_t cpusetsize,
 #define pthread_setaffinity_np(...) (-ENOSYS)
 #define pthread_getaffinity_np(...) (-ENOSYS)
 #endif
+
+/* Concurrency level */
+
+int pthread_setconcurrency(int new_level);
+int pthread_getconcurrency(void);
 
 /* Thread-specific Data Interfaces */
 
@@ -737,11 +774,6 @@ int pthread_rwlock_clockwrlock(FAR pthread_rwlock_t *lock,
 int pthread_rwlock_trywrlock(FAR pthread_rwlock_t *lock);
 int pthread_rwlock_unlock(FAR pthread_rwlock_t *lock);
 
-/* Pthread signal management APIs */
-
-int pthread_kill(pthread_t thread, int sig);
-int pthread_sigmask(int how, FAR const sigset_t *set, FAR sigset_t *oset);
-
 #ifdef CONFIG_PTHREAD_SPINLOCKS
 /* Pthread spinlocks */
 
@@ -783,48 +815,9 @@ int pthread_atfork(CODE void (*prepare)(void),
  * available in any inclusion ordering.
  */
 
-#ifndef __PTHREAD_KEY_T_DEFINED
-typedef int pthread_key_t;
-#  define __PTHREAD_KEY_T_DEFINED 1
-#endif
-
 #ifndef __PTHREAD_ADDR_T_DEFINED
 typedef FAR void *pthread_addr_t;
 #  define __PTHREAD_ADDR_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_ATTR_T_DEFINED
-struct pthread_attr_s;
-typedef struct pthread_attr_s pthread_attr_t;
-#  define __PTHREAD_ATTR_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_T_DEFINED
-typedef pid_t pthread_t;
-#  define __PTHREAD_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_CONDATTR_T_DEFINED
-typedef struct pthread_condattr_s pthread_condattr_t;
-#  define __PTHREAD_CONDATTR_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_COND_T_DEFINED
-struct pthread_cond_s;
-typedef struct pthread_cond_s pthread_cond_t;
-#  define __PTHREAD_COND_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_MUTEXATTR_T_DEFINED
-struct pthread_mutexattr_s;
-typedef struct pthread_mutexattr_s pthread_mutexattr_t;
-#  define __PTHREAD_MUTEXATTR_T_DEFINED 1
-#endif
-
-#ifndef __PTHREAD_MUTEX_T_DEFINED
-struct pthread_mutex_s;
-typedef struct pthread_mutex_s pthread_mutex_t;
-#  define __PTHREAD_MUTEX_T_DEFINED 1
 #endif
 
 #ifndef __PTHREAD_BARRIERATTR_T_DEFINED
@@ -854,15 +847,9 @@ typedef struct pthread_rwlock_s pthread_rwlock_t;
 #ifdef CONFIG_PTHREAD_SPINLOCKS
 #  ifndef __PTHREAD_SPINLOCK_T_DEFINED
 struct pthread_spinlock_s;
-typedef FAR struct pthread_spinlock_s pthread_spinlock_t;
+typedef struct pthread_spinlock_s pthread_spinlock_t;
 #    define __PTHREAD_SPINLOCK_T_DEFINED 1
 #  endif
 #endif /* CONFIG_PTHREAD_SPINLOCKS */
-
-#ifndef __PTHREAD_ONCE_T_DEFINED
-struct pthread_once_s;
-typedef struct pthread_once_s pthread_once_t;
-#  define __PTHREAD_ONCE_T_DEFINED 1
-#endif
 
 #endif /* __INCLUDE_PTHREAD_H */

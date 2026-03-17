@@ -77,7 +77,9 @@ static int group_signal_handler(pid_t pid, FAR void *arg)
 {
   FAR struct group_signal_s *info = (FAR struct group_signal_s *)arg;
   FAR struct tcb_s *tcb;
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   FAR sigactq_t *sigact;
+#endif
   int ret;
 
   /* Get the TCB associated with the group member */
@@ -85,33 +87,73 @@ static int group_signal_handler(pid_t pid, FAR void *arg)
   tcb = nxsched_get_tcb(pid);
   DEBUGASSERT(tcb != NULL && tcb->group != NULL && info != NULL);
 
-  if (tcb)
+  /* Set this one as the default if we have not already set the
+   * default.
+   */
+
+  if (!info->dtcb)
     {
-      /* Set this one as the default if we have not already set the
-       * default.
+      info->dtcb = tcb;
+    }
+
+  /* Is the thread waiting for this signal (in this case, the signal is
+   * probably blocked).
+   */
+
+  ret = nxsig_ismember(&tcb->sigwaitmask, info->siginfo->si_signo);
+  if (ret == 1 && (!info->atcb || info->siginfo->si_signo == SIGCHLD))
+    {
+      /* Yes.. This means that the task is suspended, waiting for this
+       * signal to occur. Stop looking and use this TCB.  The
+       * requirement is this:  If a task group receives a signal and
+       * more than one thread is waiting on that signal, then one and
+       * only one indeterminate thread out of that waiting group will
+       * receive the signal.
        */
 
-      if (!info->dtcb)
+      ret = nxsig_tcbdispatch(tcb, info->siginfo, true);
+      if (ret < 0)
         {
-          info->dtcb = tcb;
+          return ret;
         }
 
-      /* Is the thread waiting for this signal (in this case, the signal is
-       * probably blocked).
+      /* Limit to one thread */
+
+      info->atcb = tcb;
+
+      if (info->ptcb != NULL && info->siginfo->si_signo != SIGCHLD)
+        {
+          return 1; /* Terminate the search */
+        }
+    }
+
+  /* Is this signal unblocked on this thread? */
+
+  if ((nxsig_ismember(&tcb->sigprocmask, info->siginfo->si_signo) != 1) &&
+      !info->ptcb && tcb != info->atcb)
+    {
+      /* Yes.. remember this TCB if we have not encountered any
+       * other threads that have the signal unblocked.
        */
 
-      ret = nxsig_ismember(&tcb->sigwaitmask, info->siginfo->si_signo);
-      if (ret == 1 && (!info->atcb || info->siginfo->si_signo == SIGCHLD))
+      if (!info->utcb)
         {
-          /* Yes.. This means that the task is suspended, waiting for this
-           * signal to occur. Stop looking and use this TCB.  The
-           * requirement is this:  If a task group receives a signal and
-           * more than one thread is waiting on that signal, then one and
-           * only one indeterminate thread out of that waiting group will
-           * receive the signal.
+          info->utcb = tcb;
+        }
+
+      /* Is there also a action associated with the task group? */
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+      sigact = nxsig_find_action(tcb->group, info->siginfo->si_signo);
+      if (sigact)
+        {
+          /* Yes.. then use this thread.  The requirement is this:
+           * If a task group receives a signal then one and only one
+           * indeterminate thread in the task group which is not
+           * blocking the signal will receive the signal.
            */
 
-          ret = nxsig_tcbdispatch(tcb, info->siginfo);
+          ret = nxsig_tcbdispatch(tcb, info->siginfo, true);
           if (ret < 0)
             {
               return ret;
@@ -119,54 +161,13 @@ static int group_signal_handler(pid_t pid, FAR void *arg)
 
           /* Limit to one thread */
 
-          info->atcb = tcb;
-
-          if (info->ptcb != NULL && info->siginfo->si_signo != SIGCHLD)
+          info->ptcb = tcb;
+          if (info->atcb != NULL)
             {
               return 1; /* Terminate the search */
             }
         }
-
-      /* Is this signal unblocked on this thread? */
-
-      if (!nxsig_ismember(&tcb->sigprocmask, info->siginfo->si_signo) &&
-          !info->ptcb && tcb != info->atcb)
-        {
-          /* Yes.. remember this TCB if we have not encountered any
-           * other threads that have the signal unblocked.
-           */
-
-          if (!info->utcb)
-            {
-              info->utcb = tcb;
-            }
-
-          /* Is there also a action associated with the task group? */
-
-          sigact = nxsig_find_action(tcb->group, info->siginfo->si_signo);
-          if (sigact)
-            {
-              /* Yes.. then use this thread.  The requirement is this:
-               * If a task group receives a signal then one and only one
-               * indeterminate thread in the task group which is not
-               * blocking the signal will receive the signal.
-               */
-
-              ret = nxsig_tcbdispatch(tcb, info->siginfo);
-              if (ret < 0)
-                {
-                  return ret;
-                }
-
-              /* Limit to one thread */
-
-              info->ptcb = tcb;
-              if (info->atcb != NULL)
-                {
-                  return 1; /* Terminate the search */
-                }
-            }
-        }
+#endif
     }
 
   return 0; /* Keep searching */
@@ -260,7 +261,7 @@ int group_signal(FAR struct task_group_s *group, FAR siginfo_t *siginfo)
 
       /* Now deliver the signal to the selected group member */
 
-      ret = nxsig_tcbdispatch(tcb, siginfo);
+      ret = nxsig_tcbdispatch(tcb, siginfo, true);
     }
 
 errout:

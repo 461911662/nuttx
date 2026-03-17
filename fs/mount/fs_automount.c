@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mount/fs_automount.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -39,6 +41,7 @@
 #include <nuttx/kmalloc.h>
 #include <nuttx/wqueue.h>
 #include <nuttx/fs/automount.h>
+#include <nuttx/lib/lib.h>
 
 #ifdef CONFIG_FS_AUTOMOUNTER_DRIVER
 #  include <stdio.h>
@@ -656,8 +659,6 @@ static void automount_timeout(wdparm_t arg)
   ret = work_queue(LPWORK, &priv->work, automount_worker, priv, 0);
   if (ret < 0)
     {
-      /* NOTE: Currently, work_queue only returns success */
-
       ferr("ERROR: Failed to schedule work: %d\n", ret);
     }
 }
@@ -769,8 +770,6 @@ static int automount_interrupt(FAR const struct automount_lower_s *lower,
                    priv->lower->ddelay);
   if (ret < 0)
     {
-      /* NOTE: Currently, work_queue only returns success */
-
       ferr("ERROR: Failed to schedule work: %d\n", ret);
     }
   else
@@ -807,7 +806,11 @@ FAR void *automount_initialize(FAR const struct automount_lower_s *lower)
   FAR struct automounter_state_s *priv;
   int ret;
 #ifdef CONFIG_FS_AUTOMOUNTER_DRIVER
-  char devpath[PATH_MAX];
+  FAR char *devpath = lib_get_pathbuffer();
+  if (devpath == NULL)
+    {
+      return NULL;
+    }
 #endif /* CONFIG_FS_AUTOMOUNTER_DRIVER */
 
   finfo("lower=%p\n", lower);
@@ -819,6 +822,9 @@ FAR void *automount_initialize(FAR const struct automount_lower_s *lower)
   if (priv == NULL)
     {
       ferr("ERROR: Failed to allocate state structure\n");
+#ifdef CONFIG_FS_AUTOMOUNTER_DRIVER
+      lib_put_pathbuffer(devpath);
+#endif /* CONFIG_FS_AUTOMOUNTER_DRIVER */
       return NULL;
     }
 
@@ -838,8 +844,6 @@ FAR void *automount_initialize(FAR const struct automount_lower_s *lower)
                    priv->lower->ddelay);
   if (ret < 0)
     {
-      /* NOTE: Currently, work_queue only returns success */
-
       ferr("ERROR: Failed to schedule work: %d\n", ret);
     }
 
@@ -851,10 +855,11 @@ FAR void *automount_initialize(FAR const struct automount_lower_s *lower)
 
   /* Register driver */
 
-  snprintf(devpath, sizeof(devpath),
+  snprintf(devpath, PATH_MAX,
            CONFIG_FS_AUTOMOUNTER_VFS_PATH "%s", lower->mountpoint);
 
   ret = register_driver(devpath, &g_automount_fops, 0444, priv);
+  lib_put_pathbuffer(devpath);
   if (ret < 0)
     {
       ferr("ERROR: Failed to register automount driver: %d\n", ret);
@@ -911,12 +916,17 @@ void automount_uninitialize(FAR void *handle)
 #ifdef CONFIG_FS_AUTOMOUNTER_DRIVER
   if (priv->registered)
     {
-      char devpath[PATH_MAX];
+      FAR char *devpath = lib_get_pathbuffer();
+      if (devpath == NULL)
+        {
+          return;
+        }
 
-      snprintf(devpath, sizeof(devpath),
+      snprintf(devpath, PATH_MAX,
                CONFIG_FS_AUTOMOUNTER_VFS_PATH "%s", lower->mountpoint);
 
       unregister_driver(devpath);
+      lib_put_pathbuffer(devpath);
     }
 
   nxmutex_destroy(&priv->lock);

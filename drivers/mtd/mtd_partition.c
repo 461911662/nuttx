@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/mtd/mtd_partition.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -899,7 +901,7 @@ FAR struct mtd_dev_s *mtd_partition(FAR struct mtd_dev_s *mtd,
    * nullified by kmm_zalloc).
    */
 
-  part->child.erase   = part_erase;
+  part->child.erase   = mtd->erase ? part_erase : NULL;
   part->child.bread   = part_bread;
   part->child.bwrite  = part_bwrite;
   part->child.read    = mtd->read ? part_read : NULL;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_lock.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,9 +38,9 @@
 #include <nuttx/mutex.h>
 #include <nuttx/list.h>
 
-#include "lock.h"
 #include "sched/sched.h"
 #include "fs_heap.h"
+#include "vfs.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -98,11 +100,14 @@ static mutex_t g_protect_lock = NXMUTEX_INITIALIZER;
 static int file_lock_get_path(FAR struct file *filep, FAR char *path)
 {
   FAR struct tcb_s *tcb = this_task();
+  bool is_allowed_type;
 
-  /* We only apply file lock on mount points (f_inode won't be NULL). */
+  /* We only apply file lock on mountpt and driver (f_inode won't be NULL). */
 
-  if (!INODE_IS_MOUNTPT(filep->f_inode) ||
-      tcb->flags & TCB_FLAG_SIGNAL_ACTION)
+  is_allowed_type = INODE_IS_MOUNTPT(filep->f_inode) ||
+                    INODE_IS_DRIVER(filep->f_inode);
+
+  if (!is_allowed_type || tcb->flags & TCB_FLAG_SIGNAL_ACTION)
     {
       return -EBADF;
     }
@@ -300,7 +305,7 @@ file_lock_find_bucket(FAR const char *filepath)
 
 static void file_lock_free_entry(FAR ENTRY *entry)
 {
-  lib_free(entry->key);
+  fs_heap_free(entry->key);
   fs_heap_free(entry->data);
 }
 
@@ -323,7 +328,7 @@ file_lock_create_bucket(FAR const char *filepath)
 
   /* Creating an instance store */
 
-  item.key = strdup(filepath);
+  item.key = fs_heap_strdup(filepath);
   if (item.key == NULL)
     {
       fs_heap_free(bucket);
@@ -334,7 +339,7 @@ file_lock_create_bucket(FAR const char *filepath)
 
   if (hsearch_r(item, ENTER, &hretvalue, &g_file_lock_table) == 0)
     {
-      lib_free(item.key);
+      fs_heap_free(item.key);
       fs_heap_free(bucket);
       return NULL;
     }
@@ -730,7 +735,7 @@ retry:
 
   /* Update filep lock state */
 
-  filep->locked = true;
+  filep->f_locked = true;
 
   /* When there is a lock change, we need to wake up the blocking lock */
 
@@ -768,7 +773,7 @@ void file_closelk(FAR struct file *filep)
   bool deleted = false;
   int ret;
 
-  if (!filep->locked)
+  if (!filep->f_locked)
     {
       return;
     }
@@ -805,7 +810,7 @@ void file_closelk(FAR struct file *filep)
         {
           deleted = true;
           file_lock_delete(file_lock);
-          filep->locked = false;
+          filep->f_locked = false;
         }
     }
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/stm32l5/nucleo-l552ze/include/board.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -170,6 +172,11 @@
 
 #define GPIO_USART3_RX   GPIO_USART3_RX_4    /* PD9 */
 #define GPIO_USART3_TX   GPIO_USART3_TX_4    /* PD8 */
+
+/* LPUART1: Connected to STLink VCP by default on Nucleo-L552ZE-Q */
+
+#define GPIO_LPUART1_RX  GPIO_LPUART1_RX_4   /* PG8 */
+#define GPIO_LPUART1_TX  GPIO_LPUART1_TX_4   /* PG7 */
 
 /* LED definitions **********************************************************/
 

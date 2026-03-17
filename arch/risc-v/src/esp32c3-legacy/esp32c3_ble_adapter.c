@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/esp32c3-legacy/esp32c3_ble_adapter.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1261,7 +1263,7 @@ static bool IRAM_ATTR is_in_isr_wrapper(void)
  *   Malloc buffer
  *
  * Input Parameters:
- *  szie - buffer size
+ *  size - buffer size
  *
  * Returned Value:
  *   None
@@ -1285,7 +1287,7 @@ static void *malloc_wrapper(size_t size)
  *   Malloc buffer in DRAM
  *
  * Input Parameters:
- *  szie - buffer size
+ *  size - buffer size
  *
  * Returned Value:
  *   None
@@ -1647,7 +1649,7 @@ static void coex_schm_status_bit_set_wrapper(uint32_t type, uint32_t status)
  * Description:
  *
  * Input Parameters:
- *  szie
+ *  size
  *  status
  *
  * Returned Value:
@@ -2207,7 +2209,7 @@ int esp32c3_bt_controller_disable(void)
 
   while (!btdm_power_state_active())
     {
-      nxsig_usleep(1000); /* wait */
+      nxsched_usleep(1000); /* wait */
     }
 
   btdm_controller_disable();

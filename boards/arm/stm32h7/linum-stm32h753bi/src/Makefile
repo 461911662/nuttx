@@ -1,6 +1,8 @@
 ############################################################################
 # boards/arm/stm32h7/linum-stm32h753bi/src/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -68,6 +70,18 @@ endif
 
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += stm32_appinitialize.c
+endif
+
+ifeq ($(CONFIG_STM32H7_LTDC),y)
+CSRCS += stm32_lcd.c
+endif
+
+ifeq ($(CONFIG_AUDIO_TONE),y)
+  CSRCS += stm32_tone.c
+endif
+
+ifeq ($(CONFIG_INPUT_FT5X06),y)
+CSRCS += stm32_touchscreen.c
 endif
 
 include $(TOPDIR)/boards/Board.mk

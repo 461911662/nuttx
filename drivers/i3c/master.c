@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/i3c/master.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1179,7 +1181,7 @@ static void i3c_master_handle_ibi(FAR void *arg)
 
   master->ops->recycle_ibi_slot(dev, slot);
   atomic_fetch_sub(&dev->ibi->pending_ibis, 1);
-  if (!atomic_load(&dev->ibi->pending_ibis))
+  if (!atomic_read(&dev->ibi->pending_ibis))
     {
       sem_post(&dev->ibi->all_ibis_handled);
     }
@@ -2032,7 +2034,7 @@ int i3c_dev_disable_ibi_locked(FAR struct i3c_dev_desc *dev)
       return ret;
     }
 
-  if (atomic_load(&dev->ibi->pending_ibis))
+  if (atomic_read(&dev->ibi->pending_ibis))
     {
       sem_wait(&dev->ibi->all_ibis_handled);
     }
@@ -2085,7 +2087,7 @@ int i3c_dev_request_ibi_locked(FAR struct i3c_dev_desc *dev,
       return -ENOMEM;
     }
 
-  atomic_init(&ibi->pending_ibis, 0);
+  atomic_set(&ibi->pending_ibis, 0);
   sem_init(&ibi->all_ibis_handled, 0, 1);
   ibi->handler = req->handler;
   ibi->max_payload_len = req->max_payload_len;
@@ -2159,8 +2161,8 @@ void i3c_master_detach_i2c_dev(FAR struct i3c_master_controller *master,
  *
  *   This function takes care of everything for you:
  *    - creates and initializes the I3C bus.
- *    - registers all I3C charactor driver that supports I3C transfer.
- *    - registers the I2C charactor driver that supports I2C transfer.
+ *    - registers all I3C character driver that supports I3C transfer.
+ *    - registers the I2C character driver that supports I2C transfer.
  *
  * Input Parameters:
  *   master    - Master used to send frames on the bus.
@@ -2238,6 +2240,9 @@ int i3c_master_register(FAR struct i3c_master_controller *master,
    */
 
   master->init_done = true;
+  i3c_bus_normaluse_lock(&master->bus);
+  i3c_master_register_new_i3c_devs(master);
+  i3c_bus_normaluse_unlock(&master->bus);
 
   /* Expose I3C driver node by the i3c_driver on our I3C Bus, i3c driver id
    * equal to i3c bus id.

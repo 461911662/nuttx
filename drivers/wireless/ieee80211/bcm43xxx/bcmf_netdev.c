@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/wireless/ieee80211/bcm43xxx/bcmf_netdev.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -435,7 +437,7 @@ static void bcmf_tx_poll_work(FAR void *arg)
 {
   FAR struct bcmf_dev_s *priv = (FAR struct bcmf_dev_s *)arg;
 
-  net_lock();
+  netdev_lock(&priv->bc_dev);
 
   /* Ignore the notification if the interface is not yet up */
 
@@ -460,7 +462,7 @@ static void bcmf_tx_poll_work(FAR void *arg)
         }
     }
 
-  net_unlock();
+  netdev_unlock(&priv->bc_dev);
 }
 
 /****************************************************************************
@@ -490,7 +492,7 @@ static void bcmf_rxpoll_work(FAR void *arg)
    * thread has been configured.
    */
 
-  net_lock();
+  netdev_lock(&priv->bc_dev);
 
   /* Tx work will hold the d_buf until there is data to send,
    * replace and cache the d_buf temporarily
@@ -510,7 +512,7 @@ static void bcmf_rxpoll_work(FAR void *arg)
 #if 0
   bcmf_txdone(priv);
 #endif
-  net_unlock();
+  netdev_unlock(&priv->bc_dev);
 }
 
 /****************************************************************************
@@ -921,8 +923,7 @@ static int bcmf_ioctl(FAR struct net_driver_s *dev, int cmd,
 
   if (!priv->bc_bifup)
     {
-      wlerr("ERROR: invalid state "
-            "(IFF_DOWN, unable to execute command: %x)\n", cmd);
+      wlerr("ERROR: invalid state (unable to execute command: %x)\n", cmd);
       return -EPERM;
     }
 

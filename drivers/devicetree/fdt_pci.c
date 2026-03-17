@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/devicetree/fdt_pci.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -37,7 +39,7 @@
 #define FDT_PCI_TYPE_MEM32    0x02000000
 #define FDT_PCI_TYPE_MEM64    0x03000000
 #define FDT_PCI_TYPE_MASK     0x03000000
-#define FDT_PCI_PREFTCH       0x40000000
+#define FDT_PCI_PREFETCH      0x40000000
 
 /****************************************************************************
  * Public Functions
@@ -97,7 +99,7 @@ int fdt_pci_ecam_register(FAR const void *fdt)
 
   /* Get the reg address, 64 or 32 */
 
-  cfg.start = fdt_get_reg_base(fdt, offset);
+  cfg.start = fdt_get_reg_base(fdt, offset, 0);
   cfg.end = cfg.start + fdt_get_reg_size(fdt, offset);
 
   /* Get the ranges address */
@@ -116,22 +118,39 @@ int fdt_pci_ecam_register(FAR const void *fdt)
 
       if ((type & FDT_PCI_TYPE_MASK) == FDT_PCI_TYPE_IO)
         {
-          io.start = fdt_ld_by_cells(ranges + na, pna);
+          io.start = fdt_ld_by_cells(ranges + 1, na - 1);
           io.end = io.start + fdt_ld_by_cells(ranges + na + pna, ns);
+          io.offset = fdt_ld_by_cells(ranges + na, pna) - io.start;
+          io.flags = PCI_RESOURCE_IO;
         }
-      else if ((type & FDT_PCI_PREFTCH) == FDT_PCI_PREFTCH)
+      else if ((type & FDT_PCI_PREFETCH) == FDT_PCI_PREFETCH ||
+               (type & FDT_PCI_TYPE_MASK) == FDT_PCI_TYPE_MEM64)
         {
-          prefetch.start = fdt_ld_by_cells(ranges + na, pna);
+          prefetch.start = fdt_ld_by_cells(ranges + 1, na - 1);
           prefetch.end = prefetch.start +
                          fdt_ld_by_cells(ranges + na + pna, ns);
+          prefetch.offset = fdt_ld_by_cells(ranges + na, pna) -
+                            prefetch.start;
+          if ((type & FDT_PCI_PREFETCH) == FDT_PCI_PREFETCH)
+            {
+              prefetch.flags = PCI_RESOURCE_PREFETCH;
+            }
+
+          if ((type & FDT_PCI_TYPE_MASK) == FDT_PCI_TYPE_MEM64)
+            {
+              prefetch.flags |= PCI_RESOURCE_MEM_64;
+            }
+          else
+            {
+              prefetch.flags |= PCI_RESOURCE_MEM;
+            }
         }
-      else if (((type & FDT_PCI_TYPE_MEM32) == FDT_PCI_TYPE_MEM32 &&
-                sizeof(uintptr_t) == 4) ||
-               ((type & FDT_PCI_TYPE_MEM64) == FDT_PCI_TYPE_MEM64 &&
-                sizeof(uintptr_t) == 8))
+      else
         {
-          mem.start = fdt_ld_by_cells(ranges + na, pna);
+          mem.start = fdt_ld_by_cells(ranges + 1, na - 1);
           mem.end = mem.start + fdt_ld_by_cells(ranges + na + pna, ns);
+          mem.offset = fdt_ld_by_cells(ranges + na, pna) - mem.start;
+          mem.flags = PCI_RESOURCE_MEM;
         }
     }
 

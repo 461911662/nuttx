@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/rpmsg/rpmsg_virtio_ivshmem.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,8 +32,8 @@
 
 #include <nuttx/drivers/addrenv.h>
 #include <nuttx/pci/pci_ivshmem.h>
-#include <nuttx/rpmsg/rpmsg_virtio.h>
 #include <nuttx/rpmsg/rpmsg_virtio_ivshmem.h>
+#include <nuttx/rpmsg/rpmsg_virtio_lite.h>
 #include <nuttx/wdog.h>
 
 /****************************************************************************
@@ -51,15 +53,15 @@
 
 struct rpmsg_virtio_ivshmem_mem_s
 {
-  volatile uint64_t         basem;
-  volatile uint32_t         seqs;
-  volatile uint32_t         seqm;
-  struct rpmsg_virtio_rsc_s rsc;
+  volatile uint64_t              basem;
+  volatile uint32_t              seqs;
+  volatile uint32_t              seqm;
+  struct rpmsg_virtio_lite_rsc_s rsc;
 };
 
 struct rpmsg_virtio_ivshmem_dev_s
 {
-  struct rpmsg_virtio_s                  dev;
+  struct rpmsg_virtio_lite_s             dev;
   struct ivshmem_driver_s                drv;
   FAR struct ivshmem_device_s           *ivdev;
   rpmsg_virtio_callback_t                callback;
@@ -82,15 +84,15 @@ struct rpmsg_virtio_ivshmem_dev_s
  ****************************************************************************/
 
 static const FAR char *
-rpmsg_virtio_ivshmem_get_cpuname(FAR struct rpmsg_virtio_s *dev);
-static FAR struct rpmsg_virtio_rsc_s *
-rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_s *dev);
+rpmsg_virtio_ivshmem_get_cpuname(FAR struct rpmsg_virtio_lite_s *dev);
+static FAR struct rpmsg_virtio_lite_rsc_s *
+rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_lite_s *dev);
 static int
-rpmsg_virtio_ivshmem_is_master(FAR struct rpmsg_virtio_s *dev);
-static int rpmsg_virtio_ivshmem_notify(FAR struct rpmsg_virtio_s *dev,
+rpmsg_virtio_ivshmem_is_master(FAR struct rpmsg_virtio_lite_s *dev);
+static int rpmsg_virtio_ivshmem_notify(FAR struct rpmsg_virtio_lite_s *dev,
                                        uint32_t notifyid);
 static int
-rpmsg_virtio_ivshmem_register_callback(FAR struct rpmsg_virtio_s *dev,
+rpmsg_virtio_ivshmem_register_callback(FAR struct rpmsg_virtio_lite_s *dev,
                                        rpmsg_virtio_callback_t callback,
                                        FAR void *arg);
 static int rpmsg_virtio_ivshmem_probe(FAR struct ivshmem_device_s *ivdev);
@@ -100,7 +102,7 @@ static void rpmsg_virtio_ivshmem_remove(FAR struct ivshmem_device_s *ivdev);
  * Private Data
  ****************************************************************************/
 
-static const struct rpmsg_virtio_ops_s g_rpmsg_virtio_ivshmem_ops =
+static const struct rpmsg_virtio_lite_ops_s g_rpmsg_virtio_ivshmem_ops =
 {
   .get_cpuname       = rpmsg_virtio_ivshmem_get_cpuname,
   .get_resource      = rpmsg_virtio_ivshmem_get_resource,
@@ -114,23 +116,23 @@ static const struct rpmsg_virtio_ops_s g_rpmsg_virtio_ivshmem_ops =
  ****************************************************************************/
 
 static const FAR char *
-rpmsg_virtio_ivshmem_get_cpuname(FAR struct rpmsg_virtio_s *dev)
+rpmsg_virtio_ivshmem_get_cpuname(FAR struct rpmsg_virtio_lite_s *dev)
 {
   FAR struct rpmsg_virtio_ivshmem_dev_s *priv =
     (FAR struct rpmsg_virtio_ivshmem_dev_s *)dev;
   return priv->cpuname;
 }
 
-static FAR struct rpmsg_virtio_rsc_s *
-rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_s *dev)
+static FAR struct rpmsg_virtio_lite_rsc_s *
+rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_lite_s *dev)
 {
   FAR struct rpmsg_virtio_ivshmem_dev_s *priv =
     (FAR struct rpmsg_virtio_ivshmem_dev_s *)dev;
-  FAR struct rpmsg_virtio_rsc_s *rsc;
-  FAR struct rpmsg_virtio_cmd_s *cmd;
+  FAR struct rpmsg_virtio_lite_rsc_s *rsc;
+  FAR struct rpmsg_virtio_lite_cmd_s *cmd;
 
   rsc = &priv->shmem->rsc;
-  cmd = RPMSG_VIRTIO_RSC2CMD(rsc);
+  cmd = RPMSG_VIRTIO_LITE_RSC2CMD(rsc);
 
   if (priv->master)
     {
@@ -154,7 +156,7 @@ rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_s *dev)
     }
   else
     {
-      /* Wait untils master is ready, salve need use master base to
+      /* Wait until master is ready, slave needs to use master base to
        * initialize addrenv.
        */
 
@@ -163,7 +165,6 @@ rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_s *dev)
           usleep(1000);
         }
 
-      cmd->cmd_master       = 0;
       priv->addrenv[0].va   = (uint64_t)(uintptr_t)priv->shmem;
       priv->addrenv[0].pa   = priv->shmem->basem;
       priv->addrenv[0].size = priv->shmem_size;
@@ -176,14 +177,15 @@ rpmsg_virtio_ivshmem_get_resource(FAR struct rpmsg_virtio_s *dev)
   return rsc;
 }
 
-static int rpmsg_virtio_ivshmem_is_master(FAR struct rpmsg_virtio_s *dev)
+static int
+rpmsg_virtio_ivshmem_is_master(FAR struct rpmsg_virtio_lite_s *dev)
 {
   FAR struct rpmsg_virtio_ivshmem_dev_s *priv =
     (FAR struct rpmsg_virtio_ivshmem_dev_s *)dev;
   return priv->master;
 }
 
-static int rpmsg_virtio_ivshmem_notify(FAR struct rpmsg_virtio_s *dev,
+static int rpmsg_virtio_ivshmem_notify(FAR struct rpmsg_virtio_lite_s *dev,
                                        uint32_t vqid)
 {
   FAR struct rpmsg_virtio_ivshmem_dev_s *priv =
@@ -206,7 +208,7 @@ static int rpmsg_virtio_ivshmem_notify(FAR struct rpmsg_virtio_s *dev,
 }
 
 static int
-rpmsg_virtio_ivshmem_register_callback(FAR struct rpmsg_virtio_s *dev,
+rpmsg_virtio_ivshmem_register_callback(FAR struct rpmsg_virtio_lite_s *dev,
                                        rpmsg_virtio_callback_t callback,
                                        FAR void *arg)
 {
@@ -229,7 +231,7 @@ static int rpmsg_virtio_ivshmem_interrupt(int irq, FAR void *context,
 
   if (priv->callback != NULL)
     {
-      priv->callback(priv->arg, RPMSG_VIRTIO_NOTIFY_ALL);
+      priv->callback(priv->arg, RPMSG_VIRTIO_LITE_NOTIFY_ALL);
     }
 
   return 0;
@@ -258,7 +260,7 @@ static void rpmsg_virtio_ivshmem_wdog(wdparm_t arg)
 
   if (should_notify && priv->callback != NULL)
     {
-      priv->callback(priv->arg, RPMSG_VIRTIO_NOTIFY_ALL);
+      priv->callback(priv->arg, RPMSG_VIRTIO_LITE_NOTIFY_ALL);
     }
 
   wd_start(&priv->wdog, RPMSG_VIRTIO_IVSHMEM_WDOG_DELAY,
@@ -286,10 +288,10 @@ static int rpmsg_virtio_ivshmem_probe(FAR struct ivshmem_device_s *ivdev)
 
   /* Do rpmsg virtio initialize */
 
-  ret = rpmsg_virtio_initialize(&priv->dev);
+  ret = rpmsg_virtio_lite_initialize(&priv->dev);
   if (ret < 0)
     {
-      rpmsgerr("Rpmsg virtio intialize failed, ret=%d\n", ret);
+      rpmsgerr("Rpmsg virtio initialize failed, ret=%d\n", ret);
       goto err;
     }
 

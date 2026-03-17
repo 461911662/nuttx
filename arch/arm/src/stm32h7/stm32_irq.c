@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/stm32h7/stm32_irq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -203,7 +205,6 @@ static int stm32_reserved(int irq, void *context, void *arg)
  *
  ****************************************************************************/
 
-#ifdef CONFIG_ARMV7M_USEBASEPRI
 static inline void stm32_prioritize_syscall(int priority)
 {
   uint32_t regval;
@@ -215,7 +216,6 @@ static inline void stm32_prioritize_syscall(int priority)
   regval |= (priority << NVIC_SYSH_PRIORITY_PR11_SHIFT);
   putreg32(regval, NVIC_SYSH8_11_PRIORITY);
 }
-#endif
 
 /****************************************************************************
  * Name: stm32_irqinfo
@@ -322,8 +322,40 @@ static int stm32_irqinfo(int irq, uintptr_t *regaddr, uint32_t *bit,
           *bit     = 1 << (extint - 128);
         }
       else
+#elif STM32_IRQ_NEXTINTS <= 192
+      if (extint < 32)
+        {
+          *regaddr = (NVIC_IRQ0_31_ENABLE + offset);
+          *bit     = 1 << extint;
+        }
+      else if (extint < 64)
+        {
+          *regaddr = (NVIC_IRQ32_63_ENABLE + offset);
+          *bit     = 1 << (extint - 32);
+        }
+      else if (extint < 96)
+        {
+          *regaddr = (NVIC_IRQ64_95_ENABLE + offset);
+          *bit     = 1 << (extint - 64);
+        }
+      else if (extint < 128)
+        {
+          *regaddr = (NVIC_IRQ96_127_ENABLE + offset);
+          *bit     = 1 << (extint - 96);
+        }
+      else if (extint < 160)
+        {
+          *regaddr = (NVIC_IRQ128_159_ENABLE + offset);
+          *bit     = 1 << (extint - 128);
+        }
+      else if (extint < STM32_IRQ_NEXTINTS)
+        {
+          *regaddr = (NVIC_IRQ160_191_ENABLE + offset);
+          *bit     = 1 << (extint - 160);
+        }
+      else
 #else
-#  warning Missing logic
+#  error Missing logic
 #endif
         {
           return ERROR; /* Invalid interrupt */
@@ -372,9 +404,6 @@ static int stm32_irqinfo(int irq, uintptr_t *regaddr, uint32_t *bit,
 void up_irqinitialize(void)
 {
   uintptr_t regaddr;
-#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI)
-  uint32_t regval;
-#endif
   int nintlines;
   int i;
 
@@ -449,9 +478,8 @@ void up_irqinitialize(void)
 #ifdef CONFIG_ARCH_IRQPRIO
   /* up_prioritize_irq(STM32_IRQ_PENDSV, NVIC_SYSH_PRIORITY_MIN); */
 #endif
-#ifdef CONFIG_ARMV7M_USEBASEPRI
+
   stm32_prioritize_syscall(NVIC_SYSH_SVCALL_PRIORITY);
-#endif
 
   /* If the MPU is enabled, then attach and enable the Memory Management
    * Fault handler.
@@ -479,17 +507,6 @@ void up_irqinitialize(void)
 
   stm32_dumpnvic("initial", NR_IRQS);
 
-  /* If a debugger is connected, try to prevent it from catching hardfaults.
-   * If CONFIG_ARMV7M_USEBASEPRI, no hardfaults are expected in normal
-   * operation.
-   */
-
-#if defined(CONFIG_DEBUG_SYMBOLS) && !defined(CONFIG_ARMV7M_USEBASEPRI)
-  regval  = getreg32(NVIC_DEMCR);
-  regval &= ~NVIC_DEMCR_VCHARDERR;
-  putreg32(regval, NVIC_DEMCR);
-#endif
-
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
   /* Initialize logic to support a second level of interrupt decoding for
    * GPIO pins.
@@ -501,6 +518,7 @@ void up_irqinitialize(void)
 
   /* And finally, enable interrupts */
 
+  arm_color_intstack();
   up_irq_enable();
 #endif
 }

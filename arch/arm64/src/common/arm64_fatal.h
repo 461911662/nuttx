@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_fatal.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -165,8 +167,8 @@
  * Public Type Declarations
  ****************************************************************************/
 
-typedef int (*fatal_handle_func_t)(struct regs_context *regs,
-                                   uint64_t far, uint64_t esr);
+typedef int (*fatal_handle_func_t)(uint64_t *regs, uint64_t far,
+                                   uint64_t esr);
 
 /****************************************************************************
  * Public Function Prototypes
@@ -180,12 +182,12 @@ typedef int (*fatal_handle_func_t)(struct regs_context *regs,
  * Input Parameters:
  *   reg:    exception stack reg context
  *
- * Returned Value: None
+ * Returned Value: regs
  *   If the function return, the exception has been handled
  *
  ****************************************************************************/
 
-void arm64_fatal_handler(struct regs_context *reg);
+uint64_t *arm64_fatal_handler(uint64_t *reg);
 
 /****************************************************************************
  * Name: arm64_register_debug_hook

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/include/armv7-r/cp15.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -157,7 +159,10 @@
 #define CP15_CNTV_TVAL(r)  _CP15(0, r, c14, c3, 0)  /* Virtual TimerValue register */
 #define CP15_CNTV_CTL(r)   _CP15(0, r, c14, c3, 1)  /* Virtual Timer Control register */
 
-#define CP15_CNTPCT(lo,hi) _CP15_64(0, lo, hi, c14)   /* Physical Count register */
+#define CP15_CNTPCT(lo,hi)    _CP15_64(0, lo, hi, c14) /* Physical Count register */
+#define CP15_CNTVCT(lo,hi)    _CP15_64(1, lo, hi, c14) /* Virtual Count register */
+#define CP15_CNTP_CVAL(lo,hi) _CP15_64(2, lo, hi, c14) /* Physical Timer CompareValue register */
+#define CP15_CNTV_CVAL(lo,hi) _CP15_64(3, lo, hi, c14) /* Virtual Timer CompareValue register */
 
 #define CP15_DCIALLU(r)    _CP15(0, r, c15, c5, 0)   /* Invalidate data cache */
 
@@ -215,5 +220,46 @@
      );                                 \
      value;                             \
   })                                    \
+
+#define CP15_MODIFY(v,m,a) CP15_SET(a, ((CP15_GET(a) & ~(m)) | ((uintptr_t)(v) & (m))))
+
+/* MPIDR_EL1, Multiprocessor Affinity Register */
+
+#define MPIDR_AFFLVL_MASK   (0xff)
+#define MPIDR_ID_MASK       (0x00ffffff)
+
+#define MPIDR_AFF0_SHIFT    (0)
+#define MPIDR_AFF1_SHIFT    (8)
+#define MPIDR_AFF2_SHIFT    (16)
+
+/* mpidr register, the register is define:
+ *   - bit 0~7:   Aff0
+ *   - bit 8~15:  Aff1
+ *   - bit 16~23: Aff2
+ *   - bit 24:    MT, multithreading
+ *   - bit 25~29: RES0
+ *   - bit 30:    U, multiprocessor/Uniprocessor
+ *   - bit 31:    RES1
+ *  Different ARM/ARM64 cores will use different Affn define, the mpidr
+ *  value is not CPU number, So we need to change CPU number to mpid
+ *  and vice versa
+ */
+
+#define GET_MPIDR()             CP15_GET(MPIDR)
+
+#define MPIDR_AFFLVL(mpidr, aff_level) \
+  (((mpidr) >> MPIDR_AFF ## aff_level ## _SHIFT) & MPIDR_AFFLVL_MASK)
+
+#define MPID_TO_CORE(mpid, aff_level) \
+  (((mpid) >> MPIDR_AFF ## aff_level ## _SHIFT) & MPIDR_AFFLVL_MASK)
+
+#define CORE_TO_MPID(core, aff_level) \
+  ({ \
+    uint64_t __mpidr = GET_MPIDR(); \
+    __mpidr &= ~(MPIDR_AFFLVL_MASK << MPIDR_AFF ## aff_level ## _SHIFT); \
+    __mpidr |= (core << MPIDR_AFF ## aff_level ## _SHIFT); \
+    __mpidr &= MPIDR_ID_MASK; \
+    __mpidr; \
+  })
 
 #endif /* __ARCH_ARM_SRC_ARMV7_R_CP15_H */

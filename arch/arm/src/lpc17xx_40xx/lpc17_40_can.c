@@ -1,19 +1,11 @@
 /****************************************************************************
  * arch/arm/src/lpc17xx_40xx/lpc17_40_can.c
  *
- *   Copyright (C) 2011 Li Zhuoyi. All rights reserved.
- *   Copyright (C) 2012 Gregory Nutt. All rights reserved.
- *   Authors:
- *     Li Zhuoyi <lzyy.cn@gmail.com>
- *     Gregory Nutt <gnutt@nuttx.org>
- *   History:
- *     2011-07-12: Initial version (Li Zhuoyi)
- *     2011-08-03: Support CAN1/CAN2 (Li Zhuoyi)
- *     2012-01-02: Add support for CAN loopback mode (Gregory Nutt)
- *
- * This file is a part of NuttX:
- *
- *   Copyright (C) 2010 Gregory Nutt. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2010,2012 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2011 Li Zhuoyi. All rights reserved.
+ * SPDX-FileContributor: Li Zhuoyi <lzyy.cn@gmail.com>
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1774,6 +1766,8 @@ static int lpc17can_ifup(struct net_driver_s *dev)
   lpc17can_rxint(priv, true);
   lpc17can_txint(priv, true);
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1801,6 +1795,9 @@ static int lpc17can_ifdown(struct net_driver_s *dev)
   lpc17can_reset(priv);
 
   priv->bifup = false;
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 

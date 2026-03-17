@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/supervisor/riscv_perform_syscall.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,23 +40,25 @@
 void *riscv_perform_syscall(uintreg_t *regs)
 {
   struct tcb_s **running_task = &g_running_tasks[this_cpu()];
+  bool restore_context = true;
   struct tcb_s *tcb;
 
-  if (*running_task != NULL)
+  if (regs[REG_A0] != SYS_restore_context)
     {
       (*running_task)->xcp.regs = regs;
+      restore_context = false;
     }
 
-  /* Set up the interrupt register set needed by swint() */
+  /* Set irq flag */
 
-  up_set_current_regs(regs);
+  up_set_interrupt_context(true);
 
   /* Run the system call handler (swint) */
 
   riscv_swint(0, regs, NULL);
   tcb = this_task();
 
-  if ((*running_task) != tcb)
+  if (*running_task != tcb || restore_context)
     {
 #ifdef CONFIG_ARCH_ADDRENV
       /* Make sure that the address environment for the previously
@@ -63,8 +67,15 @@ void *riscv_perform_syscall(uintreg_t *regs)
        * thread at the head of the ready-to-run list.
        */
 
-      addrenv_switch(NULL);
+      addrenv_switch(tcb);
+      tcb = this_task();
 #endif
+      /* Update scheduler parameters */
+
+      if (!restore_context)
+        {
+          nxsched_switch_context(*running_task, tcb);
+        }
 
       /* Record the new "running" task.  g_running_tasks[] is only used by
        * assertion logic for reporting crashes.
@@ -73,7 +84,16 @@ void *riscv_perform_syscall(uintreg_t *regs)
       *running_task = tcb;
     }
 
-  up_set_current_regs(NULL);
+  /* Set irq flag */
 
-  return tcb->xcp.regs;
+  up_set_interrupt_context(false);
+
+  regs = tcb->xcp.regs;
+
+  /* (*running_task)->xcp.regs is about to become invalid
+   * and will be marked as NULL to avoid misusage.
+   */
+
+  (*running_task)->xcp.regs = NULL;
+  return regs;
 }

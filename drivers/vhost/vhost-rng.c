@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/vhost/vhost-rng.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,9 +27,10 @@
 #include <debug.h>
 #include <errno.h>
 #include <stdio.h>
-#include <sys/random.h>
+#include <stdlib.h>
 
 #include <nuttx/kmalloc.h>
+#include <nuttx/spinlock.h>
 #include <nuttx/vhost/vhost.h>
 #include <nuttx/wqueue.h>
 
@@ -86,28 +89,22 @@ static void vhost_rng_work(FAR void *arg)
   irqstate_t flags;
   uint16_t idx;
   uint32_t len;
-  ssize_t ret;
 
   vq = priv->hdev->vrings_info[0].vq;
   flags = spin_lock_irqsave(&priv->lock);
   for (; ; )
     {
-      buf = virtqueue_get_available_buffer(vq, &idx, &len);
+      buf = virtqueue_get_first_avail_buffer(vq, &idx, &len);
       if (buf == NULL)
         {
           break;
         }
 
       spin_unlock_irqrestore(&priv->lock, flags);
-      ret = getrandom(buf, len, 0);
-      if (ret < 0)
-        {
-          vhosterr("getrandom failed, ret=%zd\n", ret);
-          ret = 0;
-        }
+      arc4random_buf(buf, len);
 
       flags = spin_lock_irqsave(&priv->lock);
-      virtqueue_add_consumed_buffer(vq, idx, (uint32_t)ret);
+      virtqueue_add_consumed_buffer(vq, idx, len);
       virtqueue_kick(vq);
     }
 
@@ -154,7 +151,7 @@ static int vhost_rng_probe(FAR struct vhost_device *hdev)
 
   vqnames[0]  = "virtio_rng";
   callback[0] = vhost_rng_handler;
-  ret = vhost_create_virtqueues(hdev, 0, 1, vqnames, callback);
+  ret = vhost_create_virtqueues(hdev, 0, 1, vqnames, callback, NULL);
   if (ret < 0)
     {
       vhosterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);

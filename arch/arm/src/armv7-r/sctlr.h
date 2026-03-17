@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-r/sctlr.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,13 +34,16 @@
  * Included Files
  ****************************************************************************/
 
+#include <arch/barriers.h>
 #include <arch/irq.h>
-
-#include "barriers.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+/* Vector Base Address Register (VBAR) */
+
+#define VBAR_MASK                (0xffffffe0)
 
 /* CP15 c0 Registers ********************************************************/
 
@@ -518,14 +523,14 @@ static inline unsigned int cp15_rdsctlr(void)
 static inline void cp15_wrsctlr(unsigned int sctlr)
 {
   CP15_SET(SCTLR, sctlr);
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
 }
 
 /* Read/write the vector base address register (VBAR) */

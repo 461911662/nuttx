@@ -217,6 +217,14 @@ static int ipv4_dev_forward(FAR struct net_driver_s *dev,
 #endif
   int ret;
 
+  if (IFF_IS_NODST_FORWARD(fwddev->d_flags))
+    {
+      nwarn("WARNING: IP forwarding disabled on destination device %s\n",
+            fwddev->d_ifname);
+      ret = -EOPNOTSUPP;
+      goto errout;
+    }
+
 #ifdef CONFIG_NET_IPFILTER
   /* Do filter before forwarding, to make sure we drop silently before
    * replying any other errors.
@@ -371,9 +379,10 @@ static int ipv4_forward_callback(FAR struct net_driver_s *fwddev,
 
   DEBUGASSERT(fwddev != NULL);
 
-  /* Only IFF_UP device and non-loopback device need forward packet */
+  /* Only IFF_RUNNING device and non-loopback device need forward packet */
 
-  if (!IFF_IS_UP(fwddev->d_flags) || fwddev->d_lltype == NET_LL_LOOPBACK)
+  if (!IFF_IS_RUNNING(fwddev->d_flags) ||
+      fwddev->d_lltype == NET_LL_LOOPBACK)
     {
       return OK;
     }
@@ -459,10 +468,18 @@ int ipv4_forward(FAR struct net_driver_s *dev, FAR struct ipv4_hdr_s *ipv4)
   in_addr_t srcipaddr;
   FAR struct net_driver_s *fwddev;
   int ret;
-#ifdef CONFIG_NET_ICMP
+#if defined(CONFIG_NET_ICMP) && !defined(CONFIG_NET_ICMP_NO_STACK)
   int icmp_reply_type;
   int icmp_reply_code;
 #endif /* CONFIG_NET_ICMP */
+
+  if (IFF_IS_NOSRC_FORWARD(dev->d_flags))
+    {
+      nwarn("WARNING: IP forwarding disabled on source device %s\n",
+            dev->d_ifname);
+      ret = -EOPNOTSUPP;
+      goto drop;
+    }
 
   /* Search for a device that can forward this packet. */
 
@@ -511,7 +528,7 @@ int ipv4_forward(FAR struct net_driver_s *dev, FAR struct ipv4_hdr_s *ipv4)
 
 #endif
 
-      nwarn("WARNING: Packet forwarding to same device not supportedN\n");
+      nwarn("WARNING: Packet forwarding to same device not supported\n");
       ret = -ENOSYS;
       goto drop;
     }
@@ -526,7 +543,7 @@ int ipv4_forward(FAR struct net_driver_s *dev, FAR struct ipv4_hdr_s *ipv4)
 drop:
   ipv4_dropstats(ipv4);
 
-#ifdef CONFIG_NET_ICMP
+#if defined(CONFIG_NET_ICMP) && !defined(CONFIG_NET_ICMP_NO_STACK)
   /* Reply ICMP to the sender for particular errors. */
 
   switch (ret)
@@ -546,6 +563,11 @@ drop:
         icmp_reply_code = ICMP_EXC_TTL;
         goto reply;
 
+      case -EOPNOTSUPP:
+        icmp_reply_type = ICMP_DEST_UNREACHABLE;
+        icmp_reply_code = ICMP_HOST_UNREACH;
+        goto reply;
+
       default:
         break; /* We don't know how to reply, just go on (to drop). */
     }
@@ -554,7 +576,7 @@ drop:
   dev->d_len = 0;
   return ret;
 
-#ifdef CONFIG_NET_ICMP
+#if defined(CONFIG_NET_ICMP) && !defined(CONFIG_NET_ICMP_NO_STACK)
 reply:
 #  ifdef CONFIG_NET_NAT44
   /* Before we reply ICMP, call NAT outbound to try to translate destination
@@ -599,11 +621,24 @@ reply:
 void ipv4_forward_broadcast(FAR struct net_driver_s *dev,
                             FAR struct ipv4_hdr_s *ipv4)
 {
+  /* Check if source device supports IP forwarding capability.
+   * Broadcast/multicast forwarding is only allowed if the receiving
+   * device has SRC_FORWARD enabled. This is consistent with the unicast
+   * forwarding policy enforced in ipv4_forward().
+   */
+
+  if (IFF_IS_NOSRC_FORWARD(dev->d_flags))
+    {
+      nwarn("WARNING: IP broadcast forwarding disabled "
+            "on source device %s\n", dev->d_ifname);
+      return;
+    }
+
   /* Don't bother if the TTL would expire */
 
   if (ipv4->ttl > 1)
     {
-      /* Forward the the broadcast/multicast packet to all devices except,
+      /* Forward the broadcast/multicast packet to all devices except,
        * of course, the device that received the packet.
        */
 

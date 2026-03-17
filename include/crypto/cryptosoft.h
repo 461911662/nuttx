@@ -1,6 +1,9 @@
 /****************************************************************************
  * include/crypto/cryptosoft.h
- * $OpenBSD: cryptosoft.h,v 1.14 2012/12/07 17:03:22 mikeb Exp $
+ *
+ * SPDX-License-Identifier: OAR
+ * SPDX-FileCopyrightText: 2000 Angelos D. Keromytis
+ * SPDX-FileContributor: Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -33,6 +36,10 @@
 #include <sys/queue.h>
 #include <crypto/cryptodev.h>
 #include <crypto/xform.h>
+
+/****************************************************************************
+ * Public Type Definitions
+ ****************************************************************************/
 
 /* Software session entry */
 
@@ -89,5 +96,9 @@ int swcr_kprocess(FAR struct cryptkop *);
 int swcr_newsession(FAR uint32_t *, FAR struct cryptoini *);
 int swcr_freesession(uint64_t);
 void swcr_init(void);
+
+/* Software key management */
+
+void swkey_init(void);
 
 #endif /* __INCLUDE_CRYPTO_CRYPTOSOFT_H */

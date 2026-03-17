@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/cxd56xx/cxd56_i2c.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -482,7 +484,8 @@ static int cxd56_i2c_interrupt(int irq, void *context, void *arg)
  *   if the interrupt occurs when the writing request.
  *   Actual receiving data is in RX_FULL interrupt handler.
  *
- * TODO : The argument "last" is not used.
+ *   TODO : The argument "last" is not used.
+ *
  ****************************************************************************/
 
 static int cxd56_i2c_receive(struct cxd56_i2cdev_s *priv, int last)
@@ -586,8 +589,9 @@ static int cxd56_i2c_send(struct cxd56_i2cdev_s *priv, int last)
  * Description:
  *   Perform a sequence of I2C transfers
  *
- * TODO: Multiple i2c_msg_s read operations with the same address are not
- * currently guaranteed.
+ *   TODO: Multiple i2c_msg_s read operations with the same address are not
+ *         currently guaranteed.
+ *
  ****************************************************************************/
 
 static int cxd56_i2c_transfer(struct i2c_master_s *dev,
@@ -665,6 +669,7 @@ static int cxd56_i2c_transfer(struct i2c_master_s *dev,
       if (priv->error != OK)
         {
           ret = priv->error;
+          wostop = 0;
           break;
         }
 
@@ -719,6 +724,10 @@ static int cxd56_i2c_reset(struct i2c_master_s *dev)
   /* Lock out other clients */
 
   nxmutex_lock(&priv->lock);
+
+  /* Disable clock gating (clock enable) */
+
+  cxd56_i2c_clock_gate_disable(priv->port);
 
   /* Use GPIO configuration to un-wedge the bus */
 
@@ -791,6 +800,11 @@ static int cxd56_i2c_reset(struct i2c_master_s *dev)
       up_udelay(10);
     }
 
+  /* Disable input of SCL and SDA pins */
+
+  cxd56_gpio_config(scl_gpio, false);
+  cxd56_gpio_config(sda_gpio, false);
+
   /* Generate a start followed by a stop to reset slave
    * state machines.
    */
@@ -817,7 +831,11 @@ out:
 
   cxd56_i2c_pincontrol(priv->port, true);
 
-  /* Release the port for re-use by other clients */
+  /* Enable clock gating (clock disable) */
+
+  cxd56_i2c_clock_gate_enable(priv->port);
+
+  /* Release the port for reuse by other clients */
 
   nxmutex_unlock(&priv->lock);
   return ret;
@@ -1124,10 +1142,6 @@ struct i2c_master_s *cxd56_i2cbus_initialize(int port)
 
   cxd56_i2c_setfrequency(priv, I2C_DEFAULT_FREQUENCY);
 
-  /* Configure pin */
-
-  cxd56_i2c_pincontrol(port, true);
-
   /* Attach Interrupt Handler */
 
   irq_attach(priv->irqid, cxd56_i2c_interrupt, priv);
@@ -1147,6 +1161,10 @@ struct i2c_master_s *cxd56_i2cbus_initialize(int port)
   /* Enable clock gating (clock disable) */
 
   cxd56_i2c_clock_gate_enable(port);
+
+  /* Configure pin */
+
+  cxd56_i2c_pincontrol(port, true);
 
   nxmutex_unlock(&priv->lock);
   return &priv->dev;

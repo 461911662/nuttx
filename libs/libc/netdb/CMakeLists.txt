@@ -43,7 +43,11 @@ if(CONFIG_LIBC_NETDB)
     lib_gaistrerror.c
     lib_freeaddrinfo.c
     lib_getaddrinfo.c
-    lib_getnameinfo.c)
+    lib_getnameinfo.c
+    lib_rexec.c
+    lib_dn.c
+    lib_proto.c
+    lib_protor.c)
 
   # Add host file support
 
@@ -55,7 +59,8 @@ if(CONFIG_LIBC_NETDB)
 
   if(CONFIG_NETDB_DNSCLIENT)
     list(APPEND SRCS lib_dnsinit.c lib_dnsbind.c lib_dnsquery.c)
-    list(APPEND SRCS lib_dnsaddserver.c lib_dnsdefaultserver.c)
+    list(APPEND SRCS lib_dnsaddserver.c lib_dnsdelserver.c
+         lib_dnsdefaultserver.c)
     list(APPEND SRCS lib_dnsforeach.c lib_dnsnotify.c)
     list(APPEND SRCS lib_dnsqueryfamily.c)
 

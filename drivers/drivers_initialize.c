@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/drivers_initialize.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,6 +35,7 @@
 #include <nuttx/input/uinput.h>
 #include <nuttx/mtd/mtd.h>
 #include <nuttx/net/loopback.h>
+#include <nuttx/net/rpmsgdrv.h>
 #include <nuttx/net/tun.h>
 #include <nuttx/net/telnet.h>
 #include <nuttx/note/note_driver.h>
@@ -48,24 +51,28 @@
 #include <nuttx/syslog/syslog.h>
 #include <nuttx/syslog/syslog_console.h>
 #include <nuttx/thermal.h>
+#include <nuttx/timers/ptp_clock_dummy.h>
+#include <nuttx/timers/capture.h>
 #include <nuttx/trace.h>
 #include <nuttx/usrsock/usrsock_rpmsg.h>
 #include <nuttx/vhost/vhost.h>
 #include <nuttx/virtio/virtio.h>
 #include <nuttx/drivers/optee.h>
+#include <nuttx/usb/usbhost.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
 /* Check if only one console device is selected.
- * If you get this errro, search your .config file for CONSOLE_XXX_CONSOLE
+ * If you get this error, search your .config file for CONSOLE_XXX_CONSOLE
  * options and remove what is not needed.
  */
 
 #if (defined(CONFIG_LWL_CONSOLE) + defined(CONFIG_SERIAL_CONSOLE) + \
      defined(CONFIG_CDCACM_CONSOLE) + defined(CONFIG_PL2303_CONSOLE) + \
-     defined(CONFIG_SERIAL_RTT_CONSOLE) + defined(CONFIG_RPMSG_UART_CONSOLE)) > 1
+     defined(CONFIG_SERIAL_RTT_CONSOLE) + defined(CONFIG_RPMSG_UART_CONSOLE) + \
+     defined(CONFIG_RPMSG_UART_RAW_CONSOLE) ) > 1
 #  error More than one console driver selected. Check your configuration !
 #endif
 
@@ -168,6 +175,10 @@ void drivers_initialize(void)
   rpmsg_serialinit();
 #endif
 
+#ifdef CONFIG_RPMSG_UART_RAW
+  rpmsg_serialrawinit();
+#endif
+
 #ifdef CONFIG_RAM_UART
   ram_serialinit();
 #endif
@@ -240,6 +251,10 @@ void drivers_initialize(void)
   sensor_rpmsg_initialize();
 #endif
 
+#ifdef CONFIG_SENSORS_MONITOR
+  sensor_monitor_initialize();
+#endif
+
 #ifdef CONFIG_DEV_RPMSG_SERVER
   rpmsgdev_server_init();
 #endif
@@ -258,12 +273,22 @@ void drivers_initialize(void)
   usrsock_rpmsg_server_initialize();
 #endif
 
+#ifdef CONFIG_NET_RPMSG_DRV_SERVER
+  /* Initialize the net rpmsg default server */
+
+  net_rpmsg_drv_server_init();
+#endif
+
 #ifdef CONFIG_SMART_DEV_LOOP
   smart_loop_register_driver();
 #endif
 
 #ifdef CONFIG_MTD_LOOP
   mtd_loop_register();
+#endif
+
+#ifdef CONFIG_USBHOST_WAITER
+  usbhost_drivers_initialize();
 #endif
 
 #if defined(CONFIG_PCI) && !defined(CONFIG_PCI_LATE_DRIVERS_REGISTER)
@@ -284,6 +309,14 @@ void drivers_initialize(void)
 
 #ifdef CONFIG_THERMAL
   thermal_init();
+#endif
+
+#ifdef CONFIG_PTP_CLOCK_DUMMY
+  ptp_clock_dummy_initialize(0);
+#endif
+
+#ifdef CONFIG_FAKE_CAPTURE
+  fake_capture_initialize(2);
 #endif
 
   drivers_trace_end();

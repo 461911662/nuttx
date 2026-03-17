@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/common/iar/fork.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -27,7 +29,7 @@
 #include "arm_fork.h"
 
 	MODULE up_fork
-	SECTION .text:CODE:NOROOT(2)
+	SECTION .text:CODE:NOROOT(2), "ax"
 
 /****************************************************************************
  * Pre-processor Definitions

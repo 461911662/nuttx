@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/pci/pci_epc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 #include <debug.h>
 
 #include <nuttx/bits.h>
+#include <nuttx/mm/mm.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/lib/math32.h>
 #include <nuttx/pci/pci_epc.h>
@@ -62,6 +65,7 @@ static struct list_node g_pci_epc_device_list =
  *
  * Returned Value:
  *   Return epc created if success, NULL if failed
+ *
  ****************************************************************************/
 
 FAR struct pci_epc_ctrl_s *pci_get_epc(FAR const char *epc_name)
@@ -110,6 +114,7 @@ FAR struct pci_epc_ctrl_s *pci_get_epc(FAR const char *epc_name)
  *
  * Returned Value:
  *    Return the member if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_get_next_free_bar(
@@ -164,6 +169,7 @@ int pci_epc_get_next_free_bar(
  *
  * Returned Value:
  *    Epc features if success, NULL if failed
+ *
  ****************************************************************************/
 
 FAR const struct pci_epc_features_s *
@@ -197,6 +203,7 @@ pci_epc_get_features(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno)
  *
  * Returned Value:
  *    None
+ *
  ****************************************************************************/
 
 void pci_epc_stop(FAR struct pci_epc_ctrl_s *epc)
@@ -224,6 +231,7 @@ void pci_epc_stop(FAR struct pci_epc_ctrl_s *epc)
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_start(FAR struct pci_epc_ctrl_s *epc)
@@ -258,6 +266,7 @@ int pci_epc_start(FAR struct pci_epc_ctrl_s *epc)
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_raise_irq(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -305,6 +314,7 @@ int pci_epc_raise_irq(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_map_msi_irq(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -350,6 +360,7 @@ int pci_epc_map_msi_irq(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return interrupt number if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_get_msi(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno)
@@ -395,6 +406,7 @@ int pci_epc_get_msi(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno)
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_set_msi(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -436,6 +448,7 @@ int pci_epc_set_msi(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return interrupt + 1 number if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_get_msix(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno)
@@ -482,6 +495,7 @@ int pci_epc_get_msix(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno)
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_set_msix(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -517,6 +531,7 @@ int pci_epc_set_msix(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    None
+ *
  ****************************************************************************/
 
 void pci_epc_unmap_addr(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -550,6 +565,7 @@ void pci_epc_unmap_addr(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_map_addr(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -585,6 +601,7 @@ int pci_epc_map_addr(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    None
+ *
  ****************************************************************************/
 
 void pci_epc_clear_bar(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -618,6 +635,7 @@ void pci_epc_clear_bar(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_set_bar(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -662,6 +680,7 @@ int pci_epc_set_bar(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *    Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_write_header(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
@@ -700,6 +719,7 @@ int pci_epc_write_header(FAR struct pci_epc_ctrl_s *epc, uint8_t funcno,
  *
  * Returned Value:
  *   Return 0 if success, negative if failed
+ *
  ****************************************************************************/
 
 int pci_epc_add_epf(FAR struct pci_epc_ctrl_s *epc,
@@ -751,6 +771,7 @@ out:
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_remove_epf(FAR struct pci_epc_ctrl_s *epc,
@@ -783,6 +804,7 @@ void pci_epc_remove_epf(FAR struct pci_epc_ctrl_s *epc,
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_linkup(FAR struct pci_epc_ctrl_s *epc)
@@ -824,6 +846,7 @@ void pci_epc_linkup(FAR struct pci_epc_ctrl_s *epc)
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_linkdown(FAR struct pci_epc_ctrl_s *epc)
@@ -865,6 +888,7 @@ void pci_epc_linkdown(FAR struct pci_epc_ctrl_s *epc)
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_init_notify(FAR struct pci_epc_ctrl_s *epc)
@@ -906,6 +930,7 @@ void pci_epc_init_notify(FAR struct pci_epc_ctrl_s *epc)
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_bme_notify(FAR struct pci_epc_ctrl_s *epc)
@@ -943,15 +968,18 @@ void pci_epc_bme_notify(FAR struct pci_epc_ctrl_s *epc)
  * Input Parameters:
  *   name        - EPC name strings
  *   priv        - The epc priv data
+ *   dma_addr    - Used for inbound address
+ *   dma_len     - The dma memory len
  *   ops         - Function pointers for performing EPC operations
  *
  * Returned Value:
  *   Return struct pci_epc_ctrl_s * if success, NULL if failed.
+ *
  ****************************************************************************/
 
 FAR struct pci_epc_ctrl_s *
-pci_epc_create(FAR const char *name, FAR void *priv,
-               FAR const struct pci_epc_ops_s *ops)
+pci_epc_create(FAR const char *name, FAR void *priv, FAR void *dma_addr,
+               size_t dma_len, FAR const struct pci_epc_ops_s *ops)
 {
   FAR struct pci_epc_ctrl_s *epc;
   size_t len;
@@ -968,6 +996,16 @@ pci_epc_create(FAR const char *name, FAR void *priv,
       return NULL;
     }
 
+  if (dma_addr != NULL && dma_len != 0)
+    {
+      epc->dmaheap = mm_initialize_pool("pci_dma", dma_addr, dma_len, NULL);
+      if (epc->dmaheap == NULL)
+        {
+          pcierr("Create DMA heap error \n");
+          goto free_epc;
+        }
+    }
+
   epc->priv = priv;
   memcpy(epc->name, name, len);
   nxmutex_init(&epc->lock);
@@ -979,6 +1017,10 @@ pci_epc_create(FAR const char *name, FAR void *priv,
   nxmutex_unlock(&g_pci_epc_lock);
 
   return epc;
+
+free_epc:
+  kmm_free(epc);
+  return NULL;
 }
 
 /****************************************************************************
@@ -994,6 +1036,7 @@ pci_epc_create(FAR const char *name, FAR void *priv,
  *
  * Returned Value:
  *   None
+ *
  ****************************************************************************/
 
 void pci_epc_destroy(FAR struct pci_epc_ctrl_s *epc)
@@ -1009,4 +1052,93 @@ void pci_epc_destroy(FAR struct pci_epc_ctrl_s *epc)
 
   nxmutex_destroy(&epc->lock);
   kmm_free(epc);
+}
+
+/****************************************************************************
+ * Name: pci_epc_dma_alloc
+ *
+ * Description:
+ *   This function is used to create a new endpoint controller (EPC) device.
+ *
+ *   Invoke to destroy the PCI EPC device.
+ *
+ * Input Parameters:
+ *   epc  - The EPC device that has to be destroyed
+ *   size - The dma memory size
+ *
+ * Returned Value:
+ *   The point of dma memory if success, NULL if failed
+ *
+ ****************************************************************************/
+
+FAR void *pci_epc_dma_alloc(FAR struct pci_epc_ctrl_s *epc, size_t size)
+{
+  if (epc->dmaheap != NULL)
+    {
+      return mm_malloc(epc->dmaheap, size);
+    }
+  else
+    {
+      return kmm_malloc(size);
+    }
+}
+
+/****************************************************************************
+ * Name: pci_epc_dma_memalign
+ *
+ * Description:
+ *   This function is used to create a new endpoint controller (EPC) device.
+ *
+ *   Invoke to destroy the PCI EPC device.
+ *
+ * Input Parameters:
+ *   epc       - The EPC device that has to be destroyed
+ *   alignment - Alignment size
+ *   size      - The dma memory size
+ *
+ * Returned Value:
+ *   The point of dma memory if success, NULL if failed
+ *
+ ****************************************************************************/
+
+FAR void *pci_epc_dma_memalign(FAR struct pci_epc_ctrl_s *epc,
+                               size_t alignment, size_t size)
+{
+  if (epc->dmaheap != NULL)
+    {
+      return mm_memalign(epc->dmaheap, alignment, size);
+    }
+  else
+    {
+      return kmm_memalign(alignment, size);
+    }
+}
+
+/****************************************************************************
+ * Name: pci_epc_dma_free
+ *
+ * Description:
+ *   This function is used to create a new endpoint controller (EPC) device.
+ *
+ *   Invoke to destroy the PCI EPC device.
+ *
+ * Input Parameters:
+ *   epc       - The EPC device that has to be destroyed
+ *   mem       - The dma memory need ed to be free
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+void pci_epc_dma_free(FAR struct pci_epc_ctrl_s *epc, FAR void *mem)
+{
+  if (epc->dmaheap != NULL)
+    {
+      mm_free(epc->dmaheap, mem);
+    }
+  else
+    {
+      kmm_free(mem);
+    }
 }

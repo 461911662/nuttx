@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-net.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,6 +28,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <nuttx/compiler.h>
 #include <nuttx/kmalloc.h>
@@ -569,7 +572,7 @@ static int virtio_net_init(FAR struct virtio_net_priv_s *priv,
 
   virtio_set_status(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
   virtio_negotiate_features(vdev, (1UL << VIRTIO_NET_F_MAC) |
-                                  (1UL << VIRTIO_F_ANY_LAYOUT));
+                                  (1UL << VIRTIO_F_ANY_LAYOUT), NULL);
   virtio_set_status(vdev, VIRTIO_CONFIG_FEATURES_OK);
 
   vqnames[VIRTIO_NET_RX]   = "virtio_net_rx";
@@ -577,7 +580,7 @@ static int virtio_net_init(FAR struct virtio_net_priv_s *priv,
   callbacks[VIRTIO_NET_RX] = virtio_net_rxready;
   callbacks[VIRTIO_NET_TX] = virtio_net_txdone;
   ret = virtio_create_virtqueues(vdev, 0, VIRTIO_NET_NUM, vqnames,
-                                 callbacks);
+                                 callbacks, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);
@@ -611,8 +614,9 @@ static void virtio_net_set_macaddr(FAR struct virtio_net_priv_s *priv)
 
   if (virtio_has_feature(vdev, VIRTIO_NET_F_MAC))
     {
-      virtio_read_config(vdev, offsetof(struct virtio_net_config_s, mac),
-                         mac, IFHWADDRLEN);
+      virtio_read_config_bytes(vdev,
+                               offsetof(struct virtio_net_config_s, mac),
+                               mac, IFHWADDRLEN);
     }
   else
     {
@@ -622,20 +626,8 @@ static void virtio_net_set_macaddr(FAR struct virtio_net_priv_s *priv)
        *        conflicts with something else on the network.
        */
 
-      srand(time(NULL) +
-#ifdef CONFIG_NETDEV_IFINDEX
-            dev->d_ifindex
-#else
-            (uintptr_t)dev % 256
-#endif
-          );
-
       mac[0] = 0x42;
-      mac[1] = rand() % 256;
-      mac[2] = rand() % 256;
-      mac[3] = rand() % 256;
-      mac[4] = rand() % 256;
-      mac[5] = rand() % 256;
+      arc4random_buf(mac + 1, 5);
     }
 }
 
@@ -686,7 +678,7 @@ static int virtio_net_probe(FAR struct virtio_device *vdev)
 
 #endif
 
-  /* Register the net deivce */
+  /* Register the net device */
 
   ret = netdev_lower_register(netdev,
 #ifdef CONFIG_DRIVERS_WIFI_SIM

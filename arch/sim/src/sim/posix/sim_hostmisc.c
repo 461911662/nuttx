@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sim/src/sim/posix/sim_hostmisc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,6 +24,7 @@
  * Included Files
  ****************************************************************************/
 
+#include <signal.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -50,7 +53,7 @@
  * Public Function Prototypes
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_COVERAGE
+#ifndef CONFIG_COVERAGE_NONE
 void __gcov_dump(void);
 #endif
 
@@ -72,7 +75,7 @@ extern int backtrace(void **array, int size);
 
 void host_abort(int status)
 {
-#ifdef CONFIG_ARCH_COVERAGE
+#ifndef CONFIG_COVERAGE_NONE
   /* Dump gcov data. */
 
   host_uninterruptible_no_return(__gcov_dump);
@@ -223,4 +226,13 @@ int host_waitpid(pid_t pid)
 
   pid = host_uninterruptible(waitpid, pid, &status, 0);
   return pid < 0 ? -errno : status;
+}
+
+/****************************************************************************
+ * Name: host_kill
+ ****************************************************************************/
+
+int host_kill(pid_t pid, int sig)
+{
+  return host_uninterruptible(kill, pid, sig);
 }

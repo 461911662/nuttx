@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/nrf91/nrf91_gpio.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,12 @@
 #include "arm_internal.h"
 #include "hardware/nrf91_gpio.h"
 #include "nrf91_gpio.h"
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static spinlock_t g_nrf91_gpio_lock = SP_UNLOCKED;
 
 /****************************************************************************
  * Private Functions
@@ -269,7 +277,7 @@ int nrf91_gpio_config(nrf91_pinset_t cfgset)
 
       pin = GPIO_PIN_DECODE(cfgset);
 
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_nrf91_gpio_lock);
 
       /* First, configure the port as a generic input so that we have a
        * known starting point and consistent behavior during the re-
@@ -296,7 +304,7 @@ int nrf91_gpio_config(nrf91_pinset_t cfgset)
           nrf91_gpio_sense(cfgset, port, pin);
           break;
 
-        case GPIO_OUTPUT:  /* GPIO outpout pin */
+        case GPIO_OUTPUT:  /* GPIO output pin */
           nrf91_gpio_output(cfgset, port, pin);
           break;
 
@@ -304,7 +312,7 @@ int nrf91_gpio_config(nrf91_pinset_t cfgset)
           ret = -EINVAL;
         }
 
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_nrf91_gpio_lock, flags);
     }
   else
     {

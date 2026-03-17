@@ -34,13 +34,26 @@
  * Public Functions
  ****************************************************************************/
 
-#undef strdup /* See mm/README.txt */
+#undef strdup
 FAR char *strdup(FAR const char *s)
 {
   size_t size = strlen(s) + 1;
   FAR char *news = (FAR char *)lib_malloc(size);
 
   if (news)
+    {
+      memcpy(news, s, size);
+    }
+
+  return news;
+}
+
+FAR char *nx_strdup(FAR const char *s)
+{
+  size_t size = strlen(s) + 1;
+  FAR char *news = (FAR char *)kmm_malloc(size);
+
+  if (news != NULL)
     {
       strlcpy(news, s, size);
     }

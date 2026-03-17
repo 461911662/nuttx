@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/misoc/src/common/misoc_net.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -692,6 +694,9 @@ static int misoc_net_ifup(struct net_driver_s *dev)
 
   ethmac_sram_writer_ev_enable_write(1);
   leave_critical_section(flags);
+
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -738,6 +743,9 @@ static int misoc_net_ifdown(struct net_driver_s *dev)
 
   priv->misoc_net_bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 

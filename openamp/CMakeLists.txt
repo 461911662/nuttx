@@ -21,7 +21,8 @@
 # ##############################################################################
 if(CONFIG_OPENAMP)
 
-  set(OPENAMP_VERSION 2022.10.0)
+  set(OPENAMP_VERSION 2025.10.0)
+  set(LIBMETAL_VERSION 2025.10.0)
 
   include(libmetal.cmake)
   include(open-amp.cmake)

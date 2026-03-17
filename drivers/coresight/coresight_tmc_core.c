@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/coresight/coresight_tmc_core.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,7 +44,7 @@
 
 static enum tmc_mem_intf_width_e tmc_etf_get_memwidth(uint32_t devid)
 {
-  /* Indicate the minimum alignemnt for RRR/RURP/RWP/DBA etc registers. */
+  /* Indicate the minimum alignment for RRR/RURP/RWP/DBA etc registers. */
 
   switch (BMVAL(devid, 8, 10))
   {
@@ -67,7 +69,7 @@ static enum tmc_mem_intf_width_e tmc_etr_get_memwidth(uint32_t devid)
 {
   uint32_t val = (BMVAL(devid, 14, 15) << 3) | BMVAL(devid, 8, 10);
 
-  /* Indicate the minimum alignemnt for RRR/RURP/RWP/DBA etc registers. */
+  /* Indicate the minimum alignment for RRR/RURP/RWP/DBA etc registers. */
 
   switch (val)
   {
@@ -143,6 +145,7 @@ tmc_register(FAR const struct coresight_desc_s *desc)
     }
 
   tmc_init_arch_data(tmcdev, desc);
+  tmcdev->caps = desc->caps;
 
   switch (tmcdev->config_type)
     {

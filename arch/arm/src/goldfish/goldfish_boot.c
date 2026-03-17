@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/goldfish/goldfish_boot.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,6 +33,7 @@
 #include "goldfish_memorymap.h"
 #include "smp.h"
 #include "gic.h"
+#include "scu.h"
 
 #ifdef CONFIG_DEVICE_TREE
 #  include <nuttx/fdt.h>
@@ -39,6 +42,16 @@
 #ifdef CONFIG_SCHED_INSTRUMENTATION
 #  include <sched/sched.h>
 #  include <nuttx/sched_note.h>
+#endif
+
+#include <nuttx/syslog/syslog_rpmsg.h>
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+#ifdef CONFIG_SYSLOG_RPMSG
+static char g_syslog_rpmsg_buf[4096];
 #endif
 
 /****************************************************************************
@@ -65,6 +78,12 @@ void arm_boot(void)
 
   goldfish_setupmappings();
 
+#ifdef CONFIG_SMP
+  /* Enable SMP cache coherency for CPU0 */
+
+  arm_enable_smp(0);
+#endif
+
   arm_fpuconfig();
 
 #ifdef CONFIG_ARM_PSCI
@@ -82,6 +101,10 @@ void arm_boot(void)
 
   arm_earlyserialinit();
 #endif
+
+#ifdef CONFIG_SYSLOG_RPMSG
+  syslog_rpmsg_init_early(g_syslog_rpmsg_buf, sizeof(g_syslog_rpmsg_buf));
+#endif
 }
 
 #if defined(CONFIG_ARM_PSCI) && defined(CONFIG_SMP)
@@ -90,7 +113,15 @@ int up_cpu_start(int cpu)
 #ifdef CONFIG_SCHED_INSTRUMENTATION
   /* Notify of the start event */
 
-  sched_note_cpu_start(this_task_inirq(), cpu);
+  sched_note_cpu_start(this_task(), cpu);
+#endif
+
+#ifdef CONFIG_ARCH_ADDRENV
+  /* Copy cpu0 page table to target cpu. */
+
+  memcpy((uint32_t *)(PGTABLE_BASE_VADDR + PGTABLE_SIZE * cpu),
+          (uint32_t *)PGTABLE_BASE_VADDR, PGTABLE_SIZE);
+  UP_DSB();
 #endif
 
   return psci_cpu_on(cpu, (uintptr_t)__start);

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_hpet.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -555,7 +557,7 @@ struct intel64_tim_dev_s *intel64_hpet_init(uint64_t base)
           /* Configure legacy mode.
            *
            * There is no way to disable PIT interrupts (?) other than enable
-           * legacy mode for HPET. Otherwise unwanted PIT interupts will
+           * legacy mode for HPET. Otherwise unwanted PIT interrupts will
            * interfere with HPET interrupts, making them useless.
            */
 

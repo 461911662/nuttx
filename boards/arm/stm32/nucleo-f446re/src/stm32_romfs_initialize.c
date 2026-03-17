@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/stm32/nucleo-f446re/src/stm32_romfs_initialize.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -69,7 +71,7 @@
  ****************************************************************************/
 
 __asm__ (
-  "   .section .rodata                            \n"
+  "   .section .rodata, \"a\"                     \n"
   "   .balign  16                                 \n"
   "   .globl   romfs_data_begin                   \n"
   "romfs_data_begin:                              \n"

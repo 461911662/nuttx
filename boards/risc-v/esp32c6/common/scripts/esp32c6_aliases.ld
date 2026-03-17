@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/risc-v/esp32c6/common/scripts/esp32c6_aliases.ld
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,6 +24,7 @@ cache_set_idrom_mmu_size = Cache_Set_IDROM_MMU_Size;
 cache_resume_icache = Cache_Resume_ICache;
 cache_suspend_icache = Cache_Suspend_ICache;
 cache_invalidate_icache_all = Cache_Invalidate_ICache_All;
+_interrupt_handler = exception_common;
 
 #ifdef CONFIG_ESPRESSIF_BLE
 

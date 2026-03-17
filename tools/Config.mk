@@ -95,7 +95,7 @@ else
 
 HOSTCC ?= cc
 HOSTCFLAGS ?= -O2 -Wall -Wstrict-prototypes -Wshadow
-HOSTCFLAGS += -DHAVE_STRTOK_C=1
+HOSTCFLAGS += -DHAVE_STRTOK_C=1 -DHAVE_STRNDUP=1
 
 ifeq ($(CONFIG_WINDOWS_CYGWIN),y)
 HOSTCFLAGS += -DHOST_CYGWIN=1
@@ -620,7 +620,7 @@ define DOWNLOAD
 	$(ECHO_END)
 endef
 
-# CLONE - Git clone repository. Initializes a new Git repository in the 
+# CLONE - Git clone repository. Initializes a new Git repository in the
 #         folder on your local machine and populates it with the contents
 #         of the central repository.
 #         The third argument is an storage path. The second argument is used
@@ -635,7 +635,7 @@ define CLONE
 		if [ ! -d $3 ]; then \
 			git clone --quiet $1 $3; \
 		fi; \
-		cp -fr $3 $2; \
+		$(DIRLINK) $3 $2; \
 	fi
 	$(ECHO_END)
 endef
@@ -659,7 +659,7 @@ endef
 
 # CLEAN - Default clean target
 
-ifeq ($(CONFIG_ARCH_COVERAGE),y)
+ifeq ($(CONFIG_COVERAGE_NONE),)
 	EXTRA = *.gcno *.gcda
 endif
 
@@ -784,7 +784,7 @@ else
   CONVERT_PATH = $1
 endif
 
-# Upper/Lower case string, add the `UL` prefix to private function 
+# Upper/Lower case string, add the `UL` prefix to private function
 
 ULPOP = $(wordlist 3,$(words $(1)),$(1))
 ULSUB = $(subst $(word 1,$(1)),$(word 2,$(1)),$(2))

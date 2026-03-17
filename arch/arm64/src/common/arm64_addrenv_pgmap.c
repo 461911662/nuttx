@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_addrenv_pgmap.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,9 +32,10 @@
 #include <nuttx/pgalloc.h>
 #include <nuttx/sched.h>
 
+#include <arch/barriers.h>
+
 #include <sys/mman.h>
 
-#include "barriers.h"
 #include "pgalloc.h"
 #include "arm64_mmu.h"
 
@@ -216,7 +219,7 @@ int up_addrenv_kmap_init(void)
 
   /* When all is set and done, flush the data caches */
 
-  ARM64_DSB();
+  UP_DSB();
 
   return OK;
 }
@@ -278,6 +281,10 @@ int up_addrenv_kmap_pages(void **pages, unsigned int npages, uintptr_t vaddr,
   /* Also, revoke user execute access */
 
   mask |= PTE_BLOCK_DESC_UXN;
+
+  /* Flags for normal memory region */
+
+  mask |= MMU_MT_NORMAL_FLAGS;
 
   /* Let arm64_map_pages do the work */
 

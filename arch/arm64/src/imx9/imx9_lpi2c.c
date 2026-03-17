@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/imx9/imx9_lpi2c.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -176,10 +178,6 @@ struct imx9_lpi2c_config_s
   uint8_t filtsda;             /* Glitch Filter for SDA pin */
   iomux_cfg_t scl_pin;         /* Peripheral configuration for SCL as SCL */
   iomux_cfg_t sda_pin;         /* Peripheral configuration for SDA as SDA */
-#if defined(CONFIG_I2C_RESET)
-  gpio_pinset_t reset_scl_pin; /* GPIO configuration for SCL as GPIO */
-  gpio_pinset_t reset_sda_pin; /* GPIO configuration for SDA as GPIO */
-#endif
   uint8_t mode;                /* Master or Slave mode */
 #ifndef CONFIG_I2C_POLLED
   uint32_t irq;                /* Event IRQ */
@@ -338,10 +336,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c1_config =
   .filtsda       = CONFIG_IMX9_LPI2C1_FILTSDA,
   .scl_pin       = MUX_LPI2C1_SCL,
   .sda_pin       = MUX_LPI2C1_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C1_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C1_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -386,10 +380,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c2_config =
   .filtsda       = CONFIG_IMX9_LPI2C2_FILTSDA,
   .scl_pin       = MUX_LPI2C2_SCL,
   .sda_pin       = MUX_LPI2C2_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C2_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C2_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -434,10 +424,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c3_config =
   .filtsda       = CONFIG_IMX9_LPI2C3_FILTSDA,
   .scl_pin       = MUX_LPI2C3_SCL,
   .sda_pin       = MUX_LPI2C3_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C3_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C3_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -482,10 +468,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c4_config =
   .filtsda       = CONFIG_IMX9_LPI2C4_FILTSDA,
   .scl_pin       = MUX_LPI2C4_SCL,
   .sda_pin       = MUX_LPI2C4_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C4_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C4_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -530,10 +512,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c5_config =
   .filtsda       = CONFIG_IMX9_LPI2C5_FILTSDA,
   .scl_pin       = MUX_LPI2C5_SCL,
   .sda_pin       = MUX_LPI2C5_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C5_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C5_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -578,10 +556,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c6_config =
   .filtsda       = CONFIG_IMX9_LPI2C6_FILTSDA,
   .scl_pin       = MUX_LPI2C6_SCL,
   .sda_pin       = MUX_LPI2C6_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C6_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C6_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -626,10 +600,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c7_config =
   .filtsda       = CONFIG_IMX9_LPI2C7_FILTSDA,
   .scl_pin       = MUX_LPI2C7_SCL,
   .sda_pin       = MUX_LPI2C7_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C7_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C7_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -674,10 +644,6 @@ static const struct imx9_lpi2c_config_s imx9_lpi2c8_config =
   .filtsda       = CONFIG_IMX9_LPI2C8_FILTSDA,
   .scl_pin       = MUX_LPI2C8_SCL,
   .sda_pin       = MUX_LPI2C8_SDA,
-#if defined(CONFIG_I2C_RESET)
-  .reset_scl_pin = GPIO_LPI2C8_SCL_RESET,
-  .reset_sda_pin = GPIO_LPI2C8_SDA_RESET,
-#endif
 #ifndef CONFIG_I2C_SLAVE
   .mode          = LPI2C_MASTER,
 #else
@@ -1110,7 +1076,7 @@ static void imx9_lpi2c_setclock(struct imx9_lpi2c_priv_s *priv,
           imx9_get_rootclock(priv->config->clk_root, &src_freq);
 
           /* LPI2C output frequency = (Source Clock (Hz)/ 2^prescale) /
-           *   (CLKLO + 1 + CLKHI + 1 + ROUNDDOWN((2 + FILTSCL) / 2^prescale)
+           *   (CLKLO + 1 + CLKHI + 1 + ALIGN_DOWN((2 + FILTSCL)/2^prescale)
            *
            * Assume  CLKLO = 2 * CLKHI, SETHOLD = CLKHI, DATAVD = CLKHI / 2
            */
@@ -1311,14 +1277,10 @@ static int imx9_lpi2c_start_message(struct imx9_lpi2c_priv_s *priv)
   priv->dcnt  = priv->msgv->length;
   priv->flags = priv->msgv->flags;
 
-  /* Enable RX interrupt before sending START in order not to miss it */
+  /* Disable ABORT which may be present after errors */
 
-  if ((priv->flags & I2C_M_READ) != 0)
-    {
-      irq_config |= LPI2C_MIER_RDIE;
-    }
-
-  imx9_lpi2c_putreg(priv, IMX9_LPI2C_MIER_OFFSET, irq_config);
+  imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MCFGR0_OFFSET,
+                       LPI2C_MCFG0_ABORT, 0);
 
   /* Send start + address unless M_NOSTART is defined */
 
@@ -1331,27 +1293,22 @@ static int imx9_lpi2c_start_message(struct imx9_lpi2c_priv_s *priv)
   else
     {
       imx9_lpi2c_traceevent(priv, I2CEVENT_NOSTART, priv->msgc);
-
-      if ((priv->flags & I2C_M_READ) == 0)
-        {
-          /* We didn't send start, send the first byte to trigger TX IRQs */
-
-          imx9_lpi2c_putreg(priv, IMX9_LPI2C_MTDR_OFFSET,
-                            LPI2C_MTDR_CMD_TXD |
-                            LPI2C_MTDR_DATA(*priv->ptr++));
-          priv->dcnt--;
-        }
     }
-
-  /* Enable TX interrupt after sending the first byte - before sending
-   * anything the FIFO count is at 0, so the TX interrupt would trigger
-   * right away
-   */
 
   if ((priv->flags & I2C_M_READ) == 0)
     {
+      /* Queue the first byte. NB: if start was sent and NACK received,
+       * the byte won't be sent out to the bus.
+       */
+
+      imx9_lpi2c_putreg(priv, IMX9_LPI2C_MTDR_OFFSET,
+                        LPI2C_MTDR_CMD_TXD |
+                        LPI2C_MTDR_DATA(*priv->ptr++));
+      priv->dcnt--;
+
+      /* Enable TX interrupt */
+
       irq_config |= LPI2C_MIER_TDIE;
-      imx9_lpi2c_putreg(priv, IMX9_LPI2C_MIER_OFFSET, irq_config);
     }
   else
     {
@@ -1360,7 +1317,13 @@ static int imx9_lpi2c_start_message(struct imx9_lpi2c_priv_s *priv)
       imx9_lpi2c_putreg(priv, IMX9_LPI2C_MTDR_OFFSET,
                         LPI2C_MTDR_CMD_RXD |
                         LPI2C_MTDR_DATA((priv->dcnt - 1)));
+
+      /* Enable RX interrupt */
+
+      irq_config |= LPI2C_MIER_RDIE;
     }
+
+  imx9_lpi2c_putreg(priv, IMX9_LPI2C_MIER_OFFSET, irq_config);
 
   return OK;
 }
@@ -1488,9 +1451,10 @@ static int imx9_lpi2c_isr_process(struct imx9_lpi2c_priv_s *priv)
 
   /* Ignore NACK on RX last byte - this is normal */
 
-  if ((status & LPI2C_MSR_NDF) != 0 && (priv->flags & I2C_M_READ) != 0 &&
-      priv->dcnt == 1)
+  if ((status & (LPI2C_MSR_RDF | LPI2C_MSR_NDF)) ==
+      (LPI2C_MSR_RDF | LPI2C_MSR_NDF) && priv->dcnt == 1)
     {
+      imx9_lpi2c_putreg(priv, IMX9_LPI2C_MSR_OFFSET, LPI2C_MSR_NDF);
       status &= ~LPI2C_MSR_NDF;
     }
 
@@ -1510,23 +1474,32 @@ static int imx9_lpi2c_isr_process(struct imx9_lpi2c_priv_s *priv)
       imx9_lpi2c_putreg(priv, IMX9_LPI2C_MSR_OFFSET,
                         status & LPI2C_MSR_ERROR_MASK);
 
-      priv->status = status;
-      priv->msgc = 0;
-      priv->dcnt = 0;
-
-      /* If there is no stop condition on the bus after clearing the error,
-       * send stop. Otherwise stop the transfer now.
+      /* If there is no stop condition on the bus, abort (send stop).
+       * Otherwise stop the transfer now.
        */
 
-      status = imx9_lpi2c_getstatus(priv);
       if ((status & LPI2C_MSR_SDF) == 0)
         {
-          imx9_lpi2c_sendstop(priv);
+          /* Disable RX and TX interrupts */
+
+          imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MIER_OFFSET,
+                               LPI2C_MIER_TDIE | LPI2C_MIER_TDIE, 0);
+
+          /* Abort any ongoing transfer, this also sends stop on the bus */
+
+          imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MCFGR0_OFFSET, 0,
+                               LPI2C_MCFG0_ABORT);
         }
       else
         {
           imx9_lpi2c_stop_transfer(priv);
         }
+
+      /* Mark that there are no more messages to process */
+
+      priv->status = status;
+      priv->msgc = 0;
+      priv->dcnt = 0;
 
       return OK;
     }
@@ -1974,7 +1947,7 @@ static int imx9_lpi2c_dma_transfer(struct imx9_lpi2c_priv_s *priv)
                                                  LPI2C_MSR_ALF |
                                                  LPI2C_MSR_FEF);
 
-  /* Enable the Iterrupts */
+  /* Enable the Interrupts */
 
   imx9_lpi2c_putreg(priv, IMX9_LPI2C_MIER_OFFSET,
                     LPI2C_MIER_NDIE | LPI2C_MIER_ALIE |
@@ -2083,6 +2056,24 @@ static int imx9_lpi2c_transfer(struct i2c_master_s *dev,
       ret = -ETIMEDOUT;
       i2cerr("ERROR: Timed out: MSR: status: 0x0%" PRIx32 "\n",
              priv->status);
+
+      /* Stop the ongoing transfer and clear the FIFOs */
+
+      imx9_lpi2c_stop_transfer(priv);
+
+      imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MCR_OFFSET, 0,
+                           LPI2C_MCR_RTF | LPI2C_MCR_RRF);
+
+      /* Clear any errors */
+
+      imx9_lpi2c_putreg(priv, IMX9_LPI2C_MSR_OFFSET, LPI2C_MSR_ERROR_MASK);
+
+      /* Reset the semaphore. There is a race between interrupts and
+       * sem_waitdone, and the semaphore is anyhow posted one extra time in
+       * imx9_lpi2c_stop_transfer above
+       */
+
+      nxsem_reset(&priv->sem_isr, 0);
     }
 
   /* Check for error status conditions */
@@ -2109,7 +2100,7 @@ static int imx9_lpi2c_transfer(struct i2c_master_s *dev,
         {
           /* FIFO Error */
 
-          i2cerr("Transfer without start condition\n");
+          i2cerr("FIFO error\n");
           ret = -EINVAL;
         }
     }
@@ -2162,11 +2153,8 @@ static int imx9_lpi2c_transfer(struct i2c_master_s *dev,
 static int imx9_lpi2c_reset(struct i2c_master_s *dev)
 {
   struct imx9_lpi2c_priv_s *priv = (struct imx9_lpi2c_priv_s *)dev;
-  unsigned int clock_count;
-  unsigned int stretch_count;
-  uint32_t scl_gpio;
-  uint32_t sda_gpio;
-  uint32_t frequency;
+  uint32_t status;
+  unsigned count;
   int ret;
 
   DEBUGASSERT(dev);
@@ -2183,97 +2171,44 @@ static int imx9_lpi2c_reset(struct i2c_master_s *dev)
       return ret;
     }
 
-  ret = -EIO;
-
-  /* Save the current frequency */
-
-  frequency = priv->frequency;
-
   /* De-init the port */
 
   imx9_lpi2c_deinit(priv);
-
-  /* Use GPIO configuration to un-wedge the bus */
-
-  imx9_iomux_gpio(priv->config->scl_pin, true);
-  imx9_iomux_gpio(priv->config->sda_pin, true);
-
-  scl_gpio = priv->config->reset_scl_pin;
-  sda_gpio = priv->config->reset_sda_pin;
-
-  imx9_config_gpio(scl_gpio);
-  imx9_config_gpio(sda_gpio);
-
-  /* Let SDA go high */
-
-  imx9_gpio_write(sda_gpio, 1);
-
-  /* Clock the bus until any slaves currently driving it let it go. */
-
-  clock_count = 0;
-  while (!imx9_gpio_read(sda_gpio))
-    {
-      /* Give up if we have tried too hard */
-
-      if (clock_count++ > 10)
-        {
-          goto out;
-        }
-
-      /* Sniff to make sure that clock stretching has finished.
-       *
-       * If the bus never relaxes, the reset has failed.
-       */
-
-      stretch_count = 0;
-      while (!imx9_gpio_read(scl_gpio))
-        {
-          /* Give up if we have tried too hard */
-
-          if (stretch_count++ > 10)
-            {
-              goto out;
-            }
-
-          up_udelay(10);
-        }
-
-      /* Drive SCL low */
-
-      imx9_gpio_write(scl_gpio, 0);
-      up_udelay(10);
-
-      /* Drive SCL high again */
-
-      imx9_gpio_write(scl_gpio, 1);
-      up_udelay(10);
-    }
-
-  /* Generate a start followed by a stop to reset slave
-   * state machines.
-   */
-
-  imx9_gpio_write(sda_gpio, 0);
-  up_udelay(10);
-  imx9_gpio_write(scl_gpio, 0);
-  up_udelay(10);
-  imx9_gpio_write(scl_gpio, 1);
-  up_udelay(10);
-  imx9_gpio_write(sda_gpio, 1);
-  up_udelay(10);
 
   /* Re-init the port */
 
   imx9_lpi2c_init(priv);
 
-  /* Restore the frequency */
+  /* Set bus to relaxed mode - this allows clocking the bus even when it
+   * is busy
+   */
 
-  imx9_lpi2c_setclock(priv, frequency);
-  ret = OK;
+  imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MCFGR0_OFFSET,
+                       0, LPI2C_MCFG0_RELAX);
 
-out:
+  /* Clock the bus until it gets freed  (max 10 times) */
 
-  /* Release the port for re-use by other clients */
+  count = 0;
+  status = imx9_lpi2c_getstatus(priv);
+  while ((status & LPI2C_MSR_BBF) != 0 && count++ < 10)
+    {
+      i2cerr("Bus %d busy!\n", priv->config->clk_root - CCM_CR_LPI2C1 + 1);
+      imx9_lpi2c_sendstart(priv, 0);
+      imx9_lpi2c_sendstop(priv);
+      usleep(1000);
+      status = imx9_lpi2c_getstatus(priv);
+    }
+
+  /* Check that the bus is now free */
+
+  ret = (status & LPI2C_MSR_BBF) == 0 ? OK : -EIO;
+
+  /* Exit relaxed mode */
+
+  imx9_lpi2c_modifyreg(priv, IMX9_LPI2C_MCFGR0_OFFSET,
+                       LPI2C_MCFG0_RELAX, 0);
+
+  /* Release the port for reuse by other clients */
 
   nxmutex_unlock(&priv->lock);
   return ret;

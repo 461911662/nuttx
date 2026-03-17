@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/common/arm_backtrace_unwind.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -231,7 +233,7 @@ static unsigned long unwind_get_byte(struct unwind_ctrl_s *ctrl)
  * Name: unwind_pop_register
  *
  * Description:
- *  Before poping a register check whether it is feasible or not
+ *  Before popping a register check whether it is feasible or not
  *
  ****************************************************************************/
 
@@ -743,10 +745,10 @@ int up_backtrace(struct tcb_s *tcb,
           ret = backtrace_unwind(&frame, buffer, size, &skip);
           if (ret < size)
             {
-              frame.fp = up_current_regs()[REG_FP];
-              frame.sp = up_current_regs()[REG_SP];
-              frame.pc = up_current_regs()[REG_PC];
-              frame.lr = up_current_regs()[REG_LR];
+              frame.fp = ((uint32_t *)running_regs())[REG_FP];
+              frame.sp = ((uint32_t *)running_regs())[REG_SP];
+              frame.pc = ((uint32_t *)running_regs())[REG_PC];
+              frame.lr = ((uint32_t *)running_regs())[REG_LR];
               frame.stack_base = (unsigned long)rtcb->stack_base_ptr;
               frame.stack_top = frame.stack_base + rtcb->adj_stack_size;
               ret += backtrace_unwind(&frame, &buffer[ret],

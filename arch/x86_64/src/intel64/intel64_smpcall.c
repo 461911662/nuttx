@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_smpcall.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -58,14 +60,7 @@
 
 int x86_64_smp_call_handler(int irq, void *c, void *arg)
 {
-  struct tcb_s *tcb;
-  int cpu = this_cpu();
-
-  tcb = current_task(cpu);
-  x86_64_savestate(tcb->xcp.regs);
   nxsched_smp_call_handler(irq, c, arg);
-  tcb = current_task(cpu);
-  x86_64_restorestate(tcb->xcp.regs);
 
   return OK;
 }
@@ -78,7 +73,7 @@ int x86_64_smp_call_handler(int irq, void *c, void *arg)
  *
  *   1. It saves the current task state at the head of the current assigned
  *      task list.
- *   2. It porcess g_delivertasks
+ *   2. It processes g_delivertasks
  *   3. Returns from interrupt, restoring the state of the new task at the
  *      head of the ready to run list.
  *
@@ -92,16 +87,9 @@ int x86_64_smp_call_handler(int irq, void *c, void *arg)
 
 int x86_64_smp_sched_handler(int irq, void *c, void *arg)
 {
-  struct tcb_s *tcb;
   int cpu = this_cpu();
 
-  tcb = current_task(cpu);
-  nxsched_suspend_scheduler(tcb);
-  x86_64_savestate(tcb->xcp.regs);
   nxsched_process_delivered(cpu);
-  tcb = current_task(cpu);
-  nxsched_resume_scheduler(tcb);
-  x86_64_restorestate(tcb->xcp.regs);
 
   return OK;
 }

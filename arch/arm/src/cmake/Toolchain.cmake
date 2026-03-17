@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm/src/cmake/Toolchain.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -43,10 +45,14 @@ endif()
 
 include(${ARCH_SUBDIR})
 
+# include the toolchain specific cmake file
+
 set(TOOLCHAIN_FILE)
 
 if(CONFIG_ARCH_TOOLCHAIN_CLANG) # clang
   set(TOOLCHAIN_FILE clang)
+elseif(CONFIG_ARCH_TOOLCHAIN_ARMCLANG) # arm clang
+  set(TOOLCHAIN_FILE armclang)
 elseif(CONFIG_ARCH_TOOLCHAIN_GHS) # greenhills
   set(TOOLCHAIN_FILE ghs)
 else() # gcc

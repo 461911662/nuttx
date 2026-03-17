@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/imx9/hardware/imx9_blk_ctrl.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -44,7 +46,7 @@
 #define IMX9_WAKUPMIX_I3C2_WAKEUP_OFFSET      0x38  /* I3C2 WAKEUPX CLR */
 #define IMX9_WAKUPMIX_IPG_DEBUG_CA55C0_OFFSET 0x3c  /* IPG DEBUG mask bit for CA55 core0 */
 #define IMX9_WAKUPMIX_IPG_DEBUG_CA55C1_OFFSET 0x40  /* IPG DEBUG mask bit for CA55 core1 */
-#define IMX9_WAKUPMIX_AXI_ATTR_CFG_OFFSET     0x44  /* AXI CACHE OVERRITE BIT */
+#define IMX9_WAKUPMIX_AXI_ATTR_CFG_OFFSET     0x44  /* AXI CACHE OVERRIDE BIT */
 #define IMX9_WAKUPMIX_I3C2_SDA_IRQ_OFFSET     0x48  /* I3C SDA IRQ Control */
 
 /* Wakeupmix block control registers ****************************************/

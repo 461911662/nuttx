@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_initialstate.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,7 +43,6 @@
 #include <nuttx/power/pm.h>
 #include <arch/chip/chip.h>
 
-#include "addrenv.h"
 #include "arm64_arch.h"
 #include "arm64_internal.h"
 #include "chip.h"
@@ -54,7 +55,7 @@
 void arm64_new_task(struct tcb_s * tcb)
 {
   uint64_t stack_ptr = (uintptr_t)tcb->stack_base_ptr + tcb->adj_stack_size;
-  struct regs_context *pinitctx;
+  struct xcptcontext *xcp = &tcb->xcp;
 
 #ifdef CONFIG_ARCH_KERNEL_STACK
   /* Use the process kernel stack to store context for user processes */
@@ -66,34 +67,46 @@ void arm64_new_task(struct tcb_s * tcb)
     }
 #endif
 
-  pinitctx = STACK_PTR_TO_FRAME(struct regs_context, stack_ptr);
-  memset(pinitctx, 0, sizeof(struct regs_context));
-  pinitctx->elr       = (uint64_t)tcb->start;
+  /* Initialize the context registers to stack top */
+
+  xcp->regs = (void *)(stack_ptr - XCPTCONTEXT_SIZE);
+
+  /* Initialize the xcp registers */
+
+  memset(xcp->regs, 0, XCPTCONTEXT_SIZE);
+
+  xcp->regs[REG_ELR]       = (uint64_t)tcb->start;
 
   /* Keep using SP_EL1 or SP_EL3 */
 
 #if CONFIG_ARCH_ARM64_EXCEPTION_LEVEL == 3
-  pinitctx->spsr      = SPSR_MODE_EL3H;
+  xcp->regs[REG_SPSR]      = SPSR_MODE_EL3H;
 #else
-  pinitctx->spsr      = SPSR_MODE_EL1H;
+  xcp->regs[REG_SPSR]      = SPSR_MODE_EL1H;
+#endif
+
+#ifdef CONFIG_ARM64_MTE
+  xcp->regs[REG_SCTLR_EL1] = read_sysreg(sctlr_el1) | SCTLR_TCF1_BIT;
+#endif
+
+#ifndef CONFIG_ARM64_DECODEFIQ
+  xcp->regs[REG_SPSR]     |= DAIF_FIQ_BIT;
 #endif
 
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
-  pinitctx->spsr       |= (DAIF_IRQ_BIT | DAIF_FIQ_BIT);
+  xcp->regs[REG_SPSR]     |= (DAIF_IRQ_BIT | DAIF_FIQ_BIT);
 #endif /* CONFIG_SUPPRESS_INTERRUPTS */
 
-  pinitctx->sp_elx    = (uint64_t)stack_ptr;
+  xcp->regs[REG_SP_ELX]    = (uint64_t)stack_ptr;
 #ifdef CONFIG_ARCH_KERNEL_STACK
-  pinitctx->sp_el0    = (uint64_t)tcb->xcp.ustkptr;
+  xcp->regs[REG_SP_EL0]    = (uint64_t)tcb->xcp.ustkptr;
 #else
-  pinitctx->sp_el0    = (uint64_t)pinitctx;
+  xcp->regs[REG_SP_EL0]    = (uint64_t)stack_ptr - XCPTCONTEXT_SIZE;
 #endif
-  pinitctx->exe_depth = 0;
-
-  tcb->xcp.regs       = (uint64_t *)pinitctx;
+  xcp->regs[REG_EXE_DEPTH] = 0;
 
 #ifndef CONFIG_BUILD_FLAT
-  tcb->xcp.initregs   = tcb->xcp.regs;
+  tcb->xcp.initregs        = tcb->xcp.regs;
 #endif
 }
 

@@ -51,14 +51,12 @@
 #include "hardware/esp32s3_rtccntl.h"
 #include "hardware/esp32s3_syscon.h"
 #include "hardware/wdev_reg.h"
-#include "rom/esp32s3_spiflash.h"
 #include "xtensa.h"
 #include "esp_attr.h"
 #include "esp32s3_irq.h"
 #include "esp32s3_rt_timer.h"
 #include "esp32s3_rtc.h"
-#include "esp32s3_spiflash.h"
-#include "esp32s3_wireless.h"
+#include "espressif/esp_wireless.h"
 
 #include "esp_bt.h"
 #include "esp_log.h"
@@ -67,6 +65,7 @@
 #include "esp_private/esp_clk.h"
 #include "esp_private/phy.h"
 #include "esp_private/wifi.h"
+#include "esp_private/cache_utils.h"
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "esp_rom_sys.h"
@@ -74,6 +73,7 @@
 #include "rom/ets_sys.h"
 #include "soc/soc_caps.h"
 #include "private/esp_coexist_internal.h"
+#include "soc/clk_tree_defs.h"
 
 #include "esp32s3_ble_adapter.h"
 
@@ -96,16 +96,18 @@
 #define BTDM_LPCLK_SEL_8M                (3)
 
 #define OSI_FUNCS_TIME_BLOCKING          0xffffffff
-#define OSI_VERSION                      0x00010009
+#define OSI_VERSION                      0x0001000a
 #define OSI_MAGIC_VALUE                  0xfadebead
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#define BLE_PWR_HDL_INVL                 0xffff
+
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
 #  define BLE_TASK_EVENT_QUEUE_ITEM_SIZE  8
 #  define BLE_TASK_EVENT_QUEUE_LEN        8
 #endif
 
-#ifdef CONFIG_ESP32S3_BLE_INTERRUPT_SAVE_STATUS
-#  define NR_IRQSTATE_FLAGS   CONFIG_ESP32S3_BLE_INTERRUPT_SAVE_STATUS
+#ifdef CONFIG_ESPRESSIF_BLE_INTERRUPT_SAVE_STATUS
+#  define NR_IRQSTATE_FLAGS   CONFIG_ESPRESSIF_BLE_INTERRUPT_SAVE_STATUS
 #else
 #  define NR_IRQSTATE_FLAGS   3
 #endif
@@ -228,6 +230,8 @@ struct osi_funcs_s
   void (* _btdm_rom_table_ready)(void);
   bool (* _coex_bt_wakeup_request)(void);
   void (* _coex_bt_wakeup_request_end)(void);
+  int64_t (*_get_time_us)(void);
+  void (* _assert)(void);
 };
 
 /* BLE message queue private data */
@@ -301,7 +305,7 @@ enum btdm_wakeup_src_e
 struct bt_sem_s
 {
   sem_t sem;
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   struct esp_semcache_s sc;
 #endif
 };
@@ -395,6 +399,8 @@ static void btdm_backup_dma_copy_wrapper(uint32_t reg, uint32_t mem_addr,
 static void btdm_funcs_table_ready_wrapper(void);
 static bool coex_bt_wakeup_request(void);
 static void coex_bt_wakeup_request_end(void);
+static int64_t get_time_us_wrapper(void);
+static void assert_wrapper(void);
 
 /****************************************************************************
  * Other functions
@@ -473,10 +479,9 @@ extern int api_vhci_host_register_callback(const vhci_host_callback_t
 
 /* TX power */
 
-extern int ble_txpwr_set(int power_type, int power_level);
-extern int ble_txpwr_get(int power_type);
+extern int ble_txpwr_set(int power_type, uint16_t handle, int power_level);
+extern int ble_txpwr_get(int power_type, uint16_t handle);
 
-extern uint16_t l2c_ble_link_get_tx_buf_num(void);
 extern int coex_core_ble_conn_dyn_prio_get(bool *low, bool *high);
 extern void coex_pti_v2(void);
 
@@ -494,6 +499,25 @@ extern void ets_backup_dma_copy(uint32_t reg, uint32_t mem_addr,
 #endif
 
 extern void btdm_cca_feature_enable(void);
+extern void btdm_aa_check_enhance_enable(void);
+
+#if (CONFIG_BT_BLUEDROID_ENABLED || CONFIG_BT_NIMBLE_ENABLED)
+extern void scan_stack_enable_adv_flow_ctrl_vs_cmd(bool en);
+extern void adv_stack_enable_clear_legacy_adv_vs_cmd(bool en);
+extern void adv_filter_stack_enable_dup_exc_list_vs_cmd(bool en);
+extern void chan_sel_stack_enable_set_csa_vs_cmd(bool en);
+#endif
+
+extern void ble_dtm_funcs_reset(void);
+extern void ble_scan_funcs_reset(void);
+extern void ble_42_adv_funcs_reset(void);
+extern void ble_init_funcs_reset(void);
+extern void ble_con_funcs_reset(void);
+extern void ble_cca_funcs_reset(void);
+extern void ble_ext_adv_funcs_reset(void);
+extern void ble_ext_scan_funcs_reset(void);
+extern void ble_base_funcs_reset(void);
+extern void ble_enc_funcs_reset(void);
 
 extern uint8_t _bt_bss_start[];
 extern uint8_t _bt_bss_end[];
@@ -573,6 +597,8 @@ static struct osi_funcs_s g_osi_funcs =
   ._btdm_rom_table_ready = btdm_funcs_table_ready_wrapper,
   ._coex_bt_wakeup_request = coex_bt_wakeup_request,
   ._coex_bt_wakeup_request_end = coex_bt_wakeup_request_end,
+  ._get_time_us = get_time_us_wrapper,
+  ._assert = assert_wrapper,
 };
 
 static DRAM_ATTR struct osi_funcs_s *g_osi_funcs_p;
@@ -623,7 +649,7 @@ static struct irqstate_list_s g_ble_int_flags[NR_IRQSTATE_FLAGS];
 
 /* Cached queue control variables */
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
 static struct esp_queuecache_s g_esp_queuecache;
 static uint8_t g_esp_queuecache_buffer[BLE_TASK_EVENT_QUEUE_ITEM_SIZE];
 #endif
@@ -738,7 +764,7 @@ static int interrupt_alloc_wrapper(int cpu_id,
                                    void **ret_handle)
 {
   btdm_isr_alloc_t *p;
-  intr_handle_data_t *handle;
+  struct intr_handle_data_t *handle;
   vector_desc_t *vd;
   int ret = OK;
   int cpuint;
@@ -753,7 +779,7 @@ static int interrupt_alloc_wrapper(int cpu_id,
       return ESP_ERR_NOT_FOUND;
     }
 
-  handle = kmm_calloc(1, sizeof(intr_handle_data_t));
+  handle = kmm_calloc(1, sizeof(struct intr_handle_data_t));
   if (handle == NULL)
     {
       free(p);
@@ -936,7 +962,7 @@ static void *semphr_create_wrapper(uint32_t max, uint32_t init)
       return NULL;
     }
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   esp_init_semcache(&bt_sem->sc, &bt_sem->sem);
 #endif
 
@@ -1007,7 +1033,7 @@ static int IRAM_ATTR semphr_give_from_isr_wrapper(void *semphr, void *hptw)
   int ret;
   struct bt_sem_s *bt_sem = (struct bt_sem_s *)semphr;
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   if (spi_flash_cache_enabled())
     {
       ret = semphr_give_wrapper(bt_sem);
@@ -1062,7 +1088,7 @@ static int semphr_take_wrapper(void *semphr, uint32_t block_time_ms)
 
   if (ret)
     {
-      wlerr("ERROR: Failed to wait sem in %u ticks. Error=%d\n",
+      wlerr("ERROR: Failed to wait sem in %" PRIu32 " ticks. Error=%d\n",
             MSEC2TICK(block_time_ms), ret);
     }
 
@@ -1249,7 +1275,7 @@ static void *queue_create_wrapper(uint32_t queue_len, uint32_t item_size)
 
   mq_adpt->msgsize = item_size;
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   if (queue_len <= BLE_TASK_EVENT_QUEUE_LEN &&
       item_size == BLE_TASK_EVENT_QUEUE_ITEM_SIZE)
     {
@@ -1261,7 +1287,8 @@ static void *queue_create_wrapper(uint32_t queue_len, uint32_t item_size)
   else
     {
       wlerr("Failed to create queue cache."
-            " Please incresase BLE_TASK_EVENT_QUEUE_LEN to, at least, %d",
+            " Please incresase BLE_TASK_EVENT_QUEUE_LEN to, at least, "
+            "%" PRIu32 "",
             queue_len);
       return NULL;
     }
@@ -1845,7 +1872,7 @@ static void coex_wifi_sleep_set_hook(bool sleep)
  * Description:
  *   This is a wrapper for registering a BTDM callback with the coexistence
  *   scheme. If the Wi-Fi and Bluetooth coexistence feature is enabled
- *   (CONFIG_ESP32S3_WIFI_BT_COEXIST), it calls the
+ *   (CONFIG_ESPRESSIF_WIFI_BT_COEXIST), it calls the
  *   coex_schm_register_callback function with COEX_SCHM_CALLBACK_TYPE_BT
  *   and the provided callback. If the feature is not enabled, it returns 0.
  *
@@ -1860,7 +1887,7 @@ static void coex_wifi_sleep_set_hook(bool sleep)
 
 static int coex_schm_register_btdm_callback_wrapper(void *callback)
 {
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   return coex_schm_register_callback(COEX_SCHM_CALLBACK_TYPE_BT, callback);
 #else
   return 0;
@@ -1884,7 +1911,7 @@ static int coex_schm_register_btdm_callback_wrapper(void *callback)
 
 static void coex_schm_status_bit_set_wrapper(uint32_t type, uint32_t status)
 {
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   coex_schm_status_bit_set(type, status);
 #endif
 }
@@ -1907,7 +1934,7 @@ static void coex_schm_status_bit_set_wrapper(uint32_t type, uint32_t status)
 static void coex_schm_status_bit_clear_wrapper(uint32_t type,
                                                uint32_t status)
 {
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   coex_schm_status_bit_clear(type, status);
 #endif
 }
@@ -1917,7 +1944,7 @@ static void coex_schm_status_bit_clear_wrapper(uint32_t type,
  *
  * Description:
  *   This is a wrapper for coex_schm_interval_get. If the WiFi and Bluetooth
- *   coexistence feature is enabled (CONFIG_ESP32S3_WIFI_BT_COEXIST), it
+ *   coexistence feature is enabled (CONFIG_ESPRESSIF_WIFI_BT_COEXIST), it
  *   calls the function and returns its result. If not enabled, it returns 0.
  *
  * Input Parameters:
@@ -1931,7 +1958,7 @@ static void coex_schm_status_bit_clear_wrapper(uint32_t type,
 
 static uint32_t coex_schm_interval_get_wrapper(void)
 {
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   return coex_schm_interval_get();
 #else
   return 0;
@@ -1944,8 +1971,8 @@ static uint32_t coex_schm_interval_get_wrapper(void)
  * Description:
  *   This is a wrapper for coex_schm_curr_period_get. If the WiFi and
  *   Bluetooth coexistence feature is enabled
- *   (CONFIG_ESP32S3_WIFI_BT_COEXIST), it calls the function and returns its
- *   result. If the feature is not enabled, it returns 1.
+ *   (CONFIG_ESPRESSIF_WIFI_BT_COEXIST), it calls the function and returns
+ *   its result. If the feature is not enabled, it returns 1.
  *
  * Input Parameters:
  *   None
@@ -1958,7 +1985,7 @@ static uint32_t coex_schm_interval_get_wrapper(void)
 
 static uint8_t coex_schm_curr_period_get_wrapper(void)
 {
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   return coex_schm_curr_period_get();
 #else
   return 1;
@@ -1971,8 +1998,8 @@ static uint8_t coex_schm_curr_period_get_wrapper(void)
  * Description:
  *   This is a wrapper for coex_schm_curr_phase_get. If the WiFi and
  *   Bluetooth coexistence feature is enabled
- *   (CONFIG_ESP32S3_WIFI_BT_COEXIST), it calls the function and returns its
- *   result. If the feature is not enabled, it returns NULL.
+ *   (CONFIG_ESPRESSIF_WIFI_BT_COEXIST), it calls the function and returns
+ *   its result. If the feature is not enabled, it returns NULL.
  *
  * Input Parameters:
  *   None
@@ -1985,7 +2012,7 @@ static uint8_t coex_schm_curr_period_get_wrapper(void)
 
 static void * coex_schm_curr_phase_get_wrapper(void)
 {
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   return coex_schm_curr_phase_get();
 #else
   return NULL;
@@ -2245,7 +2272,7 @@ static IRAM_ATTR int32_t esp_queue_send_generic(void *queue, void *item,
   struct timespec timeout;
   struct mq_adpt_s *mq_adpt = (struct mq_adpt_s *)queue;
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   if (!spi_flash_cache_enabled())
     {
       esp_send_queuecache(&g_esp_queuecache, item, mq_adpt->msgsize);
@@ -2627,7 +2654,7 @@ static esp_err_t btdm_low_power_mode_init(esp_bt_controller_config_t *cfg)
           break;
         }
 
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
       coex_update_lpclk_interval();
 #endif
 
@@ -2767,7 +2794,7 @@ static void btdm_low_power_mode_deinit(void)
 
       btdm_lpclk_select_src(BTDM_LPCLK_SEL_RTC_SLOW);
       btdm_lpclk_set_div(0);
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
       coex_update_lpclk_interval();
 #endif
     }
@@ -2905,6 +2932,51 @@ static void btdm_funcs_table_ready_wrapper(void)
 #if BT_BLE_CCA_MODE == 2
   btdm_cca_feature_enable();
 #endif
+#if BLE_CTRL_CHECK_CONNECT_IND_ACCESS_ADDRESS_ENABLED
+  btdm_aa_check_enhance_enable();
+#endif
+#if CONFIG_BT_CTRL_RUN_IN_FLASH_ONLY
+  /* Do nothing */
+#else
+  wlinfo("Feature Config, ADV:%d, BLE_50:%d, DTM:%d, SCAN:%d, CCA:%d, "
+          "SMP:%d, CONNECT:%d", BT_CTRL_BLE_ADV, BT_CTRL_50_FEATURE_SUPPORT,
+          BT_CTRL_DTM_ENABLE, BT_CTRL_BLE_SCAN, BT_BLE_CCA_MODE,
+          BLE_SECURITY_ENABLE, BT_CTRL_BLE_MASTER);
+
+  ble_base_funcs_reset();
+
+#  if CONFIG_BT_CTRL_BLE_ADV
+  ble_42_adv_funcs_reset();
+#    if (BT_CTRL_50_FEATURE_SUPPORT == 1)
+  ble_ext_adv_funcs_reset();
+#    endif
+#  endif
+
+#  if CONFIG_BT_CTRL_DTM_ENABLE
+  ble_dtm_funcs_reset();
+#  endif
+
+#  if CONFIG_BT_CTRL_BLE_SCAN
+  ble_scan_funcs_reset();
+#    if (BT_CTRL_50_FEATURE_SUPPORT == 1)
+  ble_ext_scan_funcs_reset();
+#    endif
+#  endif
+
+#  if (BT_BLE_CCA_MODE != 0)
+  ble_cca_funcs_reset();
+#  endif
+
+#  if CONFIG_BT_CTRL_BLE_SECURITY_ENABLE
+  ble_enc_funcs_reset();
+#  endif
+
+#  if CONFIG_BT_CTRL_BLE_MASTER
+  ble_init_funcs_reset();
+  ble_con_funcs_reset();
+#  endif
+
+#endif
 }
 
 /****************************************************************************
@@ -2993,8 +3065,168 @@ static void coex_bt_wakeup_request_end(void)
 }
 
 /****************************************************************************
+ * Name: get_time_us_wrapper
+ *
+ * Description:
+ *   Wrapper function to get the current system time in microseconds. This
+ *   function is placed in IRAM for faster execution and calls the underlying
+ *   esp32s3_rt_timer_time_us() function.
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   The current system time in microseconds as a 64-bit integer
+ *
+ ****************************************************************************/
+
+static IRAM_ATTR int64_t get_time_us_wrapper(void)
+{
+  return (int64_t)esp32s3_rt_timer_time_us();
+}
+
+/****************************************************************************
+ * Name: assert_wrapper
+ *
+ * Description:
+ *   Empty wrapper function for assertions. This function is placed in IRAM
+ *   for faster execution. Currently implemented as a no-op function.
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+static IRAM_ATTR void assert_wrapper(void)
+{
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Functions to be called by libbt
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: malloc_ble_controller_mem
+ *
+ * Description:
+ *   Allocates memory for the BLE controller using the kernel memory manager.
+ *   If allocation fails, an error message is logged.
+ *
+ * Input Parameters:
+ *   size - The number of bytes to allocate
+ *
+ * Returned Value:
+ *   A pointer to the allocated memory on success, NULL on failure
+ *
+ ****************************************************************************/
+
+void *malloc_ble_controller_mem(size_t size)
+{
+  void *p = kmm_malloc(size);
+
+  if (p == NULL)
+    {
+      wlerr("Malloc failed");
+    }
+
+  return p;
+}
+
+/****************************************************************************
+ * Name: get_ble_controller_free_heap_size
+ *
+ * Description:
+ *   Returns the amount of free heap memory available for the BLE controller.
+ *   This function queries the user heap to determine available memory.
+ *
+ * Input Parameters:
+ *   None
+ *
+ * Returned Value:
+ *   The number of free bytes in the user heap
+ *
+ ****************************************************************************/
+
+uint32_t get_ble_controller_free_heap_size(void)
+{
+  return mm_heapfree(USR_HEAP);
+}
+
+/****************************************************************************
+ * Other Functions
+ ****************************************************************************/
+
+int32_t esp_ble_to_errno(int err)
+{
+  int ret;
+
+  if (err < ESP_ERR_WIFI_BASE)
+    {
+      /* Unmask component error bits */
+
+      ret = err & 0xfff;
+
+      switch (ret)
+        {
+          case ESP_OK:
+            ret = OK;
+            break;
+          case ESP_ERR_NO_MEM:
+            ret = -ENOMEM;
+            break;
+
+          case ESP_ERR_INVALID_ARG:
+            ret = -EINVAL;
+            break;
+
+          case ESP_ERR_INVALID_STATE:
+            ret = -EIO;
+            break;
+
+          case ESP_ERR_INVALID_SIZE:
+            ret = -EINVAL;
+            break;
+
+          case ESP_ERR_NOT_FOUND:
+            ret = -ENOSYS;
+            break;
+
+          case ESP_ERR_NOT_SUPPORTED:
+            ret = -ENOSYS;
+            break;
+
+          case ESP_ERR_TIMEOUT:
+            ret = -ETIMEDOUT;
+            break;
+
+          case ESP_ERR_INVALID_MAC:
+            ret = -EINVAL;
+            break;
+
+          default:
+            ret = ERROR;
+            break;
+        }
+    }
+  else
+    {
+      ret = ERROR;
+    }
+
+  if (ret != OK)
+    {
+      wlerr("ERROR: %s\n", esp_err_to_name(err));
+    }
+
+  return ret;
+}
 
 /****************************************************************************
  * Name: esp32s3_bt_controller_init
@@ -3076,8 +3308,8 @@ int esp32s3_bt_controller_init(void)
         }
     }
 
-  cfg->controller_task_stack_size = CONFIG_ESP32S3_BLE_TASK_STACK_SIZE;
-  cfg->controller_task_prio       = CONFIG_ESP32S3_BLE_TASK_PRIORITY;
+  cfg->controller_task_stack_size = CONFIG_ESPRESSIF_BLE_TASK_STACK_SIZE;
+  cfg->controller_task_prio       = CONFIG_ESPRESSIF_BLE_TASK_PRIORITY;
   cfg->controller_task_run_cpu    = CONFIG_BT_CTRL_PINNED_TO_CORE;
   cfg->magic                      = ESP_BT_CTRL_CONFIG_MAGIC_VAL;
 
@@ -3113,22 +3345,32 @@ int esp32s3_bt_controller_init(void)
       goto error;
     }
 
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   coex_init();
 #endif
 
   periph_module_enable(PERIPH_BT_MODULE);
   periph_module_reset(PERIPH_BT_MODULE);
 
-  if (btdm_controller_init(cfg) != 0)
+  err = btdm_controller_init(cfg);
+
+  if (err != OK)
     {
+      wlerr("%s %d\n", __func__, err);
       err = -ENOMEM;
       goto error;
     }
 
+#if (CONFIG_BT_BLUEDROID_ENABLED || CONFIG_BT_NIMBLE_ENABLED)
+  scan_stack_enable_adv_flow_ctrl_vs_cmd(true);
+  adv_stack_enable_clear_legacy_adv_vs_cmd(true);
+  adv_filter_stack_enable_dup_exc_list_vs_cmd(true);
+  chan_sel_stack_enable_set_csa_vs_cmd(true);
+#endif
+
   g_btdm_controller_status = ESP_BT_CONTROLLER_STATUS_INITED;
 
-#ifdef CONFIG_ESP32S3_SPIFLASH
+#ifdef CONFIG_ESPRESSIF_SPIFLASH
   if (esp_wireless_init() != OK)
     {
       return -EIO;
@@ -3141,7 +3383,7 @@ error:
 
   bt_controller_deinit_internal ();
 
-  return esp_wifi_to_errno(err);
+  return esp_ble_to_errno(err);
 }
 
 /****************************************************************************
@@ -3164,6 +3406,13 @@ int esp32s3_bt_controller_deinit(void)
     {
       return ERROR;
     }
+
+#if (CONFIG_BT_BLUEDROID_ENABLED || CONFIG_BT_NIMBLE_ENABLED)
+  scan_stack_enable_adv_flow_ctrl_vs_cmd(false);
+  adv_stack_enable_clear_legacy_adv_vs_cmd(false);
+  adv_filter_stack_enable_dup_exc_list_vs_cmd(false);
+  chan_sel_stack_enable_set_csa_vs_cmd(false);
+#endif
 
   btdm_controller_deinit();
 
@@ -3213,7 +3462,7 @@ int esp32s3_bt_controller_enable(esp_bt_mode_t mode)
   esp_phy_enable(PHY_MODEM_BT);
   g_lp_stat.phy_enabled = 1;
 
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   coex_enable();
 #endif
 
@@ -3290,7 +3539,7 @@ error:
     }
 #endif
 
-#if CONFIG_ESP32S3_WIFI_BT_COEXIST
+#if CONFIG_ESPRESSIF_WIFI_BT_COEXIST
     coex_disable();
 #endif
   if (g_lp_stat.phy_enabled)
@@ -3327,14 +3576,14 @@ int esp32s3_bt_controller_disable(void)
   async_wakeup_request(BTDM_ASYNC_WAKEUP_SRC_DISA);
   while (!btdm_power_state_active())
     {
-      nxsig_usleep(1000); /* wait */
+      nxsched_usleep(1000); /* wait */
     }
 
   btdm_controller_disable();
 
   async_wakeup_request_end(BTDM_ASYNC_WAKEUP_SRC_DISA);
 
-#ifdef CONFIG_ESP32S3_WIFI_BT_COEXIST
+#ifdef CONFIG_ESPRESSIF_WIFI_BT_COEXIST
   coex_disable();
 #endif
 
@@ -3374,7 +3623,7 @@ int esp32s3_bt_controller_disable(void)
 }
 
 /****************************************************************************
- * Name: esp32s3_bt_controller_get_status
+ * Name: esp_bt_controller_get_status
  *
  * Description:
  *   Returns the status of the BT Controller
@@ -3387,7 +3636,7 @@ int esp32s3_bt_controller_disable(void)
  *
  ****************************************************************************/
 
-esp_bt_controller_status_t esp32s3_bt_controller_get_status(void)
+esp_bt_controller_status_t esp_bt_controller_get_status(void)
 {
   return g_btdm_controller_status;
 }

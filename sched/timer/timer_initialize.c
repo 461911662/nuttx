@@ -66,6 +66,8 @@ volatile sq_queue_t g_freetimers;
 
 volatile sq_queue_t g_alloctimers;
 
+spinlock_t g_locktimers = SP_UNLOCKED;
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -132,9 +134,12 @@ void timer_deleteall(pid_t pid)
 {
   FAR struct posix_timer_s *timer;
   FAR struct posix_timer_s *next;
+  sq_queue_t freetimers;
   irqstate_t flags;
 
-  flags = enter_critical_section();
+  sq_init(&freetimers);
+
+  flags = spin_lock_irqsave(&g_locktimers);
   for (timer = (FAR struct posix_timer_s *)g_alloctimers.head;
        timer != NULL;
        timer = next)
@@ -142,11 +147,21 @@ void timer_deleteall(pid_t pid)
       next = timer->flink;
       if (timer->pt_owner == pid)
         {
-          timer_delete((timer_t)timer);
+          sq_rem((FAR sq_entry_t *)timer, (FAR sq_queue_t *)&g_alloctimers);
+          sq_addlast((FAR sq_entry_t *)timer, (FAR sq_queue_t *)&freetimers);
         }
     }
 
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&g_locktimers, flags);
+
+  for (timer = (FAR struct posix_timer_s *)freetimers.head;
+       timer != NULL;
+       timer = next)
+    {
+      next = timer->flink;
+      sq_rem((FAR sq_entry_t *)timer, (FAR sq_queue_t *)&freetimers);
+      timer_release(timer);
+    }
 }
 
 /****************************************************************************
@@ -173,7 +188,7 @@ FAR struct posix_timer_s *timer_gethandle(timer_t timerid)
 
   if (timerid != NULL)
     {
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_locktimers);
 
       sq_for_every(&g_alloctimers, entry)
         {
@@ -184,7 +199,7 @@ FAR struct posix_timer_s *timer_gethandle(timer_t timerid)
             }
         }
 
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_locktimers, flags);
     }
 
   return timer;

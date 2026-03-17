@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/boardctl.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,18 +26,22 @@
 
 #include <nuttx/config.h>
 
-#include <sys/types.h>
 #include <sys/boardctl.h>
+#include <sys/types.h>
+#include <assert.h>
 #include <stdint.h>
 #include <errno.h>
-#include <assert.h>
+#include <gcov.h>
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
-#include <nuttx/lib/modlib.h>
+#include <nuttx/cache.h>
+#include <nuttx/init.h>
+#include <nuttx/lib/elf.h>
 #include <nuttx/binfmt/symtab.h>
 #include <nuttx/drivers/ramdisk.h>
 #include <nuttx/reboot_notifier.h>
+#include <nuttx/trace.h>
 
 #ifdef CONFIG_NX
 #  include <nuttx/nx/nxmu.h>
@@ -129,7 +135,6 @@ static inline int
             case BOARDIOC_USBDEV_CONNECT:    /* Connect the CDC/ACM device */
 #ifndef CONFIG_CDCACM_COMPOSITE
               {
-                DEBUGASSERT(ctrl->handle != NULL);
                 ret = cdcacm_initialize(ctrl->instance, ctrl->handle);
               }
 #endif
@@ -137,8 +142,7 @@ static inline int
 
             case BOARDIOC_USBDEV_DISCONNECT: /* Disconnect the CDC/ACM device */
               {
-                DEBUGASSERT(ctrl->handle != NULL && *ctrl->handle != NULL);
-                cdcacm_uninitialize(*ctrl->handle);
+                ret = cdcacm_uninitialize_instance(ctrl->instance, NULL);
               }
               break;
 
@@ -394,6 +398,7 @@ int boardctl(unsigned int cmd, uintptr_t arg)
       case BOARDIOC_POWEROFF:
         {
           reboot_notifier_call_chain(SYS_POWER_OFF, (FAR void *)arg);
+          up_flush_dcache_all();
           ret = board_power_off((int)arg);
         }
         break;
@@ -409,7 +414,10 @@ int boardctl(unsigned int cmd, uintptr_t arg)
 
       case BOARDIOC_RESET:
         {
+          g_nx_initstate = OSINIT_RESET;
+          sched_trace_mark("RESET");
           reboot_notifier_call_chain(SYS_RESTART, (FAR void *)arg);
+          up_flush_dcache_all();
           ret = board_reset((int)arg);
         }
         break;
@@ -602,7 +610,7 @@ int boardctl(unsigned int cmd, uintptr_t arg)
             (FAR const struct boardioc_symtab_s *)arg;
 
          DEBUGASSERT(symdesc != NULL);
-         modlib_setsymtab(symdesc->symtab, symdesc->nsymbols);
+         libelf_setsymtab(symdesc->symtab, symdesc->nsymbols);
         }
         break;
 #endif
@@ -800,42 +808,55 @@ int boardctl(unsigned int cmd, uintptr_t arg)
 
           if (spinlock->action == BOARDIOC_SPINLOCK_LOCK)
             {
-              if (flags != NULL)
-                {
-                  *flags = up_irq_save();
-                }
-
               if (lock != NULL)
                 {
-                  spin_lock(lock);
+                  if (flags != NULL)
+                    {
+                      *flags = spin_lock_irqsave(lock);
+                    }
+                  else
+                    {
+                      spin_lock(lock);
+                    }
+                }
+              else
+                {
+                  *flags = up_irq_save();
                 }
             }
           else if (spinlock->action == BOARDIOC_SPINLOCK_TRYLOCK)
             {
-              if (flags != NULL)
-                {
-                  *flags = up_irq_save();
-                }
-
-              if (!spin_trylock(lock))
-                {
-                  ret = -EBUSY;
-                  if (flags != NULL)
-                    {
-                      up_irq_restore(*flags);
-                    }
-                }
+              if (lock != NULL)
+              {
+                if (flags != NULL)
+                  {
+                    if (!spin_trylock_irqsave(lock, *flags))
+                      {
+                        ret = -EBUSY;
+                      }
+                  }
+                else if (!spin_trylock(lock))
+                  {
+                    ret = -EBUSY;
+                  }
+              }
             }
           else if (spinlock->action == BOARDIOC_SPINLOCK_UNLOCK)
             {
-              if (flags != NULL)
-                {
-                  up_irq_restore(*flags);
-                }
-
               if (lock != NULL)
                 {
-                  spin_unlock(lock);
+                  if (flags != NULL)
+                    {
+                      spin_unlock_irqrestore(lock, *flags);
+                    }
+                  else
+                    {
+                      spin_unlock(lock);
+                    }
+                }
+              else
+                {
+                  up_irq_restore(*flags);
                 }
             }
           else
@@ -898,6 +919,25 @@ int boardctl(unsigned int cmd, uintptr_t arg)
       case BOARDIOC_START_CPU:
         {
           ret = board_start_cpu((int)arg);
+        }
+        break;
+#endif
+
+#ifdef CONFIG_BOARDCTL_MACADDR
+      /* CMD:           BOARDIOC_MACADDR
+       * DESCRIPTION:   Get the network driver mac address.
+       * ARG:           A pointer to an instance of struct
+       *                boardioc_macaddr_s.
+       * CONFIGURATION: CONFIG_BOARDCTL_MACADDR
+       * DEPENDENCIES:  Board logic must provide board_macaddr()
+       */
+
+      case BOARDIOC_MACADDR:
+        {
+          FAR struct boardioc_macaddr_s *req =
+            (FAR struct boardioc_macaddr_s *)arg;
+
+          ret = board_macaddr(req->ifname, req->macaddr);
         }
         break;
 #endif

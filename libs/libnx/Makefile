@@ -46,6 +46,8 @@ all: $(BIN)
 .PHONY : context depend clean distclean gensources gen1bppsources gen2bppsource \
 	 gen4bppsource gen8bppsource gen16bppsource gen24bppsource gen32bppsources genfontsources
 
+ifeq ($(CONFIG_NXFONTS),y)
+
 gen1bppsources:
 	$(Q) $(MAKE) -C nxfonts -f Makefile.sources NXFONTS_BITSPERPIXEL=1 EXTRAFLAGS="$(EXTRAFLAGS)"
 
@@ -200,6 +202,9 @@ ifeq ($(CONFIG_NXFONT_TOM_THUMB_4X6),y)
 endif
 
 gensources: gen1bppsources gen2bppsource gen4bppsource gen8bppsource gen16bppsource gen24bppsource gen32bppsources genfontsources
+else
+gensources:
+endif
 
 $(AOBJS): $(BINDIR)$(DELIM)%$(OBJEXT): %.S
 	$(call ASSEMBLE, $<, $@)
@@ -241,13 +246,17 @@ depend: .depend
 
 # Generate configuration context
 
-context: gensources
+bin:
+	$(Q) mkdir $@
+
+kbin:
+	$(Q) mkdir $@
+
+context:: gensources bin kbin
 
 # Clean most derived files, retaining the configuration
 
 clean:
-	$(Q) $(MAKE) -C bin  clean
-	$(Q) $(MAKE) -C kbin clean
 	$(Q) $(MAKE) -C nxfonts -f Makefile.sources clean EXTRAFLAGS="$(EXTRAFLAGS)"
 	$(call DELFILE, $(BIN))
 	$(call DELFILE, $(KBIN))
@@ -256,12 +265,11 @@ clean:
 # Deep clean -- removes all traces of the configuration
 
 distclean: clean
-	$(Q) $(MAKE) -C bin  distclean
-	$(Q) $(MAKE) -C kbin distclean
-	$(Q) $(MAKE) -C nxfonts -f Makefile.sources distclean EXTRAFLAGS="$(EXTRAFLAGS)"
-	$(call DELFILE, bin/Make.dep)
-	$(call DELFILE, kbin/Make.dep)
+	$(call DELDIR, bin)
+	$(call DELDIR, kbin)
+	$(call DELFILE, $(CSRCS:.c=.ddc) $(ASRCS:.S=.dds))
 	$(call DELFILE, .depend)
+	$(Q) $(MAKE) -C nxfonts -f Makefile.sources distclean EXTRAFLAGS="$(EXTRAFLAGS)"
 
 -include bin/Make.dep
 -include kbin/Make.dep

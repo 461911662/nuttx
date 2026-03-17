@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/stmpe811_tsc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -49,7 +51,6 @@
 #include <nuttx/wqueue.h>
 #include <nuttx/random.h>
 
-#include <nuttx/arch.h>
 #include <nuttx/input/touchscreen.h>
 #include <nuttx/input/stmpe811.h>
 
@@ -915,7 +916,7 @@ int stmpe811_register(STMPE811_HANDLE handle, int minor)
 
   stmpe811_tscinitialize(priv);
 
-  /* Inidicate that the touchscreen controller was successfully initialized */
+  /* Indicate that the touchscreen controller was successfully initialized */
 
   priv->inuse |= TSC_PIN_SET;                    /* Pins 4-7 are now in-use */
   priv->flags |= STMPE811_FLAGS_TSC_INITIALIZED; /* TSC function is initialized */

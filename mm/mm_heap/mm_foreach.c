@@ -58,6 +58,7 @@ void mm_foreach(FAR struct mm_heap_s *heap, mm_node_handler_t handler,
 #endif
 
   DEBUGASSERT(handler);
+  mm_free_delaylist(heap);
 
   /* Visit each region */
 
@@ -81,6 +82,7 @@ void mm_foreach(FAR struct mm_heap_s *heap, mm_node_handler_t handler,
            node = (FAR struct mm_allocnode_s *)((FAR char *)node + nodesize))
         {
           nodesize = MM_SIZEOF_NODE(node);
+          DEBUGASSERT(nodesize >= MM_SIZEOF_ALLOCNODE);
           minfo("region=%d node=%p size=%zu preceding=%u (%c %c)\n",
                 region, node, nodesize, (unsigned int)node->preceding,
                 MM_PREVNODE_IS_FREE(node) ? 'F' : 'A',

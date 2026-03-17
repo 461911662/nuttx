@@ -1,6 +1,8 @@
 # ##############################################################################
 # boards/arm/stm32/common/src/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -150,6 +152,18 @@ endif()
 
 if(CONFIG_STEPPER_DRV8825)
   list(APPEND SRCS stm32_drv8825.c)
+endif()
+
+if(CONFIG_INPUT_SBUTTON)
+  list(APPEND SRCS stm32_sbutton.c)
+endif()
+
+if(CONFIG_INPUT_KMATRIX)
+  list(APPEND SRCS stm32_kmatrix_gpio.c)
+endif()
+
+if(CONFIG_INPUT_KMATRIX_I2C)
+  list(APPEND SRCS stm32_kmatrix_i2c.c)
 endif()
 
 target_sources(board PRIVATE ${SRCS})

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/usbdev/rndis.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1020,7 +1022,7 @@ static void rndis_rxdispatch(FAR void *arg)
   FAR struct eth_hdr_s *hdr;
   irqstate_t flags;
 
-  net_lock();
+  netdev_lock(&priv->netdev);
   flags = enter_critical_section();
   rndis_giverxreq(priv);
   priv->netdev.d_len = priv->current_rx_datagram_size;
@@ -1097,7 +1099,7 @@ static void rndis_rxdispatch(FAR void *arg)
       rndis_freenetreq(priv);
     }
 
-  net_unlock();
+  netdev_unlock(&priv->netdev);
 }
 
 /****************************************************************************
@@ -1162,6 +1164,7 @@ static int rndis_transmit(FAR struct rndis_dev_s *priv)
 
 static int rndis_ifup(FAR struct net_driver_s *dev)
 {
+  netdev_carrier_on(dev);
   return OK;
 }
 
@@ -1175,6 +1178,7 @@ static int rndis_ifup(FAR struct net_driver_s *dev)
 
 static int rndis_ifdown(FAR struct net_driver_s *dev)
 {
+  netdev_carrier_off(dev);
   return OK;
 }
 
@@ -1190,7 +1194,7 @@ static void rndis_txavail_work(FAR void *arg)
 {
   FAR struct rndis_dev_s *priv = (FAR struct rndis_dev_s *)arg;
 
-  net_lock();
+  netdev_lock(&priv->netdev);
 
   if (rndis_allocnetreq(priv))
     {
@@ -1201,7 +1205,7 @@ static void rndis_txavail_work(FAR void *arg)
         }
     }
 
-  net_unlock();
+  netdev_unlock(&priv->netdev);
 }
 
 /****************************************************************************
@@ -1843,6 +1847,7 @@ static void usbclass_ep0incomplete(FAR struct usbdev_ep_s *ep,
         priv->response_queue_words -= len_words;
         memcpy(priv->response_queue, priv->response_queue + len_words,
                priv->response_queue_words * sizeof(uint32_t));
+        rndis_send_encapsulated_response(priv, 0);
       }
     }
 }
@@ -2602,15 +2607,17 @@ static int usbclass_setup(FAR struct usbdevclass_driver_s *driver,
                   }
                 else
                   {
-                    /* Retrieve a single reply from the response queue to
-                     * control request buffer.
+                    /* Reply info as many as possible, if host read less than
+                     * cached, just send one msg to avoid msg truncation
                      */
 
                     FAR struct rndis_response_header *hdr =
                       (struct rndis_response_header *)priv->response_queue;
-                    memcpy(ctrlreq->buf, hdr, hdr->msglen);
+                    ret = priv->response_queue_words * sizeof(uint32_t);
+                    if (ret > len)
+                      ret = hdr->msglen;
+                    memcpy(ctrlreq->buf, hdr, ret);
                     ctrlreq->priv = priv;
-                    ret = hdr->msglen;
                   }
               }
           }
@@ -2746,6 +2753,22 @@ static void usbclass_resetconfig(FAR struct rndis_dev_s *priv)
 }
 
 /****************************************************************************
+ * Name: rndis_carrier_on_work
+ *
+ * Description:
+ *   Schedule to work queue because netdev_carrier_on API can't be used in
+ *   interrupt context
+ *
+ ****************************************************************************/
+
+static void rndis_carrier_on_work(FAR void *arg)
+{
+  FAR struct rndis_dev_s *priv = arg;
+
+  netdev_carrier_on(&priv->netdev);
+}
+
+/****************************************************************************
  * Name: usbclass_setconfig
  *
  * Description:
@@ -2853,10 +2876,16 @@ static int usbclass_setconfig(FAR struct rndis_dev_s *priv, uint8_t config)
   /* We are successfully configured */
 
   priv->config = config;
-  if (priv->netdev.d_ifup(&priv->netdev) == OK)
-    {
-      priv->netdev.d_flags |= IFF_UP;
-    }
+
+  priv->netdev.d_flags |= IFF_UP;
+
+  /* Schedule to work queue because netdev_carrier_on API can't be used in
+   * interrupt context. Since the current network card is not yet RUNNING,
+   * it will not be selected to trigger rndis_txavail, so pollwork can be
+   * reused.
+   */
+
+  work_queue(LPWORK, &priv->pollwork, rndis_carrier_on_work, priv, 0);
 
   return OK;
 

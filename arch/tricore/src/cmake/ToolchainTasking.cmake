@@ -1,5 +1,7 @@
 # ##############################################################################
-# arch/tricore/src/cmake/Toolchain.cmake
+# arch/tricore/src/cmake/ToolchainTasking.cmake
+#
+# SPDX-License-Identifier: Apache-2.0
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
@@ -23,26 +25,24 @@
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_VERSION 1)
 
-set(ARCH_SUBDIR)
-
-if(CONFIG_ARCH_TC3XX) # TC3XX
+if(CONFIG_ARCH_CHIP_TC3XX)
   set(ARCH_SUBDIR tc3xx)
-else()
-  set(ARCH_SUBDIR tc3xx)
+elseif(CONFIG_ARCH_CHIP_TC4XX)
+  set(ARCH_SUBDIR tc4xx)
 endif()
 
-include(${ARCH_SUBDIR})
+include(chip.cmake)
 
-set(CMAKE_ASM_COMPILER cctc)
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_PREFIX}cctc)
 set(CMAKE_C_COMPILER ${CMAKE_ASM_COMPILER})
-set(CMAKE_CXX_COMPILER cctc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}cctc)
 set(CMAKE_STRIP strip --strip-unneeded)
 set(CMAKE_OBJCOPY echo)
-set(CMAKE_OBJDUMP elfdump)
+set(CMAKE_OBJDUMP ${TOOLCHAIN_PREFIX}elfdump)
 
-set(CMAKE_LINKER cctc)
-set(CMAKE_LD cctc)
-set(CMAKE_AR artc -r)
+set(CMAKE_LINKER ${TOOLCHAIN_PREFIX}cctc)
+set(CMAKE_LD ${TOOLCHAIN_PREFIX}cctc)
+set(CMAKE_AR ${TOOLCHAIN_PREFIX}artc -r)
 set(CMAKE_NM nm)
 set(CMAKE_RANLIB ranlib)
 
@@ -81,7 +81,7 @@ add_compile_options(--tradeoff=2)
 if(CONFIG_DEBUG_SYMBOLS)
   add_compile_options(--debug-info=default)
   add_compile_options(--keep-temporary-files)
-  add_link_options(-g)
+  add_compile_options(${CONFIG_DEBUG_SYMBOLS_LEVEL})
 endif()
 
 # merge source code with assembly output
@@ -106,6 +106,7 @@ add_compile_options(--branch-target-align)
 # cmake-format: on
 
 add_compile_options(--fp-model=2)
+add_link_options(--no-default-libraries)
 add_link_options(--fp-model=2)
 add_link_options(-lfp_fpu)
 

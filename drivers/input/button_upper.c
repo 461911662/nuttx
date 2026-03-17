@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/button_upper.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -59,7 +61,7 @@ struct btn_upperhalf_s
 
   FAR const struct btn_lowerhalf_s *bu_lower;
 
-  btn_buttonset_t bu_sample;  /* Last sampled button states */
+  btn_buttonset_t bu_sample; /* Last sampled button states */
   bool bu_enabled;
 
   /* The following is a singly linked list of open references to the
@@ -83,9 +85,11 @@ struct btn_open_s
 
   /* Button event notification information */
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
   pid_t bo_pid;
   struct btn_notify_s bo_notify;
   struct sigwork_s bo_work;
+#endif
 
   /* Poll event information */
 
@@ -295,6 +299,7 @@ static void btn_sample(wdparm_t arg)
 
       /* Have any signal events occurred? */
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
       if ((press & opriv->bo_notify.bn_press)     != 0 ||
           (release & opriv->bo_notify.bn_release) != 0)
         {
@@ -304,6 +309,7 @@ static void btn_sample(wdparm_t arg)
           nxsig_notification(opriv->bo_pid, &opriv->bo_notify.bn_event,
                              SI_QUEUE, &opriv->bo_work);
         }
+#endif
     }
 
   priv->bu_sample = sample;

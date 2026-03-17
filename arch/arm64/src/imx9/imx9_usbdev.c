@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/imx9/imx9_usbdev.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -40,6 +42,7 @@
 #include <nuttx/usb/usbdev_trace.h>
 
 #include <nuttx/irq.h>
+#include <arch/barriers.h>
 #include <arch/board/board.h>
 
 #include <imx9_usbdev.h>
@@ -232,7 +235,7 @@ const struct trace_msg_t g_usb_trace_strings_intdecode[] =
 /* This represents a Endpoint Transfer Descriptor dQH overlay (32 bytes) */
 
 #define IMX9_DTD_S                                                                          \
-  volatile uint32_t       nextdesc;      /* Address of the next DMA descripto in RAM */     \
+  volatile uint32_t       nextdesc;      /* Address of the next DMA descriptor in RAM */    \
   volatile uint32_t       config;        /* Misc. bit encoded configuration information */  \
   uint32_t                buffer0;       /* Buffer start address */                         \
   uint32_t                buffer1;       /* Buffer start address */                         \
@@ -321,7 +324,7 @@ struct imx9_dqh_s
 #define IMX9_EP0MAXPACKET           (64)         /* EP0 max packet size (1-64) */
 #define IMX9_BULKMAXPACKET          (512)        /* Bulk endpoint max packet (8/16/32/64/512) */
 #define IMX9_INTRMAXPACKET          (1024)       /* Interrupt endpoint max packet (1 to 1024) */
-#define IMX9_ISOCMAXPACKET          (512)        /* Acutally 1..1023 */
+#define IMX9_ISOCMAXPACKET          (512)        /* Actually 1..1023 */
 
 /* Endpoint bit position in SETUPSTAT, PRIME, FLUSH, STAT, COMPLETE
  * registers
@@ -866,7 +869,7 @@ static void imx9_readsetup(struct imx9_usb_s *priv, uint8_t epphy,
   /* Set the trip wire */
 
   imx9_modifyreg(priv, IMX9_USBDEV_USBCMD_OFFSET, 0, USBDEV_USBCMD_SUTW);
-  ARM64_DSB();
+  UP_DSB();
 
   DEBUGASSERT(IS_CACHE_ALIGNED(dqh, sizeof(struct imx9_dqh_s)));
   up_invalidate_dcache((uintptr_t)dqh,
@@ -890,7 +893,7 @@ static void imx9_readsetup(struct imx9_usb_s *priv, uint8_t epphy,
 
   imx9_putreg(priv, IMX9_USBDEV_ENDPTSETUPSTAT_OFFSET,
               IMX9_ENDPTMASK(IMX9_EP0_OUT));
-  ARM64_DSB();
+  UP_DSB();
 }
 
 /****************************************************************************
@@ -1273,7 +1276,7 @@ static void imx9_usbreset(struct imx9_usb_s *priv)
 
   imx9_set_address(priv, 0);
 
-  /* Initialise the Enpoint List Address */
+  /* Initialise the Endpoint List Address */
 
   imx9_putreg(priv, IMX9_USBDEV_ENDPOINTLIST_OFFSET,
               (uint32_t)(uintptr_t)priv->qh);
@@ -1320,7 +1323,7 @@ static inline void imx9_ep0state(struct imx9_usb_s *priv,
       break;
     }
 
-  ARM64_DSB();
+  UP_DSB();
 }
 
 /****************************************************************************
@@ -1971,6 +1974,10 @@ static int imx9_usbinterrupt(int irq, void *context, void *arg)
 
   usbtrace(TRACE_INTENTRY(IMX9_TRACEINTID_USB), 0);
 
+#ifdef CONFIG_SMP
+  irqstate_t flags = enter_critical_section();
+#endif
+
   /* Read the interrupts and then clear them */
 
   disr = imx9_getreg(priv, IMX9_USBDEV_USBSTS_OFFSET);
@@ -1981,6 +1988,10 @@ static int imx9_usbinterrupt(int irq, void *context, void *arg)
       usbtrace(TRACE_INTDECODE(IMX9_TRACEINTID_DEVRESET), 0);
 
       imx9_usbreset(priv);
+
+#ifdef CONFIG_SMP
+      leave_critical_section(flags);
+#endif
 
       usbtrace(TRACE_INTEXIT(IMX9_TRACEINTID_USB), 0);
       return OK;
@@ -2149,6 +2160,10 @@ static int imx9_usbinterrupt(int irq, void *context, void *arg)
 
       imx9_putreg(priv, IMX9_USBDEV_ENDPTNAK_OFFSET, pending);
     }
+
+#ifdef CONFIG_SMP
+  leave_critical_section(flags);
+#endif
 
   usbtrace(TRACE_INTEXIT(IMX9_TRACEINTID_USB), 0);
   return OK;

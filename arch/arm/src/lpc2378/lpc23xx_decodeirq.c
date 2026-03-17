@@ -1,13 +1,11 @@
 /****************************************************************************
  * arch/arm/src/lpc2378/lpc23xx_decodeirq.c
  *
- *   Copyright (C) 2010 Rommel Marcelo. All rights reserved.
- *   Author: Rommel Marcelo
- *
- * This file is part of the NuttX RTOS and based on the lpc2148 port:
- *
- *   Copyright (C) 2010, 2011 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2010 Rommel Marcelo. All rights reserved.
+ * SPDX-FileCopyrightText: 2010,2011 Gregory Nutt. All rights reserved.
+ * SPDX-FileContributor: Rommel Marcelo
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -96,7 +94,9 @@ static uint32_t *lpc23xx_decodeirq(uint32_t *regs)
 
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
   err("ERROR: Unexpected IRQ\n");
-  up_set_current_regs(regs);
+
+  tcb->xcp.regs = regs;
+  up_set_interrupt_context(true);
   PANIC();
   return NULL;
 #else
@@ -118,15 +118,12 @@ static uint32_t *lpc23xx_decodeirq(uint32_t *regs)
 
   if (irq < NR_IRQS)            /* redundant check ?? */
     {
-       uint32_t *savestate;
+      uint32_t *saveregs;
+      bool savestate;
 
-      /* Current regs non-zero indicates that we are processing an
-       * interrupt; current_regs is also used to manage interrupt level
-       * context switches.
-       */
-
-      savestate = up_current_regs();
-      up_set_current_regs(regs);
+      savestate = up_interrupt_context();
+      saveregs = tcb->xcp.regs;
+      up_set_interrupt_context(true);
       tcb->xcp.regs = regs;
 
       /* Acknowledge the interrupt */
@@ -137,12 +134,10 @@ static uint32_t *lpc23xx_decodeirq(uint32_t *regs)
 
       irq_dispatch(irq, regs);
 
-      /* Restore the previous value of current_regs.
-       * NULL would indicate that we are no longer in an interrupt handler.
-       * It will be non-NULL if we are returning from a nested interrupt.
-       */
+      /* Restore the previous value of saveregs. */
 
-      up_set_current_regs(savestate);
+      up_set_interrupt_context(savestate);
+      tcb->xcp.regs = saveregs;
     }
 
   return NULL;  /* Return not used in this architecture */

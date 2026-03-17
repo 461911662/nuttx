@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/ina219.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -62,10 +77,6 @@
 #define INA219_CONFIG_OPMODE_SCONT   (5 << INA219_CONFIG_OPMODE_SHIFT)
 #define INA219_CONFIG_OPMODE_BCONT   (6 << INA219_CONFIG_OPMODE_SHIFT)
 #define INA219_CONFIG_OPMODE_SBCONT  (7 << INA219_CONFIG_OPMODE_SHIFT)
-
-#ifndef CONFIG_INA219_I2C_FREQUENCY
-#  define CONFIG_INA219_I2C_FREQUENCY 400000
-#endif
 
 #define I2C_NOSTARTSTOP_MSGS              2
 #define I2C_NOSTARTSTOP_ADDRESS_MSG_INDEX 0

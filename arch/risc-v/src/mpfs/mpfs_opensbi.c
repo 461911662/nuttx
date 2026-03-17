@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/mpfs/mpfs_opensbi.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -429,7 +431,7 @@ static int mpfs_early_init(bool cold_boot)
    *   2. MPFS_IRQ_MTIMER
    *
    * U-boot will reuse eMMC and loads the kernel from there. OpenSBI will
-   * use CLINT timer.  Upstream u-boot doesn't turn the clocks on itsef.
+   * use CLINT timer.  Upstream u-boot doesn't turn the clocks on itself.
    */
 
   if (!cold_boot)
@@ -594,16 +596,17 @@ static int mpfs_opensbi_ecall_handler(long funcid,
  *     - Calls the sbi_init() that will not return
  *
  * Input Parameters:
- *   None
+ *   a0 - hartid
+ *   a1 - next_addr
  *
  * Returned Value:
  *   None - this will never return
  *
  ****************************************************************************/
 
-void __attribute__((noreturn)) mpfs_opensbi_setup(void)
+void __attribute__((noreturn)) mpfs_opensbi_setup(uintptr_t hartid,
+                                                  uintptr_t next_addr)
 {
-  uint32_t hartid = current_hartid();
   size_t i;
 
   for (i = 0; i < nitems(mpfs_hart_index2id); i++)
@@ -616,7 +619,7 @@ void __attribute__((noreturn)) mpfs_opensbi_setup(void)
 
   csr_write(mscratch, &g_scratches[hartid].scratch);
   g_scratches[hartid].scratch.next_mode = PRV_S;
-  g_scratches[hartid].scratch.next_addr = mpfs_get_entrypt(hartid);
+  g_scratches[hartid].scratch.next_addr = next_addr;
   g_scratches[hartid].scratch.next_arg1 = 0;
 
   sbi_init(&g_scratches[hartid].scratch);

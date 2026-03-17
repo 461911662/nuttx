@@ -192,22 +192,38 @@
   while (0)
 
 #define pci_write_mmio_byte(dev, addr, val)  \
-  (*((FAR volatile uint8_t *)(addr))) = val
+  *((FAR volatile uint8_t *)(addr)) = val
 
 #define pci_write_mmio_word(dev, addr, val)  \
-  (*((FAR volatile uint16_t *)(addr))) = val
+  *((FAR volatile uint16_t *)(addr)) = val
 
 #define pci_write_mmio_dword(dev, addr, val)  \
-  (*((FAR volatile uint32_t *)(addr))) = val
+  *((FAR volatile uint32_t *)(addr)) = val
+
+#define pci_write_mmio_qword(dev, addr, val)  \
+  do \
+    { \
+      *((FAR volatile uint32_t *)(addr)) = (uint32_t)(val); \
+      *((FAR volatile uint32_t *)((FAR char *)(addr) + sizeof(uint32_t))) = (val) >> 32; \
+    } \
+  while (0)
 
 #define pci_read_mmio_byte(dev, addr, val)    \
-  (*val) = *((FAR volatile uint8_t *)(addr))
+  *(val) = *((FAR volatile uint8_t *)(addr))
 
 #define pci_read_mmio_word(dev, addr, val)    \
-  (*val) = *((FAR volatile uint16_t *)(addr))
+  *(val) = *((FAR volatile uint16_t *)(addr))
 
 #define pci_read_mmio_dword(dev, addr, val)   \
-  (*val) = *((FAR volatile uint32_t *)(addr))
+  *(val) = *((FAR volatile uint32_t *)(addr))
+
+#define pci_read_mmio_qword(dev, addr, val)  \
+  do \
+    { \
+      *(val) = *((FAR volatile uint32_t *)(addr)) | \
+               *((FAR volatile uint32_t *)((FAR char *)(addr) + sizeof(uint32_t))); \
+    } \
+  while (0)
 
 #define pci_map_region(dev, start, size) pci_bus_map_region((dev)->bus, start, size)
 
@@ -220,8 +236,9 @@
 
 struct pci_resource_s
 {
-  uintptr_t start;
-  uintptr_t end;
+  uint64_t start;
+  uint64_t end;
+  uint64_t offset;
   unsigned int flags;
 };
 
@@ -297,9 +314,9 @@ struct pci_bus_s
 
 struct pci_ops_s
 {
-  CODE int (*read)(FAR struct pci_bus_s *bus, unsigned int devfn, int where,
+  CODE int (*read)(FAR struct pci_bus_s *bus, uint32_t devfn, int where,
                    int size, FAR uint32_t *val);
-  CODE int (*write)(FAR struct pci_bus_s *bus, unsigned int devfn, int where,
+  CODE int (*write)(FAR struct pci_bus_s *bus, uint32_t devfn, int where,
                     int size, uint32_t val);
 
   /* Return memory address for pci resource */
@@ -379,7 +396,7 @@ struct pci_driver_s
  *   val   - The data buf
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -400,7 +417,7 @@ int pci_bus_read_config(FAR struct pci_bus_s *bus,
  *   val   - The data buf
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -428,7 +445,7 @@ int pci_bus_read_config_dword(FAR struct pci_bus_s *bus,
  *   val   - The data
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -449,7 +466,7 @@ int pci_bus_write_config(FAR struct pci_bus_s *bus,
  *   val   - The data
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -476,7 +493,7 @@ int pci_bus_write_config_dword(FAR struct pci_bus_s *bus,
  *   val   - The data buffer
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -495,7 +512,7 @@ int pci_bus_read_io(FAR struct pci_bus_s *bus, uintptr_t addr,
  *   val   - The data buffer
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -519,7 +536,7 @@ int pci_bus_read_io_dword(FAR struct pci_bus_s *bus, uintptr_t where,
  *   val   - The data
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -538,7 +555,7 @@ int pci_bus_write_io(FAR struct pci_bus_s *bus, uintptr_t addr,
  *   val   - The data
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -586,7 +603,7 @@ void pci_clear_master(FAR struct pci_device_s *dev);
  *   dev - PCI device to be initialized
  *pci_bus_ops_s
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -603,7 +620,7 @@ int pci_enable_device(FAR struct pci_device_s *dev);
  *   dev - PCI device to be Disable
  *
  * Returned Value:
- *   Zero if success, otherwise nagative
+ *   Zero if success, otherwise negative
  *
  ****************************************************************************/
 
@@ -774,7 +791,7 @@ int pci_get_irq(FAR struct pci_device_s *dev);
  *   num - number of vectors
  *
  * Return value:
- *   Return the number of allocated vectors on succes or negative errno
+ *   Return the number of allocated vectors on success or negative errno
  *   on failure.
  *
  ****************************************************************************/
@@ -816,6 +833,33 @@ void pci_release_irq(FAR struct pci_device_s *dev, FAR int *irq, int num);
  ****************************************************************************/
 
 int pci_connect_irq(FAR struct pci_device_s *dev, FAR int *irq, int num);
+
+/****************************************************************************
+ * Name: pci_enable_irq
+ *
+ * Description:
+ *   Enable legacy irq if available.
+ *
+ * Input Parameters:
+ *   dev - PCI device
+ *   irq - allocated vectors
+ *
+ ****************************************************************************/
+
+void pci_enable_irq(FAR struct pci_device_s *dev, int irq);
+
+/****************************************************************************
+ * Name: pci_disable_irq
+ *
+ * Description:
+ *   Disable legacy irq.
+ *
+ * Input Parameters:
+ *   dev - PCI device
+ *
+ ****************************************************************************/
+
+void pci_disable_irq(FAR struct pci_device_s *dev);
 
 /****************************************************************************
  * Name: pci_register_driver

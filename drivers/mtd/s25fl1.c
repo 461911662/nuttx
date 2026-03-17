@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/mtd/s25fl1.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -928,7 +930,7 @@ static int s25fl1_erase_chip(FAR struct s25fl1_dev_s *priv)
   status = sf25fl1_read_status1(priv);
   while ((status & STATUS1_BUSY_MASK) != 0)
     {
-      nxsig_usleep(200 * 1000);
+      nxsched_usleep(200 * 1000);
       status = sf25fl1_read_status1(priv);
     }
 
@@ -1612,7 +1614,7 @@ FAR struct mtd_dev_s *s25fl1_initialize(FAR struct qspi_dev_s *qspi,
           priv->cmdbuf[1] |= STATUS2_QUAD_ENABLE;
           s25fl1_write_status(priv);
           priv->cmdbuf[1] = sf25fl1_read_status2(priv);
-          nxsig_usleep(50 * 1000);
+          nxsched_usleep(50 * 1000);
         }
 
       /* Unprotect FLASH sectors if so requested. */

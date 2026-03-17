@@ -1,6 +1,8 @@
 ############################################################################
 # drivers/virtio/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -54,6 +56,10 @@ endif
 
 ifeq ($(CONFIG_DRIVERS_VIRTIO_RPMB),y)
   CSRCS += virtio-rpmb.c
+endif
+
+ifeq ($(CONFIG_DRIVERS_VIRTIO_RPMSG),y)
+  CSRCS += virtio-rpmsg.c
 endif
 
 ifeq ($(CONFIG_DRIVERS_VIRTIO_SERIAL),y)

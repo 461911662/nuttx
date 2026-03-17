@@ -411,7 +411,7 @@ void bt_conn_send(FAR struct bt_conn_s *conn, FAR struct bt_buf_s *buf)
 
   sq_init(&fraglist);
 
-  wlinfo("conn handle %u buf len %u\n", conn->handle, buf->len);
+  wlwarn("conn handle %u buf len %u\n", conn->handle, buf->len);
 
   if (conn->state != BT_CONN_CONNECTED)
     {
@@ -762,7 +762,8 @@ FAR struct bt_conn_s *bt_conn_addref(FAR struct bt_conn_s *conn)
 {
   bt_atomic_incr(&conn->ref);
 
-  wlinfo("handle %u ref %u\n", conn->handle, bt_atomic_get(&conn->ref));
+  wlinfo("handle %u ref %" PRId32 "\n", conn->handle,
+         bt_atomic_get(&conn->ref));
 
   return conn;
 }
@@ -787,7 +788,8 @@ void bt_conn_release(FAR struct bt_conn_s *conn)
 
   old_ref = bt_atomic_decr(&conn->ref);
 
-  wlinfo("handle %u ref %u\n", conn->handle, bt_atomic_get(&conn->ref));
+  wlinfo("handle %u ref %" PRId32 "\n", conn->handle,
+          bt_atomic_get(&conn->ref));
 
   if (old_ref > 1)
     {
@@ -851,6 +853,10 @@ int bt_conn_security(FAR struct bt_conn_s *conn, enum bt_security_e sec)
       return -ENOTCONN;
     }
 
+  /* Store the requested security level */
+
+  conn->sec_level = sec;
+
   /* Nothing to do */
 
   if (sec == BT_SECURITY_LOW)
@@ -858,9 +864,9 @@ int bt_conn_security(FAR struct bt_conn_s *conn, enum bt_security_e sec)
       return 0;
     }
 
-  /* For now we only support JustWorks */
+  /* For now we only support Just Works and MITM with passkey (Legacy only) */
 
-  if (sec > BT_SECURITY_MEDIUM)
+  if (sec > BT_SECURITY_HIGH)
     {
       return -EINVAL;
     }

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/tricore/src/common/tricore_exit.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,27 +56,17 @@
 
 void up_exit(int status)
 {
-  struct tcb_s *tcb = this_task();
-
   /* Destroy the task at the head of the ready to run list. */
 
   nxtask_exit();
 
-  /* Now, perform the context switch to the new ready-to-run task at the
-   * head of the list.
-   */
+  /* Scheduler parameters will update inside syscall */
 
-  tcb = this_task();
-
-  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases
-   * NOTE: the API also adjusts the global IRQ control for SMP
-   */
-
-  nxsched_resume_scheduler(tcb);
+  g_running_tasks[this_cpu()] = NULL;
 
   /* Then switch contexts */
 
-  tricore_fullcontextrestore(tcb->xcp.regs);
+  tricore_fullcontextrestore();
 
   /* tricore_fullcontextrestore() should not return but could if the software
    * interrupts are disabled.

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/inode/fs_foreachinode.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -76,18 +78,18 @@ struct inode_path_s
  *
  ****************************************************************************/
 
-static int foreach_inodelevel(FAR struct inode *node,
+static int foreach_inodelevel(FAR struct inode *inode,
                               FAR struct inode_path_s *info)
 {
   int ret = OK;
 
   /* Visit each node at this level */
 
-  for (; node; node = node->i_peer)
+  for (; inode; inode = inode->i_peer)
     {
       /* Give the next inode to the callback */
 
-      ret = info->handler(node, info->path, info->arg);
+      ret = info->handler(inode, info->path, info->arg);
 
       /* Break out of the loop early if the handler returns a non-zero
        * value.
@@ -102,12 +104,12 @@ static int foreach_inodelevel(FAR struct inode *node,
        * of the inodes at that level.
        */
 
-      if (node->i_child)
+      if (inode->i_child)
         {
           /* Construct the path to the next level */
 
           int pathlen = strlen(info->path);
-          int namlen  = strlen(node->i_name) + 1;
+          int namlen  = strlen(inode->i_name) + 1;
 
           /* Make sure that this would not exceed the maximum path length */
 
@@ -120,8 +122,8 @@ static int foreach_inodelevel(FAR struct inode *node,
           /* Append the path segment to this inode and recurse */
 
           snprintf(&info->path[pathlen], sizeof(info->path) - pathlen,
-                   "/%s", node->i_name);
-          ret = foreach_inodelevel(node->i_child, info);
+                   "/%s", inode->i_name);
+          ret = foreach_inodelevel(inode->i_child, info);
 
           /* Truncate the path name back to the correct length */
 

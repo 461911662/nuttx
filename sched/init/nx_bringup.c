@@ -34,10 +34,9 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
-#include <nuttx/coredump.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/init.h>
-#include <nuttx/nuttx.h>
+#include <nuttx/macro.h>
 #include <nuttx/symtab.h>
 #include <nuttx/trace.h>
 #include <nuttx/wqueue.h>
@@ -52,6 +51,7 @@
 #include "sched/sched.h"
 #include "wqueue/wqueue.h"
 #include "init/init.h"
+#include "misc/coredump.h"
 
 #ifdef CONFIG_ETC_ROMFS
 #  include <nuttx/drivers/ramdisk.h>
@@ -65,10 +65,9 @@
 /* Configuration */
 
 #if defined(CONFIG_INIT_NONE)
-  /* Kconfig logic will set CONFIG_INIT_NONE if dependencies are not met */
-
-#  error No initialization mechanism selected (CONFIG_INIT_NONE)
-
+#  ifndef CONFIG_BUILD_FLAT
+#    error No initialization mechanism selected (CONFIG_INIT_NONE)
+#  endif
 #else
 #  if !defined(CONFIG_INIT_ENTRY) && !defined(CONFIG_INIT_FILE)
   /* For backward compatibility with older defconfig files when this was
@@ -319,14 +318,23 @@ static inline void nx_start_application(void)
    * configured.
    */
 
+  boards_trace_begin();
   board_late_initialize();
+  boards_trace_end();
 #endif
 
-#if defined(CONFIG_BOARD_COREDUMP_SYSLOG) || \
-    defined(CONFIG_BOARD_COREDUMP_BLKDEV)
+#ifdef CONFIG_COREDUMP
   coredump_initialize();
 #endif
 
+#ifdef CONFIG_INIT_NONE
+
+  UNUSED(ret);
+
+  /* In a flat build, init thread is not mandatory */
+
+  sinfo("No init thread\n");
+#else
   posix_spawnattr_init(&attr);
   attr.priority  = CONFIG_INIT_PRIORITY;
   attr.stacksize = CONFIG_INIT_STACKSIZE;
@@ -379,6 +387,7 @@ static inline void nx_start_application(void)
 #endif
   posix_spawnattr_destroy(&attr);
   DEBUGASSERT(ret > 0);
+#endif /* CONFIG_INIT_NONE */
 }
 
 /****************************************************************************

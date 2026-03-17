@@ -83,13 +83,6 @@ static int psock_socketlevel_option(FAR struct socket *psock, int option,
 {
   FAR struct socket_conn_s *conn = psock->s_conn;
 
-  /* Verify that the socket option if valid (but might not be supported ) */
-
-  if (!value || !value_len)
-    {
-      return -EINVAL;
-    }
-
   /* Process the options always handled locally */
 
   switch (option)
@@ -147,13 +140,17 @@ static int psock_socketlevel_option(FAR struct socket *psock, int option,
        * is outside of the scope of getsockopt.
        */
 
-      case SO_BROADCAST:  /* Permits sending of broadcast messages */
-      case SO_DEBUG:      /* Enables recording of debugging information */
-      case SO_DONTROUTE:  /* Requests outgoing messages bypass standard routing */
-      case SO_KEEPALIVE:  /* Verifies TCP connections active by enabling the
-                           * periodic transmission of probes */
-      case SO_OOBINLINE:  /* Leaves received out-of-band data inline */
-      case SO_REUSEADDR:  /* Allow reuse of local addresses */
+      case SO_BROADCAST:   /* Permits sending of broadcast messages */
+      case SO_DEBUG:       /* Enables recording of debugging information */
+      case SO_DONTROUTE:   /* Requests outgoing messages bypass standard routing */
+      case SO_KEEPALIVE:   /* Verifies TCP connections active by enabling the
+                            * periodic transmission of probes */
+      case SO_OOBINLINE:   /* Leaves received out-of-band data inline */
+      case SO_REUSEADDR:   /* Allow reuse of local addresses */
+#ifdef CONFIG_NET_TIMESTAMP
+      case SO_TIMESTAMP:   /* Generates a timestamp in us for each incoming packet */
+      case SO_TIMESTAMPNS: /* Generates a timestamp in ns for each incoming packet */
+#endif
         {
           sockopt_t optionset;
 
@@ -268,6 +265,13 @@ int psock_getsockopt(FAR struct socket *psock, int level, int option,
 {
   int ret = -ENOPROTOOPT;
 
+  /* Verify that the socket option is valid (but might not be supported ) */
+
+  if (value == NULL || value_len == NULL || *value_len == 0)
+    {
+      return -EINVAL;
+    }
+
   /* Verify that the sockfd corresponds to valid, allocated socket */
 
   if (psock == NULL || psock->s_conn == NULL)
@@ -362,7 +366,7 @@ int getsockopt(int sockfd, int level, int option,
   if (ret == OK)
     {
       ret = psock_getsockopt(psock, level, option, value, value_len);
-      fs_putfilep(filep);
+      file_put(filep);
     }
 
   if (ret < 0)

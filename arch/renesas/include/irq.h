@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/renesas/include/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,6 +43,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* The SH stack must be aligned at word (4 byte) boundaries. If necessary
+ * frame_size must be rounded up to the next boundary
+ */
+
+#define STACKFRAME_ALIGN 4
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -68,24 +76,6 @@ EXTERN volatile uint32_t *g_current_regs;
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
-
-/****************************************************************************
- * Name: up_cpu_index
- *
- * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- ****************************************************************************/
-
-#define up_cpu_index() (0)
 
 /****************************************************************************
  * Inline functions

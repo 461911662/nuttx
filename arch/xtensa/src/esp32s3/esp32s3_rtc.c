@@ -366,6 +366,8 @@ static uint32_t g_rtc_dbias_pvt_240m = 28;
 static uint32_t g_dig_dbias_pvt_non_240m = 27;
 static uint32_t g_rtc_dbias_pvt_non_240m = 27;
 
+static spinlock_t g_rtc_lock = SP_UNLOCKED;
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -561,7 +563,7 @@ static uint32_t IRAM_ATTR esp32s3_rtc_clk_cal_internal(
   clks_state &= clks_mask;
 
   /* On ESP32S3, choosing RTC_CAL_RTC_MUX results in calibration of
-   * the 150k RTC clock regardless of the currenlty selected SLOW_CLK.
+   * the 150k RTC clock regardless of the currently selected SLOW_CLK.
    * The following code emulates ESP32 behavior
    */
 
@@ -905,7 +907,7 @@ static void esp32s3_select_rtc_slow_clk(enum esp32s3_slow_clk_sel_e slow_clk)
       retry_32k_xtal++;
     }
   while (cal_val == 0 && retry_32k_xtal < RETRY_CAL_EXT);
-  rtcinfo("RTC_SLOW_CLK calibration value: %d\n", cal_val);
+  rtcinfo("RTC_SLOW_CLK calibration value: %" PRIu32 "\n", cal_val);
   putreg32((uint32_t)cal_val, RTC_SLOW_CLK_CAL_REG);
 }
 
@@ -955,7 +957,7 @@ static void IRAM_ATTR esp32s3_rtc_clk_cpu_freq_to_pll_mhz(
                                              int cpu_freq_mhz)
 {
   /* There are totally 6 LDO slaves(all on by default). At the moment of
-   * swithing LDO slave, LDO voltage will also change instantaneously.
+   * switching LDO slave, LDO voltage will also change instantaneously.
    * LDO slave can reduce the voltage change caused by switching frequency.
    * CPU frequency <= 40M : just open 3 LDO slaves; CPU frequency = 80M :
    * open 4 LDO slaves; CPU frequency = 160M : open 5 LDO slaves;
@@ -2429,6 +2431,18 @@ int IRAM_ATTR esp32s3_rtc_sleep_start(uint32_t wakeup_opt,
   return reject;
 }
 
+void esp32s3_rtc_ext1_prepare(uint32_t trigger_mode, uint32_t rtc_gpio_mask)
+{
+  if (rtc_gpio_mask > 0)
+    {
+      modifyreg32(RTC_CNTL_RTC_EXT_WAKEUP1_REG, 0 ,
+                  RTC_CNTL_EXT_WAKEUP1_STATUS_CLR | rtc_gpio_mask);
+      modifyreg32(RTC_CNTL_RTC_EXT_WAKEUP_CONF_REG, 0,
+                  (trigger_mode << RTC_CNTL_EXT_WAKEUP1_LV_S) | \
+                  RTC_CNTL_GPIO_WAKEUP_FILTER);
+    }
+}
+
 /****************************************************************************
  * Name: esp32s3_rtc_clk_cpu_freq_set_config
  *
@@ -2740,7 +2754,7 @@ time_t up_rtc_time(void)
   uint64_t time_us;
   irqstate_t flags;
 
-  flags = spin_lock_irqsave(NULL);
+  flags = spin_lock_irqsave(&g_rtc_lock);
 
   /* NOTE: RT-Timer starts to work after the board is initialized, and the
    * RTC controller starts works after up_rtc_initialize is initialized.
@@ -2769,7 +2783,7 @@ time_t up_rtc_time(void)
                   esp32s3_rtc_get_boot_time();
     }
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&g_rtc_lock, flags);
 
   return (time_t)(time_us / USEC_PER_SEC);
 }
@@ -2797,7 +2811,7 @@ int up_rtc_settime(const struct timespec *ts)
   uint64_t rtc_offset_us;
 
   DEBUGASSERT(ts != NULL && ts->tv_nsec < NSEC_PER_SEC);
-  flags = spin_lock_irqsave(NULL);
+  flags = spin_lock_irqsave(&g_rtc_lock);
 
   now_us = ((uint64_t) ts->tv_sec) * USEC_PER_SEC +
           ts->tv_nsec / NSEC_PER_USEC;
@@ -2817,7 +2831,7 @@ int up_rtc_settime(const struct timespec *ts)
   g_rtc_save->offset = 0;
   esp32s3_rtc_set_boot_time(rtc_offset_us);
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&g_rtc_lock, flags);
 
   return OK;
 }
@@ -2883,7 +2897,7 @@ int up_rtc_gettime(struct timespec *tp)
   irqstate_t flags;
   uint64_t time_us;
 
-  flags = spin_lock_irqsave(NULL);
+  flags = spin_lock_irqsave(&g_rtc_lock);
 
   if (g_rt_timer_enabled == true)
     {
@@ -2898,7 +2912,7 @@ int up_rtc_gettime(struct timespec *tp)
   tp->tv_sec  = time_us / USEC_PER_SEC;
   tp->tv_nsec = (time_us % USEC_PER_SEC) * NSEC_PER_USEC;
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&g_rtc_lock, flags);
 
   return OK;
 }
@@ -2941,7 +2955,7 @@ int up_rtc_setalarm(struct alm_setalarm_s *alminfo)
     {
       /* Create the RT-Timer alarm */
 
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_rtc_lock);
 
       if (cbinfo->alarm_hdl == NULL)
         {
@@ -2952,7 +2966,7 @@ int up_rtc_setalarm(struct alm_setalarm_s *alminfo)
           if (ret < 0)
             {
               rtcerr("ERROR: Failed to create rt_timer error=%d\n", ret);
-              spin_unlock_irqrestore(NULL, flags);
+              spin_unlock_irqrestore(&g_rtc_lock, flags);
               return ret;
             }
         }
@@ -2974,7 +2988,7 @@ int up_rtc_setalarm(struct alm_setalarm_s *alminfo)
           ret = OK;
         }
 
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_rtc_lock, flags);
     }
 
   return ret;
@@ -3009,7 +3023,7 @@ int up_rtc_cancelalarm(enum alm_id_e alarmid)
 
   if (cbinfo->ac_cb != NULL)
     {
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_rtc_lock);
 
       /* Stop and delete the alarm */
 
@@ -3020,7 +3034,7 @@ int up_rtc_cancelalarm(enum alm_id_e alarmid)
       cbinfo->deadline_us = 0;
       cbinfo->alarm_hdl = NULL;
 
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_rtc_lock, flags);
 
       ret = OK;
     }
@@ -3051,7 +3065,7 @@ int up_rtc_rdalarm(struct timespec *tp, uint32_t alarmid)
   DEBUGASSERT((RTC_ALARM0 <= alarmid) &&
               (alarmid < RTC_ALARM_LAST));
 
-  flags = spin_lock_irqsave(NULL);
+  flags = spin_lock_irqsave(&g_rtc_lock);
 
   /* Get the alarm according to the alarmid */
 
@@ -3062,7 +3076,7 @@ int up_rtc_rdalarm(struct timespec *tp, uint32_t alarmid)
   tp->tv_nsec = ((esp32s3_rt_timer_time_us() + g_rtc_save->offset +
               cbinfo->deadline_us) % USEC_PER_SEC) * NSEC_PER_USEC;
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&g_rtc_lock, flags);
 
   return OK;
 }

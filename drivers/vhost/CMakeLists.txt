@@ -1,6 +1,8 @@
 # ##############################################################################
 # drivers/vhost/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -24,7 +26,11 @@ if(CONFIG_DRIVERS_VHOST)
 endif()
 
 if(CONFIG_DRIVERS_VHOST_RNG)
-  list(APPEND SRCS vhost_rng.c)
+  list(APPEND SRCS vhost-rng.c)
+endif()
+
+if(CONFIG_DRIVERS_VHOST_RPMSG)
+  list(APPEND SRCS vhost-rpmsg.c)
 endif()
 
 target_sources(drivers PRIVATE ${SRCS})

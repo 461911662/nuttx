@@ -110,10 +110,11 @@ int setenv(FAR const char *name, FAR const char *value, int overwrite)
 
   /* Get a reference to the thread-private environ in the TCB. */
 
-  sched_lock();
   rtcb  = this_task();
   group = rtcb->group;
   DEBUGASSERT(group);
+
+  nxrmutex_lock(&group->tg_mutex);
 
   /* Check if the variable already exists */
 
@@ -125,7 +126,7 @@ int setenv(FAR const char *name, FAR const char *value, int overwrite)
         {
           /* No.. then just return success */
 
-          sched_unlock();
+          nxrmutex_unlock(&group->tg_mutex);
           return OK;
         }
 
@@ -196,13 +197,13 @@ int setenv(FAR const char *name, FAR const char *value, int overwrite)
   /* Now, put the new name=value string into the environment buffer */
 
   snprintf(pvar, varlen, "%s=%s", name, value);
-  sched_unlock();
+  nxrmutex_unlock(&group->tg_mutex);
   return OK;
 
 errout_with_var:
   group_free(group, pvar);
 errout_with_lock:
-  sched_unlock();
+  nxrmutex_unlock(&group->tg_mutex);
 errout:
   set_errno(ret);
   return ERROR;

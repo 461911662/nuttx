@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/xtensa/esp32s3/common/src/esp32s3_es8311.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -40,9 +42,9 @@
 #include <arch/board/board.h>
 
 #include "esp32s3_i2c.h"
-#include "esp32s3_i2s.h"
+#include "espressif/esp_i2s.h"
 
-#if defined(CONFIG_ESP32S3_I2S) && defined(CONFIG_AUDIO_ES8311)
+#if defined(CONFIG_ESPRESSIF_I2S) && defined(CONFIG_AUDIO_ES8311)
 
 /****************************************************************************
  * Private Data
@@ -63,7 +65,7 @@ static struct es8311_lower_s g_es8311_lower[2];
  *   as /dev/audio/pcm[x] where x is determined by the I2S port number.
  *
  * Input Parameters:
- *   i2c_port  - The I2C port used for the device
+ *   i2c       - The I2C handle used for the device
  *   i2c_addr  - The I2C address used by the device
  *   i2c_freq  - The I2C frequency used for the device
  *   i2s_port  - The I2S port used for the device
@@ -74,17 +76,16 @@ static struct es8311_lower_s g_es8311_lower[2];
  *
  ****************************************************************************/
 
-int esp32s3_es8311_initialize(int i2c_port, uint8_t i2c_addr, int i2c_freq,
-                            int i2s_port)
+int esp32s3_es8311_initialize(struct i2c_master_s *i2c, uint8_t i2c_addr,
+                              int i2c_freq, int i2s_port)
 {
   struct audio_lowerhalf_s *es8311;
   struct i2s_dev_s *i2s;
-  struct i2c_master_s *i2c;
   static bool initialized = false;
   int ret;
 
-  audinfo("i2c_port %d, i2c_addr %d, i2c_freq %d\n",
-          i2c_port, i2c_addr, i2c_freq);
+  audinfo("i2c_addr %d, i2c_freq %d\n",
+           i2c_addr, i2c_freq);
 
   /* Have we already initialized? Since we never uninitialize we must
    * prevent multiple initializations. This is necessary, for example,
@@ -97,7 +98,7 @@ int esp32s3_es8311_initialize(int i2c_port, uint8_t i2c_addr, int i2c_freq,
     {
       /* Get an instance of the I2S interface for the ES8311 data channel */
 
-      i2s = esp32s3_i2sbus_initialize(i2s_port);
+      i2s = esp_i2sbus_initialize(i2s_port);
       if (i2s == NULL)
         {
           auderr("ERROR: Failed to initialize I2S\n");
@@ -105,15 +106,14 @@ int esp32s3_es8311_initialize(int i2c_port, uint8_t i2c_addr, int i2c_freq,
           goto errout;
         }
 
-      i2c = esp32s3_i2cbus_initialize(i2c_port);
       if (i2c == NULL)
         {
-          auderr("ERROR: Failed to initialize I2C%d\n", i2c_port);
+          auderr("ERROR: I2C handle is NULL\n");
           ret = -ENODEV;
           goto errout;
         }
 
-      /* Check wheter to enable a simple character driver that supports I2S
+      /* Check whether to enable a simple character driver that supports I2S
        * transfers via a read() and write().  The intent of this driver is to
        * support I2S testing.  It is not an audio driver but does conform to
        * some of the buffer management heuristics of an audio driver.  It is
@@ -211,4 +211,4 @@ errout:
   return ret;
 }
 
-#endif /* CONFIG_ESP32S3_I2S && CONFIG_AUDIO_ES8311 */
+#endif /* CONFIG_ESPRESSIF_I2S && CONFIG_AUDIO_ES8311 */

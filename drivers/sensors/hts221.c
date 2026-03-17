@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/hts221.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -50,10 +65,6 @@
 #  define hts221_dbg(x, ...)    _info(x, ##__VA_ARGS__)
 #else
 #  define hts221_dbg(x, ...)    sninfo(x, ##__VA_ARGS__)
-#endif
-
-#ifndef CONFIG_HTS221_I2C_FREQUENCY
-#  define CONFIG_HTS221_I2C_FREQUENCY 400000
 #endif
 
 #define HTS221_WHO_AM_I             0x0f
@@ -403,7 +414,7 @@ static int hts221_config_ctrl_reg2(FAR struct hts221_dev_s *priv,
               break;
             }
 
-          nxsig_usleep(10 * 1000);
+          nxsched_usleep(10 * 1000);
           retries--;
         }
       while (retries);

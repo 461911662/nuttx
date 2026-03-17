@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/coresight/coresight_core.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -617,7 +619,7 @@ static int coresight_enable_path(FAR struct list_node *path)
             ret = coresight_enable_sink(node->csdev);
             if (ret < 0)
               {
-                cserr("enalbe sink: %s failed ret: %d\n",
+                cserr("enable sink: %s failed ret: %d\n",
                       node->csdev->name, ret);
                 return ret;
               }
@@ -633,7 +635,7 @@ static int coresight_enable_path(FAR struct list_node *path)
                                           next->csdev);
               if (ret < 0)
                 {
-                  cserr("enalbe link: %s failed ret: %d\n",
+                  cserr("enable link: %s failed ret: %d\n",
                         node->csdev->name, ret);
                   goto err;
                 }

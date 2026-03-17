@@ -1,6 +1,8 @@
 # ##############################################################################
 # drivers/usbdev/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -53,6 +55,10 @@ if(CONFIG_USBDEV)
 
   if(CONFIG_USBADB)
     list(APPEND SRCS adb.c)
+  endif()
+
+  if(CONFIG_USBMTP)
+    list(APPEND SRCS mtp.c)
   endif()
 
   if(CONFIG_NET_CDCECM)

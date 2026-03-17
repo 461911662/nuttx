@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/tricore/src/common/Ifx_Cfg_Trap.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,7 +37,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* Trap Hook defination */
+/* Trap Hook definition */
 
 /* Trap Call */
 
@@ -54,6 +56,7 @@
 #define IFX_CFG_CPU_TRAP_SYSCALL_CPU3_HOOK(trapWatch)   tricore_svcall(&trapWatch)
 #define IFX_CFG_CPU_TRAP_SYSCALL_CPU4_HOOK(trapWatch)   tricore_svcall(&trapWatch)
 #define IFX_CFG_CPU_TRAP_SYSCALL_CPU5_HOOK(trapWatch)   tricore_svcall(&trapWatch)
+#define IFX_CFG_CPU_TRAP_SYSCALL_CPU6_HOOK(trapWatch)   tricore_svcall(&trapWatch)
 
 #endif /* IFX_CFG_EXTEND_TRAP_HOOKS */
 

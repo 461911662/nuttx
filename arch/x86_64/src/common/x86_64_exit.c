@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/common/x86_64_exit.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -64,16 +66,6 @@ void up_exit(int status)
 
   tcb = this_task();
 
-  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases
-   * NOTE: the API also adjusts the global IRQ control for SMP
-   */
-
-  nxsched_resume_scheduler(tcb);
-
-  /* Context switch, rearrange MMU */
-
-  x86_64_restore_auxstate(tcb);
-
 #ifdef CONFIG_ARCH_ADDRENV
   /* Make sure that the address environment for the previously running
    * task is closed down gracefully (data caches dump, MMU flushed) and
@@ -82,11 +74,28 @@ void up_exit(int status)
    */
 
   addrenv_switch(tcb);
+  tcb = this_task();
 #endif
+
+  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases
+   * NOTE: the API also adjusts the global IRQ control for SMP
+   */
+
+  g_running_tasks[this_cpu()] = tcb;
+
+  /* Context switch, rearrange MMU */
+
+  x86_64_restore_auxstate(tcb);
 
   /* Restore the cpu lock */
 
   restore_critical_section(tcb, this_cpu());
+
+#ifdef CONFIG_ARCH_KERNEL_STACK
+  /* Update kernel stack top pointer */
+
+  x86_64_set_ktopstk(tcb->xcp.ktopstk);
+#endif
 
   /* Then switch contexts */
 

@@ -32,10 +32,19 @@
 #include <debug.h>
 #include <unistd.h>
 
+#include <nuttx/sched.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/queue.h>
 
 #include "local/local.h"
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+/* Global protection lock for local socket */
+
+mutex_t g_local_lock = NXMUTEX_INITIALIZER;
 
 /****************************************************************************
  * Private Data
@@ -167,6 +176,7 @@ FAR struct local_conn_s *local_alloc(void)
 
       nxmutex_init(&conn->lc_sendlock);
       nxmutex_init(&conn->lc_polllock);
+      nxrmutex_init(&conn->lc_conn.s_lock);
 
 #ifdef CONFIG_NET_LOCAL_SCM
       conn->lc_cred.pid = nxsched_getpid();
@@ -219,8 +229,18 @@ int local_alloc_accept(FAR struct local_conn_s *server,
   conn->lc_peer   = client;
   client->lc_peer = conn;
 
-  strlcpy(conn->lc_path, client->lc_path, sizeof(conn->lc_path));
+  strlcpy(conn->lc_path, server->lc_path, sizeof(conn->lc_path));
   conn->lc_instance_id = client->lc_instance_id;
+
+  /* Create the FIFOs needed for the connection */
+
+  ret = local_create_fifos(conn, server->lc_rcvsize, client->lc_rcvsize);
+  if (ret < 0)
+    {
+      nerr("ERROR: Failed to create FIFOs for %s: %d\n",
+           client->lc_path, ret);
+      goto err;
+    }
 
   /* Open the server-side write-only FIFO.  This should not
    * block.
@@ -231,7 +251,7 @@ int local_alloc_accept(FAR struct local_conn_s *server,
     {
       nerr("ERROR: Failed to open write-only FIFOs for %s: %d\n",
            conn->lc_path, ret);
-      goto err;
+      goto errout_with_fifos;
     }
 
   /* Do we have a connection?  Is the write-side FIFO opened? */
@@ -248,7 +268,7 @@ int local_alloc_accept(FAR struct local_conn_s *server,
     {
       nerr("ERROR: Failed to open read-only FIFOs for %s: %d\n",
            conn->lc_path, ret);
-      goto err;
+      goto errout_with_fifos;
     }
 
   /* Do we have a connection?  Are the FIFOs opened? */
@@ -256,6 +276,9 @@ int local_alloc_accept(FAR struct local_conn_s *server,
   DEBUGASSERT(conn->lc_infile.f_inode != NULL);
   *accept = conn;
   return OK;
+
+errout_with_fifos:
+  local_release_fifos(conn);
 
 err:
   local_free(conn);
@@ -286,7 +309,7 @@ void local_free(FAR struct local_conn_s *conn)
 
   dq_rem(&conn->lc_conn.node, &g_local_connections);
 
-  if (local_peerconn(conn) && conn->lc_peer)
+  if (conn->lc_peer)
     {
       conn->lc_peer->lc_peer = NULL;
       conn->lc_peer = NULL;
@@ -322,17 +345,18 @@ void local_free(FAR struct local_conn_s *conn)
     }
 #endif /* CONFIG_NET_LOCAL_SCM */
 
-  /* Destroy all FIFOs associted with the connection */
+  /* Destroy all FIFOs associated with the connection */
 
   local_release_fifos(conn);
 #ifdef CONFIG_NET_LOCAL_STREAM
   nxsem_destroy(&conn->lc_waitsem);
 #endif
 
-  /* Destory sem associated with the connection */
+  /* Destroy sem associated with the connection */
 
   nxmutex_destroy(&conn->lc_sendlock);
   nxmutex_destroy(&conn->lc_polllock);
+  nxrmutex_destroy(&conn->lc_conn.s_lock);
 
   /* And free the connection structure */
 

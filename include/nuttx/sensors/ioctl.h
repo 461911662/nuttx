@@ -435,26 +435,17 @@
  * Argument:     Heater configuration.
  */
 
-#define SNIOC_HEAT             _SNIOC(0x009B)
+#define SNIOC_HEAT                    _SNIOC(0x009B)
 
 /* Command:      SNIOC_GET_INFO
  * Description:  Get device information.
  * Argument:     This is the device info pointer.
  */
 
-#define SNIOC_GET_INFO                _SNIOC(0x009B)
-
-#ifdef CONFIG_USENSOR
-/* Command:      SNIOC_SET_INFO
- * Description:  Set device information. Only used by user space.
- * Argument:     This is the device info pointer.
- */
-
-#  define SNIOC_SET_INFO              _SNIOC(0x009C)
-#endif
+#define SNIOC_GET_INFO                _SNIOC(0x009C)
 
 /* Command:      SNIOC_FLUSH
- * Description:  Flush sensor harware fifo buffer.
+ * Description:  Flush sensor hardware fifo buffer.
  */
 
 #define SNIOC_FLUSH                   _SNIOC(0x009D)
@@ -465,5 +456,77 @@
  */
 
 #define SNIOC_GET_EVENTS              _SNIOC(0x009E)
+
+/* Command:      SNIOC_SET_THERMO
+ * Description:  Set the thermocouple type.
+ * Argument:     An option from `enum sensor_thermo_type_e`
+ */
+
+#define SNIOC_SET_THERMO              _SNIOC(0x009F)
+
+/* Command:      SNIOC_LPF
+ * Description:  Enable the low pass filter
+ * Argument:     Boolean true for enable, false to disable.
+ */
+
+#define SNIOC_LPF                     _SNIOC(0x00A0)
+
+/* Command:      SNIOC_SET_GAIN
+ * Description:  Sets the gain of the sensor.
+ */
+
+#define SNIOC_SET_GAIN                _SNIOC(0x00A1)
+
+/* Command:      SNIOC_SET_LDO
+ * Description:  Sets the LDO voltage of the sensor.
+ */
+
+#define SNIOC_SET_LDO                 _SNIOC(0x00A2)
+
+/* Command:      SNIOC_GET_CALIBVALUE
+ * Description:  Get the gain calibration value of the sensor.
+ */
+
+#define SNIOC_GET_CALIBVALUE          _SNIOC(0x00A3)
+
+/* Command:      SNIOC_SET_BAUD
+ * Description:  Sets the baud rate of the sensor.
+ */
+
+#define SNIOC_SET_BAUD                _SNIOC(0x00A4)      
+
+/* IOCTL commands unique to the L86XXX and other GNSS modules */
+
+#define SNIOC_HOT_START               _SNIOC(0X00A5)
+#define SNIOC_WARM_START              _SNIOC(0X00A6)
+#define SNIOC_COLD_START              _SNIOC(0X00A7)
+#define SNIOC_FULL_COLD_START         _SNIOC(0X00A8)
+
+/* Command:      SNIOC_SET_NONWAKEUP
+ * Description:  Set non-wakeup flag for user.
+ * Argument:     True is non-wakeup, false is wakeup.
+ */
+
+#define SNIOC_SET_NONWAKEUP           _SNIOC(0x00A9)
+
+/****************************************************************************
+ * Public types
+ ****************************************************************************/
+
+/* Possible thermocouple types. Implementations should not rely on the enum's
+ * underlying value.
+ */
+
+enum sensor_thermo_type_e
+{
+  SENSOR_THERMO_TYPE_K,
+  SENSOR_THERMO_TYPE_J,
+  SENSOR_THERMO_TYPE_T,
+  SENSOR_THERMO_TYPE_N,
+  SENSOR_THERMO_TYPE_S,
+  SENSOR_THERMO_TYPE_E,
+  SENSOR_THERMO_TYPE_B,
+  SENSOR_THERMO_TYPE_R,
+};
 
 #endif /* __INCLUDE_NUTTX_SENSORS_IOCTL_H */

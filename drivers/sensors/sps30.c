@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/sps30.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -53,10 +68,6 @@
 #  define sps30_dbg(x, ...)    sninfo(x, ##__VA_ARGS__)
 #endif
 
-#ifndef CONFIG_SPS30_I2C_FREQUENCY
-#  define CONFIG_SPS30_I2C_FREQUENCY 100000
-#endif
-
 #define SPS30_MEASUREMENT_INTERVAL 1      /* one second, fixed in hw */
 #define SPS30_MEASUREMENT_MODE     0x0300
 
@@ -75,7 +86,7 @@
 #define SPS30_CMD_SOFT_RESET                 0xd304
 
 /****************************************************************************
- * Private
+ * Private Types
  ****************************************************************************/
 
 struct sps30_dev_s
@@ -177,7 +188,9 @@ static const struct file_operations g_sps30fops =
   sps30_ioctl,    /* ioctl */
   NULL,           /* mmap */
   NULL,           /* truncate */
-  NULL            /* poll */
+  NULL,           /* poll */
+  NULL,           /* readv */
+  NULL            /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , sps30_unlink /* unlink */
 #endif
@@ -490,11 +503,7 @@ static int sps30_read_values(FAR struct sps30_dev_s *priv,
                   return ret;
                 }
 
-              ret = nxsig_usleep(500 * 1000);
-              if (ret == -EINTR)
-                {
-                  return ret;
-                }
+              nxsched_usleep(500 * 1000);
             }
           else
             {

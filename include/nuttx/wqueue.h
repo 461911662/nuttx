@@ -32,8 +32,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+#include <nuttx/list_type.h>
 #include <nuttx/clock.h>
-#include <nuttx/queue.h>
 #include <nuttx/wdog.h>
 
 /****************************************************************************
@@ -249,18 +249,10 @@ typedef CODE void (*worker_t)(FAR void *arg);
 
 struct work_s
 {
-  union
-  {
-    struct
-    {
-      struct dq_entry_s dq;      /* Implements a double linked list */
-      clock_t qtime;             /* Time work queued */
-    } s;
-    struct wdog_s timer;         /* Delay expiry timer */
-  } u;
-  worker_t  worker;              /* Work callback */
-  FAR void *arg;                 /* Callback argument */
-  FAR struct kwork_wqueue_s *wq; /* Work queue */
+  struct list_node node;   /* Implements a double linked list */
+  clock_t          qtime;  /* Time work queued */
+  worker_t         worker; /* Work callback */
+  FAR void        *arg;    /* Callback argument */
 };
 
 /* This is an enumeration of the various events that may be
@@ -349,6 +341,7 @@ int work_usrstart(void);
  * Input Parameters:
  *   name       - Name of the new task
  *   priority   - Priority of the new task
+ *   stack_addr - Stack buffer of the new task
  *   stack_size - size (in bytes) of the stack needed
  *   nthreads   - Number of work thread should be created
  *
@@ -359,6 +352,7 @@ int work_usrstart(void);
 
 FAR struct kwork_wqueue_s *work_queue_create(FAR const char *name,
                                              int priority,
+                                             FAR void *stack_addr,
                                              int stack_size, int nthreads);
 
 /****************************************************************************
@@ -414,6 +408,39 @@ int work_queue(int qid, FAR struct work_s *work, worker_t worker,
 int work_queue_wq(FAR struct kwork_wqueue_s *wqueue,
                   FAR struct work_s *work, worker_t worker,
                   FAR void *arg, clock_t delay);
+
+/****************************************************************************
+ * Name: work_queue_next/work_queue_next_wq
+ *
+ * Description:
+ *   Queue work to be performed at a later time based on the last expiration
+ *   time. This function can be used to implement a periodic workqueue.
+ *   E.g, Call this function instead of work_queue in the work callback to
+ *   restart the next work for better timing accuracy.
+ *   Note that calling this function outside the work callback requires
+ *   the work->qtime being set.
+ *
+ * Input Parameters:
+ *   qid    - The work queue ID (must be HPWORK or LPWORK)
+ *   wqueue - The work queue handle
+ *   work   - The work structure to queue
+ *   worker - The worker callback to be invoked.  The callback will be
+ *            invoked on the worker thread of execution.
+ *   arg    - The argument that will be passed to the worker callback when
+ *            it is invoked.
+ *   delay  - Delay (in clock ticks) from the time queue until the worker
+ *            is invoked. Zero means to perform the work immediately.
+ *
+ * Returned Value:
+ *   Zero on success, a negated errno on failure
+ *
+ ****************************************************************************/
+
+int work_queue_next(int qid, FAR struct work_s *work, worker_t worker,
+                    FAR void *arg, clock_t delay);
+int work_queue_next_wq(FAR struct kwork_wqueue_s *wqueue,
+                       FAR struct work_s *work, worker_t worker,
+                       FAR void *arg, clock_t delay);
 
 /****************************************************************************
  * Name: work_queue_pri
@@ -520,11 +547,7 @@ int work_cancel_sync_wq(FAR struct kwork_wqueue_s *wqueue,
  *
  ****************************************************************************/
 
-#ifdef __KERNEL__
-#  define work_timeleft(work) wd_gettime(&((work)->u.timer))
-#else
-#  define work_timeleft(work) ((sclock_t)((work)->u.s.qtime - clock()))
-#endif
+#define work_timeleft(work) ((sclock_t)((work)->qtime - clock()))
 
 /****************************************************************************
  * Name: lpwork_boostpriority

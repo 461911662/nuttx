@@ -1,6 +1,8 @@
 # ##############################################################################
 # boards/arm/stm32/stm32f4discovery/kernel/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -18,4 +20,4 @@
 #
 # ##############################################################################
 
-nuttx_add_aux_library(userspace stm32_userspace.c)
+target_sources(nuttx_user PRIVATE stm32_userspace.c)

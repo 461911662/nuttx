@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/procfs/fs_procfscritmon.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,6 +44,7 @@
 #include <nuttx/kmalloc.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/fs/procfs.h>
+#include <nuttx/sched.h>
 
 #include "fs_heap.h"
 
@@ -187,6 +190,11 @@ static ssize_t critmon_read_cpu(FAR struct critmon_file_s *attr,
   size_t linesize;
   size_t copysize;
   size_t totalsize;
+#if CONFIG_SCHED_CRITMONITOR_MAXTIME_BUSYWAIT >= 0
+  struct timespec all_time;
+  clock_t elapsed;
+  uint32_t rate;
+#endif
 
   UNUSED(maxtime);
   UNUSED(linesize);
@@ -211,9 +219,9 @@ static ssize_t critmon_read_cpu(FAR struct critmon_file_s *attr,
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_PREEMPTION >= 0
   /* Convert the for maximum time pre-emption disabled */
 
-  if (g_premp_max[cpu] > 0)
+  if (g_preemp_max[cpu] > 0)
     {
-      perf_convert(g_premp_max[cpu], &maxtime);
+      perf_convert(g_preemp_max[cpu], &maxtime);
     }
   else
     {
@@ -223,7 +231,7 @@ static ssize_t critmon_read_cpu(FAR struct critmon_file_s *attr,
 
   /* Reset the maximum */
 
-  g_premp_max[cpu] = 0;
+  g_preemp_max[cpu] = 0;
 
   /* Generate output for maximum time pre-emption disabled */
 
@@ -264,6 +272,74 @@ static ssize_t critmon_read_cpu(FAR struct critmon_file_s *attr,
   linesize = procfs_snprintf(attr->line, CRITMON_LINELEN, ",%lu.%09lu",
                              (unsigned long)maxtime.tv_sec,
                              (unsigned long)maxtime.tv_nsec);
+  copysize = procfs_memcpy(attr->line, linesize, buffer, buflen, offset);
+
+  totalsize += copysize;
+  buffer    += copysize;
+  buflen    -= copysize;
+
+  if (buflen <= 0)
+    {
+      return totalsize;
+    }
+#endif
+
+#if CONFIG_SCHED_CRITMONITOR_MAXTIME_BUSYWAIT >= 0
+  /* Convert and generate output for max busywait time when trying spinlock */
+
+  if (g_busywait_max[cpu] > 0)
+    {
+      perf_convert(g_busywait_max[cpu], &maxtime);
+    }
+  else
+    {
+      maxtime.tv_sec = 0;
+      maxtime.tv_nsec = 0;
+    }
+
+  /* Reset the maximum */
+
+  g_busywait_max[cpu] = 0;
+
+  /* Generate output for max busywait time to enter csection(get spinlock) */
+
+  linesize = procfs_snprintf(attr->line, CRITMON_LINELEN, ",%lu.%09lu",
+                             (unsigned long)maxtime.tv_sec,
+                             (unsigned long)maxtime.tv_nsec);
+  copysize = procfs_memcpy(attr->line, linesize, buffer, buflen, offset);
+
+  totalsize += copysize;
+  buffer    += copysize;
+  buflen    -= copysize;
+
+  if (buflen <= 0)
+    {
+      return totalsize;
+    }
+
+  /* Convert and generate output for all busywait time when trying spinlock */
+
+  if (g_busywait_total[cpu] > 0)
+    {
+      perf_convert(g_busywait_total[cpu], &all_time);
+    }
+  else
+    {
+      all_time.tv_sec = 0;
+      all_time.tv_nsec = 0;
+    }
+
+  elapsed = clock() * CONFIG_USEC_PER_TICK;
+  rate = (uint64_t)(all_time.tv_sec * 1000000 + all_time.tv_nsec / 1000) *
+         1000000 / elapsed;
+
+  /* Generate output for all busywait time to enter csection(get spinlock) */
+
+  linesize = procfs_snprintf(attr->line, CRITMON_LINELEN, ",%lu.%09lu %2"
+                             PRId32 ".%04" PRId32 "%%",
+                             (unsigned long)all_time.tv_sec,
+                             (unsigned long)all_time.tv_nsec,
+                             rate / 10000, rate % 10000);
   copysize = procfs_memcpy(attr->line, linesize, buffer, buflen, offset);
 
   totalsize += copysize;

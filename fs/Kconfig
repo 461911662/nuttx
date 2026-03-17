@@ -45,7 +45,7 @@ config FS_AUTOMOUNTER_DEBUG
 config FS_AUTOMOUNTER_DRIVER
 	bool "Auto-mounter driver"
 	default n
-	depends on FS_AUTOMOUNTER
+	depends on FS_AUTOMOUNTER && !DISABLE_ALL_SIGNALS
 	---help---
 		Enabling this option will lead to registering of a character driver
 		on FS_AUTOMOUNTER_VFS_PATH + mount point path for auto-mounter.
@@ -127,21 +127,14 @@ config FS_HEAPBUF_SECTION
 		Allocated fs heap from the specified section. If not
 		specified, it will alloc from kernel heap.
 
-config FS_REFCOUNT
-	bool "File reference count"
-	default !DEFAULT_SMALL
-	---help---
-		Enable will Records the number of filep references. The file is
-		actually closed when the count reaches 0
-
 source "fs/vfs/Kconfig"
 source "fs/aio/Kconfig"
 source "fs/semaphore/Kconfig"
+source "fs/event/Kconfig"
 source "fs/mqueue/Kconfig"
 source "fs/shm/Kconfig"
 source "fs/mmap/Kconfig"
 source "fs/partition/Kconfig"
-source "fs/notify/Kconfig"
 source "fs/fat/Kconfig"
 source "fs/nfs/Kconfig"
 source "fs/nxffs/Kconfig"

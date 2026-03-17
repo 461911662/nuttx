@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/audio/wm8994.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,6 +38,7 @@
 #include <fixedmath.h>
 #include <debug.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/irq.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/clock.h>
@@ -1361,7 +1364,7 @@ static int wm8994_pause(FAR struct audio_lowerhalf_s *dev)
 
   if (priv->running && !priv->paused)
     {
-      /* Disable interrupts to prevent us from suppling any more data */
+      /* Disable interrupts to prevent us from supplying any more data */
 
       priv->paused = true;
       WM8994_DISABLE(priv->lower);

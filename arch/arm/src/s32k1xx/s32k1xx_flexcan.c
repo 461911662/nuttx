@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/s32k1xx/s32k1xx_flexcan.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1321,6 +1323,8 @@ static int s32k1xx_ifup(struct net_driver_s *dev)
 
   up_enable_irq(priv->config->mb_irq);
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1348,6 +1352,9 @@ static int s32k1xx_ifdown(struct net_driver_s *dev)
   s32k1xx_reset(priv);
 
   priv->bifup = false;
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -1466,10 +1473,10 @@ static int s32k1xx_ioctl(struct net_driver_s *dev, int cmd,
         {
           struct can_ioctl_data_s *req =
               (struct can_ioctl_data_s *)((uintptr_t)arg);
-          req->arbi_bitrate = priv->arbi_timing.bitrate / 1000; /* kbit/s */
+          req->arbi_bitrate = priv->arbi_timing.bitrate;
           req->arbi_samplep = priv->arbi_timing.samplep;
 #ifdef CONFIG_NET_CAN_CANFD
-          req->data_bitrate = priv->data_timing.bitrate / 1000; /* kbit/s */
+          req->data_bitrate = priv->data_timing.bitrate;
           req->data_samplep = priv->data_timing.samplep;
 #else
           req->data_bitrate = 0;
@@ -1485,7 +1492,7 @@ static int s32k1xx_ioctl(struct net_driver_s *dev, int cmd,
               (struct can_ioctl_data_s *)((uintptr_t)arg);
 
           struct flexcan_timeseg arbi_timing;
-          arbi_timing.bitrate = req->arbi_bitrate * 1000;
+          arbi_timing.bitrate = req->arbi_bitrate;
           arbi_timing.samplep = req->arbi_samplep;
 
           if (s32k1xx_bitratetotimeseg(&arbi_timing, 10, 0))
@@ -1499,7 +1506,7 @@ static int s32k1xx_ioctl(struct net_driver_s *dev, int cmd,
 
 #ifdef CONFIG_NET_CAN_CANFD
           struct flexcan_timeseg data_timing;
-          data_timing.bitrate = req->data_bitrate * 1000;
+          data_timing.bitrate = req->data_bitrate;
           data_timing.samplep = req->data_samplep;
 
           if (ret == OK && s32k1xx_bitratetotimeseg(&data_timing, 10, 1))
@@ -1514,13 +1521,12 @@ static int s32k1xx_ioctl(struct net_driver_s *dev, int cmd,
 
           if (ret == OK)
             {
-              /* Reset CAN controller and start with new timings */
+              /* Apply the new timings (interface is guaranteed to be down) */
 
               priv->arbi_timing = arbi_timing;
 #ifdef CONFIG_NET_CAN_CANFD
               priv->data_timing = data_timing;
 #endif
-              s32k1xx_ifup(dev);
             }
         }
         break;

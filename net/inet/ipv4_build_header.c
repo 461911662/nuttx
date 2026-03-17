@@ -59,6 +59,7 @@ static uint16_t g_ipid;
  *   src_ip     Source IPv4 address
  *   dst_ip     Destination IPv4 address
  *   ttl        Time to live(IPv4)
+ *   tos        Type of Service(IPv4)
  *   opt        IPv4 options
  *
  * Returned Value:
@@ -73,7 +74,7 @@ uint16_t ipv4_build_header(FAR struct ipv4_hdr_s *ipv4, uint16_t total_len,
 {
   /* Initialize the IP header. */
 
-  ipv4->vhl         = 0x45;   /* orginal initial value like this */
+  ipv4->vhl         = 0x45;   /* original initial value like this */
   ipv4->tos         = tos;
   ipv4->len[0]      = (total_len >> 8);
   ipv4->len[1]      = (total_len & 0xff);

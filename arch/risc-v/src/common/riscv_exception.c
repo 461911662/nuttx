@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/riscv_exception.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -101,31 +103,34 @@ int riscv_exception(int mcause, void *regs, void *args)
          cause, READ_CSR(CSR_EPC), READ_CSR(CSR_TVAL));
 
 #ifdef CONFIG_ARCH_KERNEL_STACK
-  if ((tcb->flags & TCB_FLAG_TTYPE_MASK) != TCB_FLAG_TTYPE_KERNEL)
+  if (((tcb->flags & TCB_FLAG_TTYPE_MASK) != TCB_FLAG_TTYPE_KERNEL) &&
+      ((tcb->flags & TCB_FLAG_SYSCALL) == false))
     {
-      _alert("Segmentation fault in PID %d: %s\n",
+      struct tcb_s *ptcb = nxsched_get_tcb(tcb->group->tg_pid);
+
+      _alert("Segmentation fault in %s (PID %d: %s)\n", get_task_name(ptcb),
              tcb->pid, get_task_name(tcb));
 
       tcb->flags |= TCB_FLAG_FORCED_CANCEL;
 
       /* Return to _exit function in privileged mode with argument SIGSEGV */
 
-      up_current_regs()[REG_EPC] = (uintptr_t)_exit;
-      up_current_regs()[REG_A0] = SIGSEGV;
-      up_current_regs()[REG_INT_CTX] |= STATUS_PPP;
+      running_regs()[REG_EPC] = _exit;
+      running_regs()[REG_A0] = (void *)SIGSEGV;
+      ((uintreg_t *)running_regs())[REG_INT_CTX] |= STATUS_PPP;
 
       /* Continue with kernel stack in use. The frame(s) in kernel stack
        * are no longer needed, so just set it to top
        */
 
-      up_current_regs()[REG_SP] = (uintptr_t)tcb->xcp.ktopstk;
+      running_regs()[REG_SP] = tcb->xcp.ktopstk;
     }
   else
 #endif
     {
       _alert("PANIC!!! Exception = %" PRIxREG "\n", cause);
       up_irq_save();
-      up_set_current_regs(regs);
+      up_set_interrupt_context(true);
       PANIC_WITH_REGS("panic", regs);
     }
 
@@ -197,31 +202,35 @@ int riscv_fillpage(int mcause, void *regs, void *args)
     {
       _alert("PANIC!!! virtual address not mappable: %" PRIxPTR "\n", vaddr);
       up_irq_save();
-      up_set_current_regs(regs);
+      up_set_interrupt_context(true);
       PANIC_WITH_REGS("panic", regs);
     }
 
   satp    = READ_CSR(CSR_SATP);
-  ptprev  = riscv_pgvaddr(mmu_satp_to_paddr(satp));
-  ptlevel = ARCH_SPGTS;
-  paddr   = mmu_pte_to_paddr(mmu_ln_getentry(ptlevel, ptprev, vaddr));
-  if (!paddr)
-    {
-      /* Nothing yet, allocate one page for final level page table */
+  paddr   = mmu_satp_to_paddr(satp);
 
-      paddr = mm_pgalloc(1);
+  for (ptlevel = 1; ptlevel <= ARCH_SPGTS; ptlevel++)
+    {
+      ptprev  = riscv_pgvaddr(paddr);
+      paddr   = mmu_pte_to_paddr(mmu_ln_getentry(ptlevel, ptprev, vaddr));
       if (!paddr)
         {
-          return -ENOMEM;
+          /* Nothing yet, allocate one page for next level page table */
+
+          paddr = mm_pgalloc(1);
+          if (!paddr)
+            {
+              return -ENOMEM;
+            }
+
+          /* Map the page table to the prior level */
+
+          mmu_ln_setentry(ptlevel, ptprev, paddr, vaddr, MMU_UPGT_FLAGS);
+
+          /* This is then used to map the next level */
+
+          riscv_pgwipe(paddr);
         }
-
-      /* Map the page table to the prior level */
-
-      mmu_ln_setentry(ptlevel, ptprev, paddr, vaddr, MMU_UPGT_FLAGS);
-
-      /* This is then used to map the final level */
-
-      riscv_pgwipe(paddr);
     }
 
   ptlast = riscv_pgvaddr(paddr);
@@ -237,7 +246,7 @@ int riscv_fillpage(int mcause, void *regs, void *args)
 
   /* Then map the virtual address to the physical address */
 
-  mmu_ln_setentry(ptlevel + 1, ptlast, paddr, vaddr, mmuflags);
+  mmu_ln_setentry(ARCH_PGT_MAX_LEVELS, ptlast, paddr, vaddr, mmuflags);
 
   return 0;
 }

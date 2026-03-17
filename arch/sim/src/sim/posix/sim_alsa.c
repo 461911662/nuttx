@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sim/src/sim/posix/sim_alsa.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,9 +28,8 @@
 #include <nuttx/nuttx.h>
 #include <nuttx/audio/audio.h>
 #include <nuttx/kmalloc.h>
-#include <nuttx/queue.h>
 #include <nuttx/nuttx.h>
-
+#include <nuttx/wqueue.h>
 #include <debug.h>
 #include <sys/param.h>
 
@@ -38,6 +39,12 @@
 #include "sim_offload.h"
 
 /****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#define SIM_AUDIO_PERIOD  MSEC2TICK(CONFIG_SIM_LOOP_INTERVAL)
+
+/****************************************************************************
  * Private Types
  ****************************************************************************/
 
@@ -45,9 +52,8 @@ struct sim_audio_s
 {
   struct audio_lowerhalf_s dev;
   struct dq_queue_s pendq;
+  struct work_s work;
   mutex_t pendlock;
-
-  sq_entry_t link;
 
   bool playback;
   bool offload;
@@ -132,8 +138,6 @@ static const struct audio_ops_s g_sim_audio_ops =
   .reserve       = sim_audio_reserve,
   .release       = sim_audio_release,
 };
-
-static sq_queue_t g_sim_audio;
 
 /****************************************************************************
  * Private Functions
@@ -301,6 +305,7 @@ static int sim_audio_close(struct sim_audio_s *priv)
   host_uninterruptible(snd_pcm_close, priv->pcm);
 
   priv->pcm = NULL;
+  priv->paused = false;
 
   return 0;
 }
@@ -560,11 +565,17 @@ static int sim_audio_stop(struct audio_lowerhalf_s *dev)
   priv->dev.upper(priv->dev.priv, AUDIO_CALLBACK_COMPLETE, NULL, OK);
 #endif
 
-  apb_free(priv->aux);
-  priv->aux = NULL;
+  if (priv->aux)
+    {
+      apb_free(priv->aux);
+      priv->aux = NULL;
+    }
 
-  priv->ops->uninit(priv->codec);
-  priv->ops = NULL;
+  if (priv->ops)
+    {
+      priv->ops->uninit(priv->codec);
+      priv->ops = NULL;
+    }
 
   return 0;
 }
@@ -627,6 +638,7 @@ static int sim_audio_flush(struct audio_lowerhalf_s *dev)
       struct ap_buffer_s *apb;
 
       apb = (struct ap_buffer_s *)dq_remfirst(&priv->pendq);
+      apb->flags &= ~AUDIO_APB_FINAL;
 #ifdef CONFIG_AUDIO_MULTI_SESSION
       priv->dev.upper(priv->dev.priv, AUDIO_CALLBACK_DEQUEUE, apb, OK, NULL);
 #else
@@ -1120,22 +1132,19 @@ fail:
   return 0;
 }
 
+static void sim_audio_work(FAR void *arg)
+{
+  struct sim_audio_s *priv = (struct sim_audio_s *)arg;
+
+  sim_audio_process(priv);
+
+  work_queue_next_wq(g_work_queue, &priv->work, sim_audio_work, priv,
+                     SIM_AUDIO_PERIOD);
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-void sim_audio_loop(void)
-{
-  sq_entry_t *entry;
-
-  for (entry = sq_peek(&g_sim_audio); entry; entry = sq_next(entry))
-    {
-      struct sim_audio_s *priv =
-        container_of(entry, struct sim_audio_s, link);
-
-      sim_audio_process(priv);
-    }
-}
 
 struct audio_lowerhalf_s *sim_audio_initialize(bool playback, bool offload)
 {
@@ -1159,7 +1168,9 @@ struct audio_lowerhalf_s *sim_audio_initialize(bool playback, bool offload)
       return NULL;
     }
 
-  sq_addlast(&priv->link, &g_sim_audio);
+  memset(&priv->work, 0, sizeof(struct work_s));
+  work_queue_wq(g_work_queue, &priv->work, sim_audio_work, priv,
+                SIM_AUDIO_PERIOD);
 
   /* Setting default config */
 
@@ -1171,6 +1182,5 @@ struct audio_lowerhalf_s *sim_audio_initialize(bool playback, bool offload)
   priv->channels    = 2;
   priv->bps         = 16;
   priv->frame_size  = 4;
-
   return &priv->dev;
 }

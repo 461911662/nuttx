@@ -1,6 +1,8 @@
 #############################################################################
 # boards/arm/stm32/common/src/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -158,6 +160,18 @@ endif
 
 ifeq ($(CONFIG_STEPPER_DRV8825),y)
   CSRCS += stm32_drv8825.c
+endif
+
+ifeq ($(CONFIG_INPUT_SBUTTON),y)
+  CSRCS += stm32_sbutton.c
+endif
+
+ifeq ($(CONFIG_INPUT_KMATRIX),y)
+  CSRCS += stm32_kmatrix_gpio.c
+endif
+
+ifeq ($(CONFIG_INPUT_KMATRIX_I2C),y)
+  CSRCS += stm32_kmatrix_i2c.c
 endif
 
 DEPPATH += --dep-path src

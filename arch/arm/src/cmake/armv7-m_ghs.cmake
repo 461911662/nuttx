@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm/src/cmake/armv7-m_ghs.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -24,18 +26,18 @@ if(CONFIG_ARCH_CORTEXM4)
   list(APPEND PLATFORM_FLAGS -cpu=cortexm4)
   if(CONFIG_ARCH_FPU)
     if(CONFIG_ARCH_DPFPU)
-      list(APPEND PLATFORM_FLAGS -fpu=vfpv3)
+      list(APPEND PLATFORM_FLAGS -fpu=vfpv4)
     else()
-      list(APPEND PLATFORM_FLAGS -fpu=vfpv3_d16)
+      list(APPEND PLATFORM_FLAGS -fpu=vfpv4_d16)
     endif()
   endif()
 elseif(CONFIG_ARCH_CORTEXM7)
   list(APPEND PLATFORM_FLAGS -cpu=cortexm7)
   if(CONFIG_ARCH_FPU)
     if(CONFIG_ARCH_DPFPU)
-      list(APPEND PLATFORM_FLAGS -fpu=vfpv3)
+      list(APPEND PLATFORM_FLAGS -fpu=vfpv5)
     else()
-      list(APPEND PLATFORM_FLAGS -fpu=vfpv3_d16)
+      list(APPEND PLATFORM_FLAGS -fpu=vfpv5_d16)
     endif()
   endif()
 else()

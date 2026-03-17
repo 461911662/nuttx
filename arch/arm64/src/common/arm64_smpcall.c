@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_smpcall.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -53,7 +55,7 @@
  *
  *   1. It saves the current task state at the head of the current assigned
  *      task list.
- *   2. It porcess g_delivertasks
+ *   2. It processes g_delivertasks
  *   3. Returns from interrupt, restoring the state of the new task at the
  *      head of the ready to run list.
  *
@@ -67,10 +69,7 @@
 
 int arm64_smp_sched_handler(int irq, void *context, void *arg)
 {
-  int cpu = this_cpu();
-
-  nxsched_process_delivered(cpu);
-
+  nxsched_process_delivered(this_cpu());
   return OK;
 }
 

@@ -1,6 +1,8 @@
 # ##############################################################################
 # crypto/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -26,7 +28,8 @@ if(CONFIG_CRYPTO)
 
   if(CONFIG_CRYPTO_CRYPTODEV)
     list(APPEND SRCS cryptodev.c)
-    if(CONFIG_CRYPTO_CRYPTODEV_SOFTWARE)
+    if(CONFIG_CRYPTO_CRYPTODEV_SOFTWARE_CRYPTO
+       OR CONFIG_CRYPTO_CRYPTODEV_SOFTWARE_KEYMGMT)
       list(APPEND SRCS cryptosoft.c)
       list(APPEND SRCS xform.c)
     endif()
@@ -43,6 +46,7 @@ if(CONFIG_CRYPTO)
   list(APPEND SRCS chachapoly.c)
   list(APPEND SRCS ecb_enc.c)
   list(APPEND SRCS ecb3_enc.c)
+  list(APPEND SRCS ecc.c)
   list(APPEND SRCS set_key.c)
   list(APPEND SRCS md5.c)
   list(APPEND SRCS poly1305.c)

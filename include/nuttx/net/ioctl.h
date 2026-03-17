@@ -94,7 +94,7 @@
 
 /* MDIO/MCD *****************************************************************/
 
-#define SIOCMIINOTIFY    _SIOC(0x0023)  /* Receive notificaion via signal on
+#define SIOCMIINOTIFY    _SIOC(0x0023)  /* Receive notification via signal on
                                          * PHY state change */
 #define SIOCGMIIPHY      _SIOC(0x0024)  /* Get address of MII PHY in use */
 #define SIOCGMIIREG      _SIOC(0x0025)  /* Get a MII register via MDIO */
@@ -120,11 +120,13 @@
 
 #define SIOCGCANBITRATE    _SIOC(0x002C)  /* Get bitrate from a CAN controller */
 #define SIOCSCANBITRATE    _SIOC(0x002D)  /* Set bitrate of a CAN controller */
-#define SIOCACANEXTFILTER  _SIOC(0x002E)  /* Add hardware-level exteneded ID filter */
-#define SIOCDCANEXTFILTER  _SIOC(0x002F)  /* Delete hardware-level exteneded ID filter */
+#define SIOCACANEXTFILTER  _SIOC(0x002E)  /* Add hardware-level extended ID filter */
+#define SIOCDCANEXTFILTER  _SIOC(0x002F)  /* Delete hardware-level extended ID filter */
 #define SIOCACANSTDFILTER  _SIOC(0x0030)  /* Add hardware-level standard ID filter */
 #define SIOCDCANSTDFILTER  _SIOC(0x0031)  /* Delete hardware-level standard ID filter */
 #define SIOCCANRECOVERY    _SIOC(0x0032)  /* Recovery can, work only when bus-off state */
+#define SIOCGCANSTATE      _SIOC(0x0041)  /* Get state from a CAN/LIN controller */
+#define SIOCSCANSTATE      _SIOC(0x0042)  /* Set the LIN/CAN controller state */
 
 /* Network socket control ***************************************************/
 
@@ -151,6 +153,11 @@
 /* RSS notify recv cpu calls ************************************************/
 
 #define SIOCNOTIFYRECVCPU  _SIOC(0x003F)  /* RSS notify recv cpu */
+
+/* VLAN control *************************************************************/
+
+#define SIOCGIFVLAN        _SIOC(0x0043)  /* Get VLAN interface */
+#define SIOCSIFVLAN        _SIOC(0x0044)  /* Set VLAN interface */
 
 /****************************************************************************
  * Public Type Definitions

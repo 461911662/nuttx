@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_doirq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -43,6 +45,37 @@
 #include "arm64_fatal.h"
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: arm64_color_intstack
+ *
+ * Description:
+ *   Set the interrupt stack to a value so that later we can determine how
+ *   much stack space was used by interrupt handling logic
+ *
+ ****************************************************************************/
+
+#if defined(CONFIG_STACK_COLORATION) && CONFIG_ARCH_INTERRUPTSTACK > 3
+static inline void arm64_color_intstack(void)
+{
+#ifdef CONFIG_SMP
+  int cpu;
+
+  for (cpu = 0; cpu < CONFIG_SMP_NCPUS; cpu++)
+    {
+      arm64_stack_color((void *)up_get_intstackbase(cpu), INTSTACK_SIZE);
+    }
+#else
+  arm64_stack_color((void *)g_interrupt_stack, INTSTACK_SIZE);
+#endif
+}
+#else
+#  define arm64_color_intstack()
+#endif
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -61,13 +94,12 @@ uint64_t *arm64_doirq(int irq, uint64_t * regs)
 
   /* Nested interrupts are not supported */
 
-  DEBUGASSERT(up_current_regs() == NULL);
+  DEBUGASSERT(!up_interrupt_context());
 
-  /* Current regs non-zero indicates that we are processing an interrupt;
-   * current_regs is also used to manage interrupt level context switches.
-   */
+  /* Set irq flag */
 
-  up_set_current_regs(regs);
+  write_sysreg((uintptr_t)tcb | 1, tpidr_el1);
+
   tcb->xcp.regs = regs;
 
   /* Deliver the IRQ */
@@ -84,6 +116,8 @@ uint64_t *arm64_doirq(int irq, uint64_t * regs)
 
   if (regs != tcb->xcp.regs)
     {
+      struct tcb_s **running_task = &g_running_tasks[this_cpu()];
+
       /* need to do a context switch */
 
 #ifdef CONFIG_ARCH_ADDRENV
@@ -93,29 +127,32 @@ uint64_t *arm64_doirq(int irq, uint64_t * regs)
        * thread at the head of the ready-to-run list.
        */
 
-      addrenv_switch(NULL);
+      addrenv_switch(tcb);
+      tcb = this_task();
 #endif
 
       /* Update scheduler parameters */
 
-      nxsched_suspend_scheduler(g_running_tasks[this_cpu()]);
-      nxsched_resume_scheduler(tcb);
+      nxsched_switch_context(*running_task, tcb);
 
       /* Record the new "running" task when context switch occurred.
        * g_running_tasks[] is only used by assertion logic for reporting
        * crashes.
        */
 
-      g_running_tasks[this_cpu()] = tcb;
+      *running_task = tcb;
       regs = tcb->xcp.regs;
     }
 
-  /* Set current_regs to NULL to indicate that we are no longer in an
-   * interrupt handler.
+  /* Clear irq flag */
+
+  write_sysreg((uintptr_t)tcb & ~1ul, tpidr_el1);
+
+  /* (*running_task)->xcp.regs is about to become invalid
+   * and will be marked as NULL to avoid misusage.
    */
 
-  up_set_current_regs(NULL);
-
+  tcb->xcp.regs = NULL;
   return regs;
 }
 
@@ -144,6 +181,7 @@ void up_irqinitialize(void)
 
   /* And finally, enable interrupts */
 
+  arm64_color_intstack();
   up_irq_enable();
 #endif
 }

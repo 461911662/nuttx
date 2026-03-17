@@ -324,7 +324,7 @@ function configure_default {
   fi
 
   if [ "X$toolchain" != "X" ]; then
-    setting=`grep _TOOLCHAIN_ $nuttx/.config | grep -v CONFIG_ARCH_TOOLCHAIN_* | grep =y`
+    setting=`grep _TOOLCHAIN_ $nuttx/.config | grep -v CONFIG_TOOLCHAIN_WINDOWS | grep -v CONFIG_ARCH_TOOLCHAIN_* | grep =y`
     original_toolchain=`echo $setting | cut -d'=' -f1`
     if [ ! -z "$original_toolchain" ]; then
       echo "  Disabling $original_toolchain"
@@ -347,7 +347,7 @@ function configure_cmake {
   fi
 
   if [ "X$toolchain" != "X" ]; then
-    setting=`grep _TOOLCHAIN_ $nuttx/build/.config | grep -v CONFIG_ARCH_TOOLCHAIN_* | grep =y`
+    setting=`grep _TOOLCHAIN_ $nuttx/build/.config | grep -v CONFIG_TOOLCHAIN_WINDOWS | grep -v CONFIG_ARCH_TOOLCHAIN_* | grep =y`
     original_toolchain=`echo $setting | cut -d'=' -f1`
     if [ ! -z "$original_toolchain" ]; then
       echo "  Disabling $original_toolchain"
@@ -450,8 +450,8 @@ function refresh_cmake {
     kconfig-tweak --file $nuttx/build/.config -d $toolchain
   fi
 
-  if ! cmake --build build -t savedefconfig 1>/dev/null; then
-    cmake --build build -t savedefconfig
+  if ! cmake --build build -t refreshsilent 1>/dev/null; then
+    cmake --build build -t refreshsilent
     fail=1
   fi
 
@@ -491,10 +491,12 @@ function refresh {
 }
 
 function run {
-  if [ ${RUN} -ne 0 ] && [ -z ${cmake} ]; then
-    run_script="$path/run"
+  if [ ${RUN} -ne 0 ]; then
+    run_script="$path/run.sh"
     if [ -x $run_script ]; then
       echo "  Running NuttX..."
+      export ARTIFACTCONFDIR=$ARTIFACTDIR/$(echo $config | sed "s/:/\//")/
+      export CURRENTCONFDIR=$(realpath $path)
       if ! $run_script; then
         fail=1
       fi

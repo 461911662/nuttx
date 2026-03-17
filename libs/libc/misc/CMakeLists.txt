@@ -27,6 +27,8 @@ list(
   APPEND
   SRCS
   lib_bitmap.c
+  lib_circbuf.c
+  lib_creat.c
   lib_mknod.c
   lib_umask.c
   lib_utsname.c
@@ -45,9 +47,12 @@ list(
   lib_openat.c
   lib_mkdirat.c
   lib_utimensat.c
-  lib_memoryregion.c
-  lib_getnprocs.c
-  lib_pathbuffer.c)
+  lib_mallopt.c
+  lib_getnprocs.c)
+
+if(CONFIG_LIBC_TEMPBUFFER)
+  list(APPEND SRCS lib_tempbuffer.c)
+endif()
 
 # Support for platforms that do not have long long types
 
@@ -76,14 +81,24 @@ list(
   lib_fnmatch.c
   lib_debug.c
   lib_crc64.c
+  lib_crc64emac.c
   lib_crc32.c
+  lib_crc32h04c11db7.c
+  lib_crc32hf4acfb13.c
   lib_crc16.c
   lib_crc16ccitt.c
+  lib_crc16ibm.c
+  lib_crc16xmodem.c
+  lib_crc16h1021.c
+  lib_crc16h8005.c
   lib_crc8.c
   lib_crc8ccitt.c
+  lib_crc8h1d.c
+  lib_crc8h2f.c
+  lib_crc8rohc.c
   lib_crc8table.c
   lib_glob.c
-  lib_execinfo.c
+  lib_backtrace.c
   lib_ftok.c
   lib_err.c
   lib_instrument.c)
@@ -112,6 +127,10 @@ endif()
 
 if(CONFIG_FDCHECK)
   list(APPEND SRCS lib_fdcheck.c)
+endif()
+
+if(CONFIG_SCHED_INSTRUMENTATION_DUMP)
+  list(APPEND SRCS lib_note.c)
 endif()
 
 if(NOT CONFIG_LIBC_UNAME_DISABLE_TIMESTAMP)

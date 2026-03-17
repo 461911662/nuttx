@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/common/multiboot1.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -52,15 +54,9 @@ _start:
     movl                $realmode_start, %esi
     movl                $0, %edi
 
-copy_loop:
-
     /* Copy by bytes, make sure the addresses are not overlapped */
-
-    movb                (%esi), %al
-    movb                %al, (%edi)
-    inc                 %esi
-    inc                 %edi
-    loop                copy_loop
+    cld
+    rep movsb
 
     /* Jump to bin_start + 0x30, skip the multiboot1 header */
 

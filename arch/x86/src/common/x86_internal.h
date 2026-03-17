@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86/src/common/x86_internal.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -70,19 +72,6 @@
 #ifndef CONFIG_ARCH_INTERRUPTSTACK
 #  define CONFIG_ARCH_INTERRUPTSTACK 0
 #endif
-
-/* The initial stack point is aligned at word (4 byte) boundaries. If
- * necessary frame_size must be rounded up to the next boundary to retain
- * this alignment.
- */
-
-#define STACK_ALIGNMENT     4
-
-/* Stack alignment macros */
-
-#define STACK_ALIGN_MASK    (STACK_ALIGNMENT - 1)
-#define STACK_ALIGN_DOWN(a) ((a) & ~STACK_ALIGN_MASK)
-#define STACK_ALIGN_UP(a)   (((a) + STACK_ALIGN_MASK) & ~STACK_ALIGN_MASK)
 
 #define getreg8(p)          inb(p)
 #define putreg8(v,p)        outb(v,p)

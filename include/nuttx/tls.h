@@ -39,7 +39,10 @@
 #include <nuttx/cache.h>
 #include <nuttx/atexit.h>
 #include <nuttx/fs/fs.h>
-#include <nuttx/list.h>
+
+#ifdef CONFIG_PTHREAD_ATFORK
+#  include <nuttx/list.h>
+#endif
 
 #include <sys/types.h>
 
@@ -146,6 +149,7 @@ struct task_info_s
 #ifdef CONFIG_PTHREAD_ATFORK
   struct list_node ta_atfork; /* Holds the pthread_atfork_s list */
 #endif
+  pid_t ta_pid; /* Process ID */
 };
 
 /* struct tls_cleanup_s *****************************************************/
@@ -196,7 +200,7 @@ struct tls_cleanup_s
 
 struct tls_info_s
 {
-  FAR struct task_info_s * tl_task;
+  FAR struct task_info_s *tl_task;
 
 #if defined(CONFIG_TLS_NELEM) && CONFIG_TLS_NELEM > 0
   uintptr_t tl_elem[CONFIG_TLS_NELEM]; /* TLS elements */
@@ -220,6 +224,14 @@ struct tls_info_s
 
   uint16_t tl_size;                    /* Actual size with alignments */
   int tl_errno;                        /* Per-thread error number */
+  pid_t tl_tid;                        /* Thread ID */
+  FAR char **tl_argv;                  /* Arguments first string */
+
+  /* Robust mutex support ***************************************************/
+
+#if !defined(CONFIG_DISABLE_PTHREAD) && !defined(CONFIG_PTHREAD_MUTEX_UNSAFE)
+  FAR struct pthread_mutex_s *tl_mhead;   /* List of mutexes held by thread  */
+#endif
 };
 
 /****************************************************************************

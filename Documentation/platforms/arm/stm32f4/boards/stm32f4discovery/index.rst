@@ -2,17 +2,32 @@
 ST STM32F4-Discovery
 ====================
 
-This page discusses issues unique to NuttX configurations for the
-STMicro STM32F4Discovery development board featuring the STM32F407VGT6
-MCU. The STM32F407VGT6 is a 168MHz Cortex-M4 operation with 1Mbit Flash
-memory and 128kbytes. The board features:
+.. tags:: chip:stm32, chip:stm32f4, chip:stm32f407
 
+The STM32F4Discover board (also known as STM32F407G-DISC1) is a low cost
+development board released by STMicroelectronics.
+
+.. figure:: stm32f4discovery.png
+   :align: center
+
+Features
+========
+
+- Processor
+    - STM32F407VGT6 (Cortex-M4 running at 168MHz)
+- Memory
+    - 192 KiB SRAM memory
+    - 1024 MiB Flash
+- Connectivity
+    - USB host/device (OTG) over Micro-AB connector 
+    - Note: the board also supports Ethernet, CAN, RS485 (but requires baseboard)
+- Multimedia
+    - Audio Input and Output (over P2 connector)
 - On-board ST-LINK/V2 for programming and debugging,
 - LIS302DL, ST MEMS motion sensor, 3-axis digital output accelerometer,
 - MP45DT02, ST MEMS audio sensor, omni-directional digital microphone,
 - CS43L22, audio DAC with integrated class D speaker driver,
 - Four user LEDs and two push-buttons,
-- USB OTG FS with micro-AB connector, and
 - Easy access to most MCU pins.
 
 Refer to http://www.st.com/internet/evalboard/product/252419.jsp for
@@ -48,7 +63,7 @@ events as follows:
   LED_SIGNAL           In a signal handler[3]   N/C      ON       N/C      OFF
   LED_ASSERTION        An assertion failed      ON       ON       N/C      OFF
   LED_PANIC            The system has crashed   N/C      N/C      N/C      ON
-  LED_IDLE             STM32 is is sleep mode   
+  LED_IDLE             STM32 is is sleep mode
   ===================  =======================  =======  =======  =======  ======
 
 [1] If LED1, LED2, LED3 are statically on, then NuttX probably failed to boot
@@ -774,8 +789,8 @@ BASIC interpreter that you can find at apps/interpreters/bas.::
 There is also a test suite for the interpreter that can be found at
 apps/examples/bastest.
 
-Configuration
--------------
+BAS
+---
 
 Below are the recommended configuration changes to use BAS with the
 stm32f4discovery/nsh configuration:
@@ -792,7 +807,7 @@ Dependencies::
 Enable the BASIC interpreter.  Other default options should be okay::
 
     CONFIG_INTERPRETERS_BAS=y    : Enables the interpreter
-    CONFIG_INTERPRETER_BAS_VT100=y
+    CONFIG_INTERPRETERS_BAS_VT100=y
 
 The BASIC test suite can be included::
 
@@ -975,7 +990,7 @@ demonstrating PCM audio using the CS43L22 stereo DAC/amplifier on board
 the STM32F4 Discovery and the STM32 I2S DMA interface.  It uses the
 file player at apps/system/nxplayer.  The serial console is on USART2.
 
-The original CS43L22 and STM32 I2S drivers were contribued by Taras
+The original CS43L22 and STM32 I2S drivers were contributed by Taras
 Drozdovsky in May of 2017.  The audio configuration was contributed by
 Alan Carvalho de Assis and derives, in part, from the work of Taras at
 https://github.com/tdrozdovskiy/CS43L22-Audio-driver.
@@ -1438,11 +1453,11 @@ other NSH configurations include these additions to the configuration file::
       CONFIG_FS_ROMFS=y
       CONFIG_LIBC_ARCH_ELF=y
       CONFIG_MODULE=y
-      CONFIG_LIBC_MODLIB=y
-      CONFIG_MODLIB_MAXDEPEND=2
-      CONFIG_MODLIB_ALIGN_LOG2=2
-      CONFIG_MODLIB_BUFFERSIZE=128
-      CONFIG_MODLIB_BUFFERINCR=32
+      CONFIG_LIBC_ELF=y
+      CONFIG_LIBC_ELF_MAXDEPEND=2
+      CONFIG_LIBC_ELF_ALIGN_LOG2=2
+      CONFIG_LIBC_ELF_BUFFERSIZE=128
+      CONFIG_LIBC_ELF_BUFFERINCR=32
 
 The could be followed may be added for testing shared libraries in the
 FLAT build using apps/examples/sotest (assuming that you also have SD
@@ -1968,6 +1983,27 @@ the second dongle you will connect to UART3 (PB10 and PB11).
 In the main NSH console (in USART2) type: "pts_test &". It will create a
 new console in UART3. Just press ENTER and start typing commands on it.
 
+sbutton
+-------
+
+This is a configuration to test the Single Button Dual Action feature.
+To test it just compile and flash nuttx.bin in the board. Then run the
+``kbd`` command inside ``nsh>`` and short press and long press User
+Button (B1) on the board.
+
+You will see something like this::
+
+     NuttShell (NSH) NuttX-12.10.0
+     nsh> kbd
+     kbd_main: nsamples: 0
+     kbd_main: Opening /dev/kbd0
+     Sample  :
+        code : 65
+        type : 0
+     Sample  :
+        code : 66
+        type : 0
+
 sporadic
 --------
 
@@ -1975,6 +2011,78 @@ This is an NSH configuration that includes apps/testing/ostest as a builtin.
 The sporadic scheduler is enabled and the purpose of this configuration is
 to investigate an error in that scheduler.  See Issue 2035.  The serial
 console is on USART6.
+
+st7567
+------
+
+Configures the board to support a ST7567 monochromatic LCD like the
+OPEN-SMART 1.8INCH LCD.
+
+Connect the STM32F4Discovery board to ST7567 LCD this way:
+
+================ ===========
+STM32F4Discovery ST7567 LCD
+================ ===========
+GND              GND
+3V [1]           3V3
+SPI1 MOSI (PA7)  SDI
+SPI1 SCK (PA5)   SCK
+PB8              DC
+SPI1 CS (PB7)    CS
+PB6              RST
+GND              LED
+================ ===========
+
+1: You need to remove the diode D3 and short-circuit the PADs in the
+board to get 3.3V. Be aware: although my board works fine, it could
+damage something that expects 3V in our board (double check).
+
+After compiling and flashing the firmware in our board, run fb command.
+
+.. code:: console
+
+   NuttShell (NSH) NuttX-12.12.0
+   nsh> ?
+   help usage:  help [-v] [<cmd>]
+
+       .           cp          expr        mount       kill        uname
+       [           cmp         false       mv          pkill       umount
+       ?           dirname     fdinfo      pidof       sleep       unset
+       alias       df          free        printf      usleep      uptime
+       unalias     dmesg       help        ps          source      watch
+       basename    echo        hexdump     pwd         test        xd
+       break       env         ls          rm          time        wait
+       cat         exec        mkdir       rmdir       true
+       cd          exit        mkrd        set         truncate
+
+     Builtin Apps:
+     dd       fb       hello    nsh      sh
+   nsh> fb
+   VideoInfo:
+         fmt: 0
+         xres: 128
+        yres: 64
+     nplanes: 1
+   PlaneInfo (plane 0):
+       fbmem: 0x10000a98
+       fblen: 1024
+      stride: 16 
+     display: 0
+         bpp: 1
+   Mapped FB: 0x10000a98
+    0: (  0,  0) (128, 64)
+    1: ( 11,  5) (106, 54)
+    2: ( 22, 10) ( 84, 44)
+    3: ( 33, 15) ( 62, 34)
+    4: ( 44, 20) ( 40, 24)
+    5: ( 55, 25) ( 18, 14)
+   Test finished
+   nsh> 
+
+You should see this image:
+
+.. figure:: st7567.png
+   :align: center
 
 testlibcxx
 ----------
@@ -2180,3 +2288,60 @@ NOTES:
    Host Compiler:  I use the MingW compiler which can be downloaded from
    http://www.mingw.org/.  If you are using GNUWin32, then it is recommended
    the you not install the optional MSYS components as there may be conflicts.
+
+HX711
+-----
+
+HX711 is a precision 24-bit analog-to-digital converter (ADC)
+designed for weigh scales and industrial control applications.
+It interfaces load cells via a simple two-wire serial interface
+(clock and data) and provides high-resolution digital weight
+measurements.
+
+**Enable the following options using ``make menuconfig``:**
+
+::
+
+    CONFIG_ADC=y
+    CONFIG_ANALOG=y
+    CONFIG_ADC_HX711=y
+    CONFIG_EXAMPLES_HX711=y
+
+**Wiring:**
+
+Connect the HX711 to the STM32F4 board using the following pins:
+
++--------+------+
+| HX711  | PIN  |
++========+======+
+| SCK    | PB1  |
++--------+------+
+| DT     | PB2  |
++--------+------+
+
+**NSH usage:**
+
+::
+
+    NuttShell (NSH) NuttX-12.10.0
+    nsh> hx711 -D
+    Current settings for: /dev/hx711_0
+    average.............: 1
+    channel.............: a
+    gain................: 128
+    value per unit......: 0
+    nsh> hx711 -v 813 -t 10
+    Taring with *float*g precision
+    nsh> hx711 -r 10
+    -2
+    0
+    0
+    -1
+    -3
+    -3
+    -2
+    -2
+    -4
+    -4
+
+For more details, refer to the official `HX711 NuttX documentation <https://nuttx.apache.org/docs/latest/components/drivers/character/analog/adc/hx711/index.html>`_.

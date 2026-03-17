@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/unionfs/fs_unionfs.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -82,7 +84,7 @@ struct unionfs_inode_s
   bool ui_unmounted;                 /* File system has been unmounted */
 };
 
-/* This structure descries one opened file */
+/* This structure describes one opened file */
 
 struct unionfs_file_s
 {
@@ -230,7 +232,9 @@ const struct mountpt_operations g_unionfs_operations =
   unionfs_ioctl,       /* ioctl */
   NULL,                /* mmap */
   unionfs_truncate,    /* truncate */
-  NULL,                /* pool */
+  NULL,                /* poll */
+  NULL,                /* readv */
+  NULL,                /* writev */
 
   unionfs_sync,        /* sync */
   unionfs_dup,         /* dup */
@@ -729,11 +733,11 @@ static FAR char *unionfs_relpath(FAR const char *path, FAR const char *name)
 
       if (path[pathlen - 1] == '/')
         {
-          ret = asprintf(&relpath, "%s%s", path, name);
+          ret = fs_heap_asprintf(&relpath, "%s%s", path, name);
         }
       else
         {
-          ret = asprintf(&relpath, "%s/%s", path, name);
+          ret = fs_heap_asprintf(&relpath, "%s/%s", path, name);
         }
 
       /* Handle errors */
@@ -753,7 +757,7 @@ static FAR char *unionfs_relpath(FAR const char *path, FAR const char *name)
        * will work later).
        */
 
-      return strdup(name);
+      return fs_heap_strdup(name);
     }
 }
 
@@ -840,12 +844,12 @@ static void unionfs_destroy(FAR struct unionfs_inode_s *ui)
 
   if (ui->ui_fs[0].um_prefix)
     {
-      lib_free(ui->ui_fs[0].um_prefix);
+      fs_heap_free(ui->ui_fs[0].um_prefix);
     }
 
   if (ui->ui_fs[1].um_prefix)
     {
-      lib_free(ui->ui_fs[1].um_prefix);
+      fs_heap_free(ui->ui_fs[1].um_prefix);
     }
 
   /* And finally free the allocated unionfs state structure as well */
@@ -1436,7 +1440,7 @@ static int unionfs_opendir(FAR struct inode *mountpt,
 
   if (strlen(relpath) > 0)
     {
-      udir->fu_relpath = strdup(relpath);
+      udir->fu_relpath = fs_heap_strdup(relpath);
       if (!udir->fu_relpath)
         {
           goto errout_with_lock;
@@ -1522,7 +1526,7 @@ static int unionfs_opendir(FAR struct inode *mountpt,
 errout_with_relpath:
   if (udir->fu_relpath != NULL)
     {
-      lib_free(udir->fu_relpath);
+      fs_heap_free(udir->fu_relpath);
     }
 
 errout_with_lock:
@@ -1776,7 +1780,7 @@ static int unionfs_readdir(FAR struct inode *mountpt,
 
                       /* Free the allocated relpath */
 
-                      lib_free(relpath);
+                      fs_heap_free(relpath);
 
                       /* Check for a duplicate */
 
@@ -1863,7 +1867,7 @@ static int unionfs_readdir(FAR struct inode *mountpt,
 
                   /* Free the allocated relpath */
 
-                  lib_free(relpath);
+                  fs_heap_free(relpath);
                 }
             }
         }
@@ -1946,7 +1950,7 @@ static int unionfs_bind(FAR struct inode *blkdriver, FAR const void *data,
 
   /* Parse options from mount syscall */
 
-  dup = tmp = strdup(data);
+  dup = tmp = fs_heap_strdup(data);
   if (!dup)
     {
       return -ENOMEM;
@@ -1975,7 +1979,7 @@ static int unionfs_bind(FAR struct inode *blkdriver, FAR const void *data,
   /* Call unionfs_dobind to do the real work. */
 
   ret = unionfs_dobind(fspath1, prefix1, fspath2, prefix2, handle);
-  lib_free(dup);
+  fs_heap_free(dup);
 
   return ret;
 }
@@ -2625,10 +2629,10 @@ static int unionfs_dobind(FAR const char *fspath1, FAR const char *prefix1,
 
   if (prefix1 && strlen(prefix1) > 0)
     {
-      ui->ui_fs[0].um_prefix = strdup(prefix1);
+      ui->ui_fs[0].um_prefix = fs_heap_strdup(prefix1);
       if (ui->ui_fs[0].um_prefix == NULL)
         {
-          ferr("ERROR: strdup(prefix1) failed\n");
+          ferr("ERROR: fs_heap_strdup(prefix1) failed\n");
           ret = -ENOMEM;
           goto errout_with_fs2;
         }
@@ -2636,10 +2640,10 @@ static int unionfs_dobind(FAR const char *fspath1, FAR const char *prefix1,
 
   if (prefix2 && strlen(prefix2) > 0)
     {
-      ui->ui_fs[1].um_prefix = strdup(prefix2);
+      ui->ui_fs[1].um_prefix = fs_heap_strdup(prefix2);
       if (ui->ui_fs[1].um_prefix == NULL)
         {
-          ferr("ERROR: strdup(prefix2) failed\n");
+          ferr("ERROR: fs_heap_strdup(prefix2) failed\n");
           ret = -ENOMEM;
           goto errout_with_prefix1;
         }
@@ -2661,7 +2665,7 @@ static int unionfs_dobind(FAR const char *fspath1, FAR const char *prefix1,
 errout_with_prefix1:
   if (ui->ui_fs[0].um_prefix != NULL)
     {
-      lib_free(ui->ui_fs[0].um_prefix);
+      fs_heap_free(ui->ui_fs[0].um_prefix);
     }
 
 errout_with_fs2:

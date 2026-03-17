@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/ioexpander/gpio.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -573,6 +575,34 @@ static int gpio_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
             }
         }
         break;
+
+      /* Command:     GPIOC_SETDEBOUNCE
+       * Description: Set the GPIO pin debounce duration.
+       * Argument:    The duration of the channel debounce, uint is ns.
+       */
+
+      case GPIOC_SETDEBOUNCE:
+        {
+          DEBUGASSERT(dev->gp_ops->go_setdebounce != NULL);
+          ret = dev->gp_ops->go_setdebounce(dev, arg);
+          break;
+        }
+
+      /* Command:     GPIOC_SETMASK
+       * Description: Mask or unmask the GPIO interrupt without disabling it.
+       *              When masked, the interrupt is suppressed but the
+       *              interrupt source remains enabled.
+       * Argument:    true to mask the interrupt;
+       *              false to unmask the interrupt.
+       */
+
+    case GPIOC_IRQ_SETMASK:
+        {
+          bool mask = (bool)arg;
+          DEBUGASSERT(dev->gp_ops->go_setmask != NULL);
+          ret = dev->gp_ops->go_setmask(dev, mask);
+          break;
+        }
 
       /* Unrecognized command */
 

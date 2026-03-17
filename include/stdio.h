@@ -87,7 +87,7 @@
 
 /* The maximum number of unique temporary file names that can be generated */
 
-#define TMP_MAX 56800235584ull
+#define TMP_MAX 308915776
 
 #if defined(CONFIG_FS_LARGEFILE)
 #  define tmpfile64 tmpfile
@@ -163,7 +163,7 @@ int    fscanf(FAR FILE *stream, FAR const IPTR char *fmt, ...)
        scanf_like(2, 3);
 int    fseek(FAR FILE *stream, long int offset, int whence);
 int    fseeko(FAR FILE *stream, off_t offset, int whence);
-int    fsetpos(FAR FILE *stream, FAR fpos_t *pos);
+int    fsetpos(FAR FILE *stream, FAR const fpos_t *pos);
 long   ftell(FAR FILE *stream);
 off_t  ftello(FAR FILE *stream);
 size_t fwrite(FAR const void *ptr, size_t size, size_t n_items,
@@ -266,7 +266,15 @@ int       remove(FAR const char *path);
 #ifndef __KERNEL__
 int pclose(FILE *stream);
 FILE *popen(FAR const char *command, FAR const char *mode) popen_like;
+#else
+#define asprintf(p, f, ...) nx_asprintf(p, f, ##__VA_ARGS__)
+#define vasprintf(p, f, a)  nx_vasprintf(p, f, a)
 #endif
+
+int nx_asprintf(FAR char **ptr, FAR const IPTR char *fmt, ...)
+    printf_like(2, 3);
+int nx_vasprintf(FAR char **ptr, FAR const IPTR char *fmt, va_list ap)
+    printf_like(2, 0);
 
 #if CONFIG_FORTIFY_SOURCE > 0
 fortify_function(fgets) FAR char *fgets(FAR char *s, int n, FAR FILE *stream)
@@ -310,6 +318,7 @@ fortify_function(vsprintf) int vsprintf(FAR char *dest,
   return ret;
 }
 
+#ifdef fortify_va_arg_pack
 fortify_function(snprintf) int snprintf(FAR char *buf, size_t size,
                                         FAR const IPTR char *format, ...)
 {
@@ -327,6 +336,7 @@ fortify_function(sprintf) int sprintf(FAR char *buf,
   fortify_assert(ret == -1 || (size_t)ret <= fortify_size(buf, 0));
   return ret;
 }
+#endif
 #endif
 
 #undef EXTERN

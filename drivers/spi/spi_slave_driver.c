@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/spi/spi_slave_driver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -70,7 +72,7 @@ struct spi_slave_driver_s
 
   FAR struct pollfd *fds;
 
-  /* The semphore reader */
+  /* The semaphore reader */
 
   sem_t wait;
 
@@ -138,7 +140,9 @@ static const struct file_operations g_spislavefops =
   NULL,                         /* ioctl */
   NULL,                         /* mmap */
   NULL,                         /* truncate */
-  spi_slave_poll                /* poll */
+  spi_slave_poll,               /* poll */
+  NULL,                         /* readv */
+  NULL                          /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , spi_slave_unlink            /* unlink */
 #endif
@@ -635,7 +639,7 @@ static void spi_slave_cmddata(FAR struct spi_slave_dev_s *dev, bool data)
  *
  * Input Parameters:
  *   dev  - SPI Slave device interface instance
- *   data - Pointer to the data buffer pointer to be shifed out.
+ *   data - Pointer to the data buffer pointer to be shifted out.
  *          The device will set the data buffer pointer to the actual data
  *
  * Returned Value:
@@ -738,9 +742,12 @@ static void spi_slave_notify(FAR struct spi_slave_dev_s *dev,
       poll_notify(&priv->fds, 1, POLLERR);
     }
 
-  while (nxsem_get_value(&priv->wait, &semcnt) == 0 && semcnt <= 0)
+  if (nxsem_get_value(&priv->wait, &semcnt) >= 0)
     {
-      nxsem_post(&priv->wait);
+      while (semcnt++ <= 0)
+        {
+          nxsem_post(&priv->wait);
+        }
     }
 }
 

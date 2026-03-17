@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/risc-v/mpfs/icicle/scripts/ld.script
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,8 @@ __uflash_start = ORIGIN(uflash);
 __uflash_size = LENGTH(uflash);
 __usram_start = ORIGIN(usram);
 __usram_size = LENGTH(usram);
+__usrio_start = ORIGIN(usrio);
+__usrio_size = LENGTH(usrio);
 
 /* Provide the kernel boundaries as well */
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/tlsr82/tc32/tc32_doirq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -66,13 +68,7 @@ uint32_t *arm_doirq(int irq, uint32_t *regs)
 
   /* Nested interrupts are not supported */
 
-  DEBUGASSERT(up_current_regs() == NULL);
-
-  /* Current regs non-zero indicates that we are processing an interrupt;
-   * current_regs is also used to manage interrupt level context switches.
-   */
-
-  up_set_current_regs(regs);
+  DEBUGASSERT(!up_interrupt_context());
 
   tcb->xcp.regs = regs;
 
@@ -82,23 +78,13 @@ uint32_t *arm_doirq(int irq, uint32_t *regs)
 
   /* Deliver the IRQ */
 
-  irq_dispatch(irq, up_current_regs());
+  irq_dispatch(irq, regs);
   tcb = this_task();
-
-  /* If a context switch occurred while processing the interrupt then
-   * current_regs may have change value.  If we return any value different
-   * from the input regs, then the lower level will know that a context
-   * switch occurred during interrupt processing.
-   */
 
   if (regs != tcb->xcp.regs)
     {
       regs = tcb->xcp.regs;
     }
-
-  /* Update the current_regs to NULL. */
-
-  up_set_current_regs(NULL);
 
 #endif
 

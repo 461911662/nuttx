@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mount/fs_mount.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,7 +37,7 @@
 
 #include "driver/driver.h"
 #include "inode/inode.h"
-#include "notify/notify.h"
+#include "vfs/vfs.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -69,8 +71,8 @@
     defined(CONFIG_FS_PROCFS) || defined(CONFIG_NFS) || \
     defined(CONFIG_FS_TMPFS) || defined(CONFIG_FS_USERFS) || \
     defined(CONFIG_FS_CROMFS) || defined(CONFIG_FS_UNIONFS) || \
-    defined(CONFIG_FS_HOSTFS) || defined(CONFIG_FS_RPMSGFS) || \
-    defined(CONFIG_FS_V9FS)
+    defined(CONFIG_FS_HOSTFS) || defined(CONFIG_FS_ZIPFS) || \
+    defined(CONFIG_FS_RPMSGFS) || defined(CONFIG_FS_V9FS)
 #  define NODFS_SUPPORT
 #endif
 

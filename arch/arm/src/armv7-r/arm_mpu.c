@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-r/arm_mpu.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -279,8 +281,7 @@ void mpu_freeregion(unsigned int region)
   mpu_set_dracr(0);
   mpu_set_drsr(0);
   g_mpu_region &= ~(1 << region);
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 
 /****************************************************************************
@@ -485,7 +486,7 @@ unsigned int mpu_configure_region(uintptr_t base, size_t size,
  *   Configure a region for privileged, strongly ordered memory
  *
  * Input Parameters:
- *   table - MPU Initiaze table.
+ *   table - MPU Initialize table.
  *   count - Initialize the number of entries in the region table.
  *
  * Returned Value:

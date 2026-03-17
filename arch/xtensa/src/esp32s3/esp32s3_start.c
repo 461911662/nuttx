@@ -48,15 +48,18 @@
 #include "hardware/esp32s3_cache_memory.h"
 #include "hardware/esp32s3_system.h"
 #include "rom/esp32s3_libc_stubs.h"
-#include "rom/opi_flash.h"
-#include "rom/esp32s3_spiflash.h"
+#include "esp_private/spi_flash_os.h"
 #include "espressif/esp_loader.h"
 
+#include "esp_app_desc.h"
+#include "esp_private/esp_mmu_map_private.h"
+#include "esp_flash_internal.h"
 #include "hal/mmu_hal.h"
 #include "hal/mmu_types.h"
 #include "hal/cache_types.h"
 #include "hal/cache_ll.h"
 #include "hal/cache_hal.h"
+#include "hal/efuse_ll.h"
 #include "soc/extmem_reg.h"
 #include "rom/cache.h"
 #include "spi_flash_mmap.h"
@@ -64,9 +67,12 @@
 #ifdef CONFIG_ESPRESSIF_SIMPLE_BOOT
 #  include "bootloader_init.h"
 #endif
+#include "bootloader_flash_config.h"
 
 #include "esp_clk_internal.h"
 #include "periph_ctrl.h"
+
+#include "esp_private/startup_internal.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -135,6 +141,7 @@ extern void cache_set_idrom_mmu_info(uint32_t instr_page_num,
 #ifdef CONFIG_ESP32S3_DATA_CACHE_16KB
 extern int cache_occupy_addr(uint32_t addr, uint32_t size);
 #endif
+extern int ets_printf(const char *fmt, ...);
 
 /****************************************************************************
  * Private Function Prototypes
@@ -162,6 +169,11 @@ extern uint8_t _instruction_reserved_start[];
 extern uint8_t _instruction_reserved_end[];
 extern uint8_t _rodata_reserved_start[];
 extern uint8_t _rodata_reserved_end[];
+
+#ifdef CONFIG_XTENSA_EXTMEM_BSS
+extern uintptr_t _ext_ram_bss_start;
+extern uintptr_t _ext_ram_bss_end;
+#endif
 
 /* Address of the CPU0 IDLE thread */
 
@@ -320,21 +332,6 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
 
   esp32s3_region_protection();
 
-#ifndef CONFIG_ESPRESSIF_SIMPLE_BOOT
-  /* Move CPU0 exception vectors to IRAM */
-
-  __asm__ __volatile__ ("wsr %0, vecbase\n"::"r" (_init_start));
-
-  /* Clear .bss. We'll do this inline (vs. calling memset) just to be
-   * certain that there are no issues with the state of global variables.
-   */
-
-  for (uint32_t *dest = (uint32_t *)_sbss; dest < (uint32_t *)_ebss; )
-    {
-      *dest++ = 0;
-    }
-#endif
-
 #ifndef CONFIG_SMP
   /* Make sure that the APP_CPU is disabled for now */
 
@@ -347,6 +344,8 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
    */
 
   esp32s3_wdt_early_deinit();
+
+  esp_flash_app_init();
 
   /* Initialize RTC controller parameters */
 
@@ -375,12 +374,6 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
 
   showprogress('A');
 
-#if defined(CONFIG_ESP32S3_FLASH_MODE_OCT) || \
-    defined(CONFIG_ESP32S3_SPIRAM_MODE_OCT)
-  esp_rom_opiflash_pin_config();
-  esp32s3_spi_timing_set_pin_drive_strength();
-#endif
-
   /* The PLL provided by bootloader is not stable enough, do calibration
    * again here so that we can use better clock for the timing tuning.
    */
@@ -401,9 +394,25 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
     }
   else
     {
-      esp_spiram_init_cache();
-      esp_spiram_test();
+      if (esp_spiram_init_cache() != OK)
+        {
+          ets_printf("SPIRAM init cache failed\n");
+          PANIC();
+        }
+
+#  if defined(CONFIG_ESP32S3_SPIRAM_MEMTEST)
+      if (esp_spiram_test() != OK)
+        {
+          ets_printf("SPIRAM test failed\n");
+          PANIC();
+        }
+#  endif  // CONFIG_ESP32S3_SPIRAM_MEMTEST
     }
+#endif
+
+#ifdef CONFIG_XTENSA_EXTMEM_BSS
+  memset(&_ext_ram_bss_start, 0,
+         (&_ext_ram_bss_end - &_ext_ram_bss_start) * sizeof(uintptr_t));
 #endif
 
   /* Setup the syscall table needed by the ROM code */
@@ -433,6 +442,8 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
   showprogress('C');
 #endif
 
+  SYS_STARTUP_FN();
+
   /* Bring up NuttX */
 
   nx_start();
@@ -458,6 +469,12 @@ noinstrument_function void noreturn_function IRAM_ATTR __esp32s3_start(void)
 
 noinstrument_function void IRAM_ATTR __start(void)
 {
+  const esp_app_desc_t *app_desc;
+
+  /* Move CPU0 exception vectors to IRAM */
+
+  __asm__ __volatile__ ("wsr %0, vecbase\n"::"r" (_init_start));
+
 #if defined(CONFIG_ESP32S3_APP_FORMAT_MCUBOOT) || \
     defined(CONFIG_ESPRESSIF_SIMPLE_BOOT)
   size_t partition_offset = PRIMARY_SLOT_OFFSET;
@@ -468,15 +485,13 @@ noinstrument_function void IRAM_ATTR __start(void)
   uint32_t app_drom_size  = (uint32_t)_image_drom_size;
   uint32_t app_drom_vaddr = (uint32_t)_image_drom_vma;
 
-#  ifdef CONFIG_ESPRESSIF_SIMPLE_BOOT
-  __asm__ __volatile__ ("wsr %0, vecbase\n"::"r" (_init_start));
-
+#ifdef CONFIG_ESPRESSIF_SIMPLE_BOOT
   if (bootloader_init() != 0)
     {
       ets_printf("Hardware init failed, aborting\n");
       while (true);
     }
-#  endif
+#endif
 
   if (map_rom_segments(app_drom_start, app_drom_vaddr, app_drom_size,
                        app_irom_start, app_irom_vaddr, app_irom_size) != 0)
@@ -486,7 +501,63 @@ noinstrument_function void IRAM_ATTR __start(void)
     }
 #endif
 
+#ifndef CONFIG_ESPRESSIF_SIMPLE_BOOT
+  /* Clear .bss. We'll do this inline (vs. calling memset) just to be
+   * certain that there are no issues with the state of global variables.
+   */
+
+  for (uint32_t *dest = (uint32_t *)_sbss; dest < (uint32_t *)_ebss; )
+    {
+      *dest++ = 0;
+    }
+#endif
+
+  app_desc = esp_app_get_description();
+  if (app_desc->magic_word != ESP_APP_DESC_MAGIC_WORD)
+    {
+      ets_printf("Magic Word check failed: %08" PRIx32 "\n",
+                 app_desc->magic_word);
+      ets_printf("Trying to boot anyway...\n");
+    }
+
   configure_cpu_caches();
+
+  if (efuse_ll_get_flash_type())
+    {
+#ifndef CONFIG_ESP32S3_FLASH_MODE_OCT
+      ets_printf("Octal Flash chip detected!\n"
+                 "Select CONFIG_ESP32S3_FLASH_MODE_OCT on menuconfig\n");
+      abort();
+#endif
+    }
+  else
+    {
+#ifdef CONFIG_ESP32S3_FLASH_MODE_OCT
+      ets_printf("Octal Flash option selected, but EFUSE not configured!\n");
+      abort();
+#endif
+    }
+
+  esp_mspi_pin_init();
+
+  /* At this point, the Flash chip is still in one of the DOUT, DIO, QOUT
+   * or QIO modes. It's hard to implement a read_id function in OPI mode,
+   * so the Flash chip ID is read here, before entering the OPI mode (if
+   * applicable).
+   */
+
+  bootloader_flash_update_id();
+
+  /* The following function initializes the Flash chip to the user-defined
+   * settings. Please note that the Flash chip is initialized with temporary
+   * settings during the boot phase to enable using different chips. In this
+   * stage, the Flash chip and the MSPI are reconfigured to the required
+   * final settings.
+   */
+
+  spi_flash_init_chip_state();
+
+  esp_mmu_map_init();
 
   __esp32s3_start();
 

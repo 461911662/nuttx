@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/moxart/moxart_irq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -114,6 +116,7 @@ void up_irqinitialize(void)
           getreg32(0x98800020));
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
+  arm_color_intstack();
   up_irq_restore(PSR_MODE_SYS | PSR_F_BIT);
 #endif
 }
@@ -277,12 +280,18 @@ uint32_t *arm_decodeirq(uint32_t *regs)
   num = ffs(status) - 1;
   arm_ack_irq(num);
 
-  DEBUGASSERT(up_current_regs() == NULL);
-  up_set_current_regs(regs);
+  DEBUGASSERT(!up_interrupt_context());
+
+  /* Set irq flag */
+
+  up_set_interrupt_context(true);
   tcb->xcp.regs = regs;
 
   irq_dispatch(num, regs);
-  up_set_current_regs(NULL);
+
+  /* Set irq flag */
+
+  up_set_interrupt_context(false);
 
   return NULL;  /* Return not used in this architecture */
 }

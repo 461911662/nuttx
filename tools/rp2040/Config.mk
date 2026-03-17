@@ -26,17 +26,38 @@
 
 # POSTBUILD -- Perform post build operations
 
-ifeq ($(CONFIG_RP2040_UF2_BINARY),y)
-ifdef PICO_SDK_PATH
-define POSTBUILD
-	$(Q)echo "Generating: nuttx.uf2"; \
+PICOTOOL_FOUND := $(shell command -v picotool 2> /dev/null)
 
-	picotool$(HOSTEXEEXT) uf2 convert --quiet -t elf nuttx nuttx.uf2;
-	$(Q)([ $$? -eq 0 ] && echo nuttx.uf2 >> nuttx.manifest && echo "Done.")
+PICOTOOL_BIN_PATH ?= $(PICO_SDK_PATH)$(DELIM)_deps$(DELIM)picotool$(DELIM)picotool
+
+define GEN_PICO_UF2
+  $(Q)echo "Generating: nuttx.uf2"; \
+
+  $(Q)$1 uf2 convert --quiet -t elf nuttx nuttx.uf2;
+  $(Q)([ $$? -eq 0 ] && echo nuttx.uf2 >> nuttx.manifest && echo "Done.")
 endef
-else
-define POSTBUILD
-	$(Q) echo "PICO_SDK_PATH must be specified for flash boot"
-endef
-endif
+
+ifeq ($(CONFIG_RP2040_UF2_BINARY),y)
+  ifdef PICOTOOL_FOUND
+    define POSTBUILD
+      $(call GEN_PICO_UF2, picotool)
+    endef
+  else
+    ifdef PICO_SDK_PATH
+      define POSTBUILD
+        $(warning "picotool not found in $$PATH, it will be sourced from pico-sdk")
+        $(Q)if [[ ! -x "$(PICOTOOL_BIN_PATH)" ]]; then \
+          echo "Warning: building picotool from pico-sdk will skip USB support! See https://github.com/raspberrypi/pico-sdk/issues/1827" >&2; \
+          cd $(PICO_SDK_PATH); \
+          cmake . >&/dev/null; \
+          make picotoolBuild >/dev/null; \
+        fi
+        $(call GEN_PICO_UF2, $(PICOTOOL_BIN_PATH))
+      endef
+    else
+      define POSTBUILD
+        $(error "Generating UF2 files requires picotool to be available in $$PATH, or $$PICO_SDK_PATH must be specified")
+      endef
+    endif
+  endif
 endif

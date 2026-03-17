@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv8-m/nvic.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -205,7 +207,7 @@
 #define NVIC_CPUID_BASE_OFFSET          0x0d00 /* CPUID base register */
 #define NVIC_INTCTRL_OFFSET             0x0d04 /* Interrupt control state register */
 #define NVIC_VECTAB_OFFSET              0x0d08 /* Vector table offset register */
-#define NVIC_AIRCR_OFFSET               0x0d0c /* Application interrupt/reset control registr */
+#define NVIC_AIRCR_OFFSET               0x0d0c /* Application interrupt/reset control register */
 #define NVIC_SYSCON_OFFSET              0x0d10 /* System control register */
 #define NVIC_CFGCON_OFFSET              0x0d14 /* Configuration control register */
 #define NVIC_SYSH_PRIORITY_OFFSET(n)    (0x0d14 + 4*((n) >> 2))
@@ -542,18 +544,25 @@
 
 /* SysTick reload value register (SYSTICK_RELOAD) */
 
+/* The armv8-m systick RELOAD regitser has 24 bits
+ * ranging from 0x1 ~ 0x00ffffff
+ * noting that, setting reload to 0 is valid but doesn't have any effects
+ */
+
+#define NVIC_MIN_SYSTICK_CNT            (0x00000001)
+#define NVIC_MAX_SYSTICK_CNT            (0x00ffffff)
 #define NVIC_SYSTICK_RELOAD_SHIFT       0         /* Bits 23-0: Timer reload value */
-#define NVIC_SYSTICK_RELOAD_MASK        (0x00ffffff << NVIC_SYSTICK_RELOAD_SHIFT)
+#define NVIC_SYSTICK_RELOAD_MASK        (NVIC_MAX_SYSTICK_CNT << NVIC_SYSTICK_RELOAD_SHIFT)
 
 /* SysTick current value register (SYSTICK_CURRENT) */
 
 #define NVIC_SYSTICK_CURRENT_SHIFT      0         /* Bits 23-0: Timer current value */
-#define NVIC_SYSTICK_CURRENT_MASK       (0x00ffffff << NVIC_SYSTICK_RELOAD_SHIFT)
+#define NVIC_SYSTICK_CURRENT_MASK       (NVIC_MAX_SYSTICK_CNT << NVIC_SYSTICK_RELOAD_SHIFT)
 
 /* SysTick calibration value register (SYSTICK_CALIB) */
 
 #define NVIC_SYSTICK_CALIB_TENMS_SHIFT  0         /* Bits 23-0: Calibration value */
-#define NVIC_SYSTICK_CALIB_TENMS_MASK   (0x00ffffff << NVIC_SYSTICK_CALIB_TENMS_SHIFT)
+#define NVIC_SYSTICK_CALIB_TENMS_MASK   (NVIC_MAX_SYSTICK_CNT << NVIC_SYSTICK_CALIB_TENMS_SHIFT)
 #define NVIC_SYSTICK_CALIB_SKEW         (1 << 30) /* Bit 30: Calibration value inexact */
 #define NVIC_SYSTICK_CALIB_NOREF        (1 << 31) /* Bit 31: No external reference clock */
 

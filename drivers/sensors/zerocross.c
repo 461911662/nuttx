@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/zerocross.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -47,7 +49,7 @@
 #ifdef CONFIG_SENSORS_ZEROCROSS
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 /* This structure describes the state of the upper half driver */
@@ -79,10 +81,11 @@ struct zc_open_s
   volatile bool do_closing;
 
   /* Zero cross event notification information */
-
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
   pid_t do_pid;
   struct sigevent do_event;
   struct sigwork_s do_work;
+#endif
 };
 
 /****************************************************************************
@@ -173,6 +176,7 @@ static void zerocross_interrupt(FAR const struct zc_lowerhalf_s *lower,
 
   /* Visit each opened reference and notify a zero cross event */
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
   for (opriv = priv->zu_open; opriv; opriv = opriv->do_flink)
     {
       /* Signal the waiter */
@@ -181,6 +185,7 @@ static void zerocross_interrupt(FAR const struct zc_lowerhalf_s *lower,
       nxsig_notification(opriv->do_pid, &opriv->do_event,
                          SI_QUEUE, &opriv->do_work);
     }
+#endif
 
   leave_critical_section(flags);
 }
@@ -341,7 +346,7 @@ errout_with_lock:
  * Name: zc_read
  *
  * Description:
- *   A dummy read method.  This is provided only to satsify the VFS layer.
+ *   A dummy read method.  This is provided only to satisfy the VFS layer.
  *
  ****************************************************************************/
 
@@ -357,7 +362,7 @@ static ssize_t zc_read(FAR struct file *filep, FAR char *buffer,
  * Name: zc_write
  *
  * Description:
- *   A dummy write method.  This is provided only to satsify the VFS layer.
+ *   A dummy write method.  This is provided only to satisfy the VFS layer.
  *
  ****************************************************************************/
 
@@ -413,6 +418,7 @@ static int zc_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
        *              failure with the errno value set appropriately.
        */
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
       case ZCIOC_REGISTER:
         {
           FAR struct sigevent *event =
@@ -432,6 +438,7 @@ static int zc_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
             }
         }
         break;
+#endif
 
       default:
         {

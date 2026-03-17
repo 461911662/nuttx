@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/net/enc28j60.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <time.h>
 #include <string.h>
 #include <assert.h>
@@ -1544,7 +1545,7 @@ static void enc_irqworker(FAR void *arg)
 
   /* Get exclusive access to both the network and the SPI bus. */
 
-  net_lock();
+  netdev_lock(&priv->dev);
   enc_lock(priv);
 
   /* Disable further interrupts by clearing the global interrupt enable bit.
@@ -1738,7 +1739,7 @@ static void enc_irqworker(FAR void *arg)
   /* Release lock on the SPI bus and the network */
 
   enc_unlock(priv);
-  net_unlock();
+  netdev_unlock(&priv->dev);
 }
 
 /****************************************************************************
@@ -1811,7 +1812,7 @@ static void enc_toworker(FAR void *arg)
 
   /* Get exclusive access to the network */
 
-  net_lock();
+  netdev_lock(&priv->dev);
 
   /* Increment statistics and dump debug info */
 
@@ -1833,7 +1834,7 @@ static void enc_toworker(FAR void *arg)
 
   /* Release lock on the network */
 
-  net_unlock();
+  netdev_unlock(&priv->dev);
 }
 
 /****************************************************************************
@@ -1935,6 +1936,7 @@ static int enc_ifup(struct net_driver_s *dev)
 
       priv->ifstate = ENCSTATE_UP;
       priv->lower->enable(priv->lower);
+      netdev_carrier_on(dev);
     }
 
   /* Un-lock the SPI bus */
@@ -1989,6 +1991,8 @@ static int enc_ifdown(struct net_driver_s *dev)
 
   priv->ifstate = ENCSTATE_DOWN;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
 
   /* Un-lock the SPI bus */
 

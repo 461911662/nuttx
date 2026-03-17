@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/riscv_fork.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -108,7 +110,7 @@
 #  define FORK_FPU_SIZE    (0)
 #endif
 
-#define FORK_SIZEOF        STACK_ALIGN_UP(FORK_INT_SIZE + FORK_FPU_SIZE)
+#define FORK_SIZEOF        STACKFRAME_ALIGN_UP(FORK_INT_SIZE + FORK_FPU_SIZE)
 
 /****************************************************************************
  * Public Types

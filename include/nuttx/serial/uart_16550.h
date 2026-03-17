@@ -30,6 +30,7 @@
 #include <nuttx/config.h>
 
 #include <nuttx/serial/serial.h>
+#include <nuttx/spinlock.h>
 
 #ifdef CONFIG_16550_UART
 
@@ -376,6 +377,7 @@ struct u16550_s
 #endif
 #endif
   uart_datawidth_t       rxtrigger; /* RX trigger level */
+  spinlock_t             lock;      /* Spinlock */
 };
 
 /****************************************************************************
@@ -387,7 +389,7 @@ struct u16550_s
  *
  * Description:
  *   Performs the low level UART initialization early in debug so that the
- *   serial console will be available during bootup.  This must be called
+ *   serial console will be available during boot up.  This must be called
  *   before uart_serialinit.
  *
  *   NOTE: Configuration of the CONSOLE UART was performed by uart_lowsetup()

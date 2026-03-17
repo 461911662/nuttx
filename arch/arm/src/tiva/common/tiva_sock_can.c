@@ -1,6 +1,7 @@
 /****************************************************************************
  * arch/arm/src/tiva/common/tiva_sock_can.c
- * SocketCAN driver implementation for Tiva. Based on the chardev driver.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -1635,7 +1636,7 @@ static void tivacan_reset(struct net_driver_s *dev)
 #endif /* CONFIG_TIVA_CAN1 */
   if (modnum > 1)
     {
-      canerr("ERROR: tried to reset nonexistant module CAN%d\n",
+      canerr("ERROR: tried to reset nonexistent module CAN%d\n",
              canmod->modnum);
     }
 
@@ -2249,6 +2250,8 @@ static int tivacan_ifup(struct net_driver_s *dev)
 
   priv->dev.d_buf = (uint8_t *)priv->tx_pool;
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -2277,6 +2280,8 @@ static int tivacan_ifdown(struct net_driver_s *dev)
   /* Stop processing messages */
 
   tivacan_reset(dev);
+
+  netdev_carrier_off(dev);
 
   return OK;
 }

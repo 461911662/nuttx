@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/mps/mps_userspace.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,9 +30,9 @@
 #include <assert.h>
 #include <sys/param.h>
 #include <nuttx/userspace.h>
+#include <arch/barriers.h>
 
 #include "mpu.h"
-#include "barriers.h"
 #include "arm_internal.h"
 #include "mps_userspace.h"
 

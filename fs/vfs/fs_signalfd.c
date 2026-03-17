@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_signalfd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -147,7 +149,7 @@ static int signalfd_file_close(FAR struct file *filep)
 
   for (signo = MIN_SIGNO; signo <= MAX_SIGNO; signo++)
     {
-      if (nxsig_ismember(&dev->sigmask, signo))
+      if (nxsig_ismember(&dev->sigmask, signo) == 1)
         {
           signal(signo, SIG_DFL);
         }
@@ -193,7 +195,7 @@ static ssize_t signalfd_file_read(FAR struct file *filep,
   siginfo = (FAR struct signalfd_siginfo *)buffer;
   do
     {
-      ret = nxsig_waitinfo(&pendmask, &info);
+      ret = nxsig_timedwait(&pendmask, &info, NULL);
       if (ret < 0)
         {
           goto errout;
@@ -350,8 +352,8 @@ int signalfd(int fd, FAR const sigset_t *mask, int flags)
 
       nxmutex_init(&dev->mutex);
 
-      fd = file_allocate(&g_signalfd_inode, O_RDOK | flags,
-                         0, dev, 0, true);
+      fd = file_allocate_from_inode(&g_signalfd_inode, O_RDOK | flags,
+                                    0, dev, 0);
       if (fd < 0)
         {
           ret = -fd;
@@ -362,7 +364,7 @@ int signalfd(int fd, FAR const sigset_t *mask, int flags)
     }
   else
     {
-      if (fs_getfilep(fd, &filep) < 0)
+      if (file_get(fd, &filep) < 0)
         {
           ret = EBADF;
           goto errout;
@@ -370,14 +372,14 @@ int signalfd(int fd, FAR const sigset_t *mask, int flags)
 
       if (filep->f_inode->u.i_ops != &g_signalfd_fileops)
         {
-          fs_putfilep(filep);
+          file_put(filep);
           goto errout;
         }
 
       dev = filep->f_priv;
       for (signo = MIN_SIGNO; signo <= MAX_SIGNO; signo++)
         {
-          if (nxsig_ismember(&dev->sigmask, signo))
+          if (nxsig_ismember(&dev->sigmask, signo) == 1)
             {
               signal(signo, SIG_DFL);
             }
@@ -392,7 +394,7 @@ int signalfd(int fd, FAR const sigset_t *mask, int flags)
   act.sa_user = dev;
   for (signo = MIN_SIGNO; signo <= MAX_SIGNO; signo++)
     {
-      if (nxsig_ismember(&dev->sigmask, signo))
+      if (nxsig_ismember(&dev->sigmask, signo) == 1)
         {
           nxsig_action(signo, &act, NULL, false);
         }
@@ -400,7 +402,7 @@ int signalfd(int fd, FAR const sigset_t *mask, int flags)
 
   if (filep != NULL)
     {
-      fs_putfilep(filep);
+      file_put(filep);
     }
 
   return fd;

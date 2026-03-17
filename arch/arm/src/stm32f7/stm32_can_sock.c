@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/stm32f7/stm32_can_sock.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -784,6 +786,8 @@ static int stm32can_ifup(struct net_driver_s *dev)
 
   priv->dev.d_buf = (uint8_t *)priv->txdesc;
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -814,6 +818,8 @@ static int stm32can_ifdown(struct net_driver_s *dev)
   /* Reset CAN */
 
   stm32can_reset(priv);
+
+  netdev_carrier_off(dev);
 
   return OK;
 }

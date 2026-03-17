@@ -17,6 +17,10 @@ config ARMV7A_HAVE_GICv2
 
 if ARMV7A_HAVE_GICv2
 
+config ARMV7A_GICv2_DUMP
+	bool "Dump the gic register"
+	default DEBUG_IRQ_INFO
+
 config ARMV7A_GIC_EOIMODE
 	bool "Enable GIC EOImode"
 	default n
@@ -28,7 +32,7 @@ config ARMV7A_GICV2_LEGACY_IRQ0
 	int "pci legacy irq0 default val"
 	default 35
 	---help---
-		The qemu pci lagacy irq0 default is 35. -1 mean disable
+		The qemu pci legacy irq0 default is 35. -1 means disable
 
 config ARMV7A_GICv2M
 	bool "gic support msi irq"
@@ -47,6 +51,9 @@ config ARMV7A_HAVE_GTM
 config ARMV7A_HAVE_PTM
 	bool
 	default n
+	select ONESHOT
+	select ONESHOT_COUNT
+	select ONESHOT_FAST_DIVISION
 	---help---
 		Selected by the configuration tool if the architecture supports the
 		per-processor Private Timers (PTMs)
@@ -57,17 +64,6 @@ config ARMV7A_HAVE_L2CC
 	---help---
 		Selected by the configuration tool if the architecture supports any
 		kind of L2 cache.
-
-config ARMV7A_SMP_BUSY_WAIT
-	bool "Busy wait when SMP boot"
-	default n
-	depends on SMP
-	---help---
-		Enables busy wait when SMP boot
-
-config ARMV7A_SMP_BUSY_WAIT_FLAG_ADDR
-	hex "Busy wait flag address"
-	depends on ARMV7A_SMP_BUSY_WAIT
 
 config ARMV7A_HAVE_L2CC_PL310
 	bool

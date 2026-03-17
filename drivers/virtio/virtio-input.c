@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-input.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -391,7 +393,7 @@ static int virtio_input_probe(FAR struct virtio_device *vdev)
   vqnames[VIRTIO_INPUT_EVENT] = "virtio_input_event";
   callbacks[VIRTIO_INPUT_EVENT] = virtio_input_recv_events;
   ret = virtio_create_virtqueues(vdev, 0, VIRTIO_INPUT_NUM, vqnames,
-                                 callbacks);
+                                 callbacks, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);

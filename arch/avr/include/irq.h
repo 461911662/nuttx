@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/avr/include/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -56,6 +58,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* The AVR32 stack must be aligned at word (4 byte) boundaries. If necessary
+ * frame_size must be rounded up to the next boundary
+ */
+
+#define STACKFRAME_ALIGN 4
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -86,24 +94,6 @@ EXTERN volatile uint8_t *g_current_regs;
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
-
-/****************************************************************************
- * Name: up_cpu_index
- *
- * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- ****************************************************************************/
-
-#define up_cpu_index() (0)
 
 /****************************************************************************
  * Inline functions
@@ -141,6 +131,13 @@ static inline_function void up_set_current_regs(FAR uint8_t *regs)
  ****************************************************************************/
 
 #define up_interrupt_context() (up_current_regs() != NULL)
+
+/****************************************************************************
+ * Name: up_getusrsp
+ ****************************************************************************/
+
+#define up_getusrsp(regs) \
+  ((uintptr_t)((uint8_t *)(regs))[REG_R13])
 
 #undef EXTERN
 #ifdef __cplusplus

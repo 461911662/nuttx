@@ -1,9 +1,10 @@
 /****************************************************************************
  * drivers/sensors/vl53l1x.c
- * Character driver for the ST vl53l1x distance.
  *
- *   Copyright (C) 2019 Acutronics Robotics
- *   Author: Acutronics Robotics (Juan Flores Muñoz) <juan@erlerobotics.com>
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: Copyright (C) 2019 Acutronics Robotics
+ * SPDX-FileCopyrightText: Acutronics Robotics
+ * SPDX-FileCopyrightText: (Juan Flores Muñoz) <juan@erlerobotics.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +35,19 @@
  *
  ****************************************************************************/
 
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
+
 /****************************************************************************
  * Included Files
  ****************************************************************************/
@@ -63,7 +77,7 @@
 #define VL53L1X_ADDR  0x29
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 struct vl53l1x_dev_s

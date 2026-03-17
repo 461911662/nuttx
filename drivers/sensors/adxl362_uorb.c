@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/adxl362_uorb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -27,9 +29,9 @@
 #include <debug.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <sys/param.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/kthread.h>
 #include <nuttx/signal.h>
@@ -162,6 +164,7 @@ static const struct sensor_ops_s g_adxl362_accel_ops =
   NULL,                 /* set_calibvalue */
   NULL,                 /* calibrate */
   NULL,                 /* get_info */
+  NULL,                 /* set_nonwakeup */
   NULL,                 /* control */
 };
 
@@ -548,7 +551,7 @@ static int adxl362_thread(int argc, FAR char **argv)
 
       /* Sleeping thread before fetching the next sensor data */
 
-      nxsig_usleep(priv->interval);
+      nxsched_usleep(priv->interval);
     }
 
   return OK;

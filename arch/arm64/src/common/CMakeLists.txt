@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm64/src/common/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -22,15 +24,14 @@ set(SRCS arm64_head.S)
 
 # TODO: support kernel startup obj ctr0
 
-list(APPEND SRCS arm64_vector_table.S arm64_vectors.S arm64_smccc.S)
+list(APPEND SRCS arm64_vector_table.S arm64_vectors.S)
 list(APPEND SRCS arm64_fork_func.S)
 
 # Common C source files ( OS call up_xxx)
 list(APPEND SRCS arm64_initialize.c arm64_initialstate.c arm64_boot.c)
-list(APPEND SRCS arm64_nputs.c arm64_copystate.c arm64_createstack.c)
+list(APPEND SRCS arm64_nputs.c arm64_createstack.c)
 list(APPEND SRCS arm64_releasestack.c arm64_stackframe.c arm64_usestack.c)
 list(APPEND SRCS arm64_exit.c arm64_fork.c)
-list(APPEND SRCS arm64_schedulesigaction.c arm64_sigdeliver.c)
 list(APPEND SRCS arm64_getintstack.c arm64_registerdump.c)
 list(APPEND SRCS arm64_perf.c arm64_tcbinfo.c)
 
@@ -41,6 +42,10 @@ list(APPEND SRCS arm64_syscall.c)
 
 # Use common heap allocation for now (may need to be customized later)
 list(APPEND SRCS arm64_allocateheap.c)
+
+if(CONFIG_ENABLE_ALL_SIGNALS)
+  list(APPEND SRCS arm64_schedulesigaction.c arm64_sigdeliver.c)
+endif()
 
 if(NOT CONFIG_ARCH_IDLE_CUSTOM)
   list(APPEND SRCS arm64_idle.c)
@@ -57,8 +62,20 @@ if(CONFIG_ARM64_GIC_VERSION EQUAL 2)
   endif()
 endif()
 
+if(CONFIG_ARCH_HAVE_DEBUG)
+  list(APPEND SRCS arm64_hwdebug.c)
+endif()
+
+if(CONFIG_ARCH_HAVE_EL3)
+  list(APPEND SRCS arm64_smccc.S)
+endif()
+
 if(CONFIG_ARCH_HAVE_MMU)
   list(APPEND SRCS arm64_mmu.c)
+endif()
+
+if(CONFIG_ARM64_MTE)
+  list(APPEND SRCS arm64_mte.c)
 endif()
 
 if(CONFIG_ARCH_HAVE_MPU)
@@ -74,9 +91,11 @@ if(CONFIG_SMP)
   list(APPEND SRCS arm64_smpcall.c)
 endif()
 
-if(CONFIG_BUILD_KERNEL)
-  list(APPEND SRCS arm64_task_start.c arm64_pthread_start.c
-       arm64_signal_dispatch.c)
+if(CONFIG_BUILD_KERNEL OR CONFIG_BUILD_PROTECTED)
+  list(APPEND SRCS arm64_task_start.c arm64_pthread_start.c)
+  if(CONFIG_ENABLE_ALL_SIGNALS)
+    list(APPEND SRCS arm64_signal_dispatch.c)
+  endif()
 endif()
 
 if(CONFIG_ARCH_KERNEL_STACK)
@@ -84,9 +103,14 @@ if(CONFIG_ARCH_KERNEL_STACK)
 endif()
 
 if(CONFIG_ARCH_ADDRENV)
-  list(APPEND SRCS arm64_addrenv.c arm64_pgalloc.c arm64_addrenv_perms.c)
-  list(APPEND SRCS arm64_addrenv_utils.c arm64_addrenv_shm.c)
-  list(APPEND SRCS arm64_addrenv_pgmap.c)
+  if(CONFIG_ARCH_USE_MMU)
+    list(APPEND SRCS arm64_addrenv_mmu.c arm64_pgalloc.c arm64_addrenv_perms.c)
+    list(APPEND SRCS arm64_addrenv_utils.c arm64_addrenv_shm.c)
+    list(APPEND SRCS arm64_addrenv_pgmap.c)
+  elseif(CONFIG_ARCH_USE_MPU)
+    list(APPEND SRCS arm64_addrenv_mpu.c)
+  endif()
+
   if(CONFIG_ARCH_STACK_DYNAMIC)
     list(APPEND SRCS arm64_addrenv_ustack.c)
   endif()
@@ -117,3 +141,15 @@ if(CONFIG_ARM64_SEMIHOSTING_HOSTFS)
 endif()
 
 target_sources(arch PRIVATE ${SRCS})
+
+if(NOT CONFIG_BUILD_FLAT AND CONFIG_ARCH_HAVE_PERF_EVENTS_USER_ACCESS)
+  target_sources(arch_interface PRIVATE arm64_perf.c)
+  target_include_directories(arch_interface PRIVATE ${NUTTX_CHIP_ABS_DIR})
+endif()
+
+nuttx_add_aux_library(STARTUP_OBJS crt0.c)
+
+target_compile_options(
+  STARTUP_OBJS
+  PRIVATE
+    $<GENEX_EVAL:$<TARGET_PROPERTY:nuttx_global,NUTTX_ELF_APP_COMPILE_OPTIONS>>)

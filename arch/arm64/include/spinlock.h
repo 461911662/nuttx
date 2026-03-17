@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/include/spinlock.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,8 @@
 #ifndef __ASSEMBLY__
 #  include <stdint.h>
 #endif /* __ASSEMBLY__ */
+
+#include <arch/barriers.h>
 
 /****************************************************************************
  * Pre-processor Prototypes
@@ -59,11 +63,8 @@
  *            all memory accesses are complete
  */
 
-#define SP_DSB() __asm__ __volatile__ ("dsb sy" : : : "memory")
-#define SP_DMB() __asm__ __volatile__ ("dmb st" : : : "memory")
-
-#define SP_WFE() __asm__ __volatile__ ("wfe" : : : "memory")
-#define SP_SEV() __asm__ __volatile__ ("sev" : : : "memory")
+#define UP_WFE() __asm__ __volatile__ ("wfe" : : : "memory")
+#define UP_SEV() __asm__ __volatile__ ("sev" : : : "memory")
 
 #ifndef __ASSEMBLY__
 
@@ -90,18 +91,19 @@ typedef uint64_t spinlock_t;
 static inline_function spinlock_t up_testset(volatile spinlock_t *lock)
 {
   spinlock_t ret = SP_LOCKED;
+  spinlock_t tmp = 0;
 
   __asm__ __volatile__
   (
     "1:                     \n"
-    "ldaxr    %0, [%2]      \n"
-    "cmp      %0, %1        \n"
+    "ldaxr    %0, [%3]      \n"
+    "cmp      %0, %2        \n"
     "beq      2f            \n"
-    "stxr     %w0, %1, [%2] \n"
-    "cbnz     %w0, 1b       \n"
+    "stxr     %w1, %2, [%3] \n"
+    "cbnz     %w1, 1b       \n"
     "2:                     \n"
-    : "+r" (ret)
-    :  "r" (SP_LOCKED), "r" (lock)
+    : "=r" (ret)
+    :  "r" (tmp), "r" (SP_LOCKED), "r" (lock)
     : "memory"
   );
 

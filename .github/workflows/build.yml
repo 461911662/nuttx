@@ -15,14 +15,19 @@ name: Build
 on:
   pull_request:
     paths-ignore:
-      - 'Documentation/**'
-      - 'tools/ci/docker/linux/**'
+      - "AUTHORS"
+      - "CONTRIBUTING.md"
+      - "**/CODEOWNERS"
+      - "Documentation/**"
+      - "tools/ci/docker/linux/**"
+      - "tools/codeowners/*"
   push:
     paths-ignore:
-      - 'Documentation/**'
+      - "AUTHORS"
+      - "CONTRIBUTING.md"
+      - "Documentation/**"
     branches:
-      - master
-      - 'releases/*'
+      - "releases/*"
     tags:
 
 permissions:
@@ -33,7 +38,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
   # Fetch the source from nuttx and nuttx-apps repos
   Fetch-Source:
     runs-on: ubuntu-latest
@@ -87,11 +91,11 @@ jobs:
             esac
           fi
 
-          echo "name=$OS_REF" >> $GITHUB_OUTPUT
+          echo "os_ref=$OS_REF" >> $GITHUB_OUTPUT
           echo "apps_ref=$APPS_REF" >> $GITHUB_OUTPUT
 
       - name: Checkout nuttx repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: apache/nuttx
           ref: ${{ steps.gittargets.outputs.os_ref }}
@@ -101,7 +105,7 @@ jobs:
         run: git -C sources/nuttx fetch --tags
 
       - name: Checkout apps repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: apache/nuttx-apps
           ref: ${{ steps.gittargets.outputs.apps_ref }}
@@ -112,7 +116,7 @@ jobs:
         run: tar zcf sources.tar.gz sources
 
       - name: Archive Source Bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.0
         with:
           name: source-bundle
           path: sources.tar.gz
@@ -125,9 +129,13 @@ jobs:
       os: Linux
       boards: |
         [
-          "arm-01", "other", "risc-v-01", "sim-01", "xtensa-01",
+          "arm-01", "risc-v-01", "sim-01", "xtensa-01", "arm64-01", "x86_64-01", "other",
           "arm-02", "risc-v-02", "sim-02", "xtensa-02",
-          "arm-03", "arm-04", "arm-05", "arm-06", "arm-07", "arm-08", "arm-09", "arm-10", "arm-11", "arm-12", "arm-13"
+          "arm-03", "risc-v-03", "sim-03",
+          "arm-04", "risc-v-04",
+          "arm-05", "risc-v-05",
+          "arm-06", "risc-v-06",
+          "arm-07", "arm-08", "arm-09", "arm-10", "arm-11", "arm-12", "arm-13", "arm-14"
         ]
 
   # Run the selected Linux Builds
@@ -144,9 +152,18 @@ jobs:
         boards: ${{ fromJSON(needs.Linux-Arch.outputs.selected_builds) }}
 
     steps:
+      - name: Show Disk Space
+        run: df -h
+
+      - name: Free Disk Space (Ubuntu)
+        run: |
+          sudo rm -rf /usr/local/lib/android
+
+      - name: After CLEAN-UP Disk Space
+        run: df -h
 
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: source-bundle
           path: .
@@ -155,7 +172,7 @@ jobs:
         run: tar zxf sources.tar.gz
 
       - name: Docker Login
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -167,6 +184,30 @@ jobs:
       - name: Export NuttX Repo SHA
         run: echo "nuttx_sha=`git -C sources/nuttx rev-parse HEAD`" >> $GITHUB_ENV
 
+      - name: Install NTFC
+        uses: ./sources/nuttx/.github/actions/ci-container
+        env:
+          BLOBDIR: /tools/blobs
+        with:
+          run: |
+            # install python venv
+            apt-get update
+            apt-get install -y python3 python3-dev python3-venv
+
+            # get NTFC sources
+            git clone -b release-0.0.1 https://github.com/szafonimateusz-mi/nuttx-ntfc
+            cd /github/workspace/nuttx-ntfc
+
+            # install NTFC with venv
+            python3 -m venv /github/workspace/nuttx-ntfc/venv
+            source /github/workspace/nuttx-ntfc/venv/bin/activate
+            pip3 install .
+            deactivate
+
+            # get NTFC test cases
+            cd external
+            git clone -b release-0.0.1 https://github.com/szafonimateusz-mi/nuttx-testing
+
       - name: Run builds
         uses: ./sources/nuttx/.github/actions/ci-container
         env:
@@ -175,20 +216,78 @@ jobs:
           run: |
             echo "::add-matcher::sources/nuttx/.github/gcc.json"
             export ARTIFACTDIR=`pwd`/buildartifacts
+            export NTFCDIR=/github/workspace/nuttx-ntfc
             git config --global --add safe.directory /github/workspace/sources/nuttx
             git config --global --add safe.directory /github/workspace/sources/apps
             cd sources/nuttx/tools/ci
             if [ "X${{matrix.boards}}" = "Xcodechecker" ]; then
                 ./cibuild.sh -c -A -N -R --codechecker testlist/${{matrix.boards}}.dat
             else
+                ( sleep 7200 ; echo Killing pytest after timeout... ; pkill -f pytest )&
                 ./cibuild.sh -c -A -N -R -S testlist/${{matrix.boards}}.dat
             fi
 
-      - uses: actions/upload-artifact@v4
+      - name: Run host_info sanity check
+        uses: ./sources/nuttx/.github/actions/ci-container
+        with:
+          run: |
+            cd sources/nuttx
+            make host_info
+
+      - name: Post-build Disk Space
+        if: always()
+        run: df -h
+
+      - uses: actions/upload-artifact@v7.0.0
         if: ${{ always() }}
         with:
           name: linux-${{matrix.boards}}-builds
           path: buildartifacts/
+        continue-on-error: true
+
+  # Test the out-of-tree build
+  OOT-Build:
+    needs: Linux
+    runs-on: ubuntu-latest
+    env:
+      DOCKER_BUILDKIT: 1
+    steps:
+      - name: Download Source Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: source-bundle
+          path: .
+
+      - name: Extract sources
+        run: tar zxf sources.tar.gz
+
+      - name: Docker Login
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export NuttX Repo SHA
+        run: echo "nuttx_sha=`git -C sources/nuttx rev-parse HEAD`" >> $GITHUB_ENV
+
+      - name: Run Out-of-Tree Build Test
+        uses: ./sources/nuttx/.github/actions/ci-container
+        env:
+          BLOBDIR: /tools/blobs
+        with:
+          run: |
+            echo "::add-matcher::sources/nuttx/.github/gcc.json"
+            git config --global --add safe.directory /github/workspace/sources/nuttx
+            git config --global --add safe.directory /github/workspace/sources/apps
+            cd sources/nuttx
+            ./tools/ci/cibuild-oot.sh
+
+      - uses: actions/upload-artifact@v7.0.0
+        if: ${{ always() }}
+        with:
+          name: oot-build-artifacts
+          path: sources/apps/testing/cxx-oot-build
         continue-on-error: true
 
   # Select the macOS Builds based on PR Arch Label
@@ -196,15 +295,15 @@ jobs:
     uses: apache/nuttx/.github/workflows/arch.yml@master
     needs: Fetch-Source
     with:
-      os: Linux
+      os: macOS
       boards: |
-        ["macos", "sim-01", "sim-02"]
+        ["macos", "sim-01", "sim-02", "sim-03"]
 
   # Run the selected macOS Builds
   macOS:
     permissions:
       contents: none
-    runs-on: macos-13
+    runs-on: macos-15-intel
     needs: macOS-Arch
     if: ${{ needs.macOS-Arch.outputs.skip_all_builds != '1' }}
     strategy:
@@ -213,7 +312,7 @@ jobs:
         boards: ${{ fromJSON(needs.macOS-Arch.outputs.selected_builds) }}
     steps:
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: source-bundle
           path: .
@@ -223,7 +322,7 @@ jobs:
 
       - name: Restore Tools Cache
         id: cache-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         env:
           cache-name: ${{ runner.os }}-cache-tools
         with:
@@ -235,9 +334,9 @@ jobs:
 
       # Released version of Cython has issues with Python 11. Set runner to use Python 3.10
       # https://github.com/cython/cython/issues/4500
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.10"
       - name: Run Builds
         run: |
           echo "::add-matcher::sources/nuttx/.github/gcc.json"
@@ -245,7 +344,7 @@ jobs:
           cd sources/nuttx/tools/ci
           ./cibuild.sh -i -c -A -R testlist/${{matrix.boards}}.dat
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.0
         with:
           name: macos-${{matrix.boards}}-builds
           path: buildartifacts/
@@ -256,7 +355,7 @@ jobs:
     uses: apache/nuttx/.github/workflows/arch.yml@master
     needs: Fetch-Source
     with:
-      os: Linux
+      os: msys2
       boards: |
         ["msys2"]
 
@@ -275,11 +374,12 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MSYS
           update: false
+          cache: false
           install: >-
             base-devel
             gcc
@@ -295,8 +395,9 @@ jobs:
             zlib-devel
             cmake
             ninja
-            python-pip 
+            python-pip
             vim
+            genromfs
 
       - name: pip3 install
         run: |
@@ -306,7 +407,7 @@ jobs:
       - run: git config --global core.autocrlf false
 
       - name: Download Source Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: source-bundle
           path: .
@@ -326,8 +427,60 @@ jobs:
           cd sources/nuttx/tools/ci
           ./cibuild.sh -g -i -A -C -N -R testlist/${{matrix.boards}}.dat
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.0
         with:
           name: msys2-${{matrix.boards}}-builds
           path: buildartifacts/
+        continue-on-error: true
+
+  # Select the msvc Builds based on PR Arch Label
+  msvc-Arch:
+    uses: apache/nuttx/.github/workflows/arch.yml@master
+    needs: Fetch-Source
+    with:
+      os: msvc
+      boards: |
+        ["msvc_placeholder_with_sim_keyword"]
+
+  # Build with MSVC in Windows native
+  msvc:
+    needs: msvc-Arch
+    if: ${{ needs.msvc-Arch.outputs.skip_all_builds != '1' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      # Set up Python environment and install kconfiglib
+      - name: Set up Python and install kconfiglib
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+      - name: Install kconfiglib
+        run: |
+          pip install kconfiglib
+
+      - run: git config --global core.autocrlf false
+
+      - name: Download Source Artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: source-bundle
+          path: .
+
+      - name: Extract sources
+        run: |
+          7z x sources.tar.gz -y
+          7z x sources.tar -y -snld
+
+      - name: Run Builds
+        run: |
+          "ARTIFACTDIR=${{github.workspace}}\sources\buildartifacts" >> $env:GITHUB_ENV
+          git config --global --add safe.directory ${{github.workspace}}\sources\nuttx
+          git config --global --add safe.directory ${{github.workspace}}\sources\apps
+          cd sources\nuttx\tools\ci
+          .\cibuild.ps1 -n -i -A -C -N testlist\windows.dat
+
+      - uses: actions/upload-artifact@v7.0.0
+        with:
+          name: msvc-builds
+          path: ./sources/buildartifacts/
         continue-on-error: true

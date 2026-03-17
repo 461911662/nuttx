@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/stm32/stm32g4xxxx_rcc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.  The
@@ -89,11 +91,16 @@
 
 #include <nuttx/config.h>
 
+#include <assert.h>
+
 #include "hardware/stm32g4xxxx_pwr.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+static_assert(CONFIG_BOARD_LOOPSPERMSEC != -1,
+              "Configure BOARD_LOOPSPERMSEC to non-default value.");
 
 #if (STM32_SYSCLK_SW == RCC_CFGR_SW_HSE)
 #  define USE_HSE
@@ -700,7 +707,7 @@ static inline bool stm32_rcc_enablepll(void)
   /* Preserve reserved bits when altering the PLLCFGR register */
 
   regval = getreg32(STM32_RCC_PLLCFGR);
-  regval &= ~(RCC_PLLCFGR_RESERVED_MASK);
+  regval &= RCC_PLLCFGR_RESERVED_MASK;
 
   /* Configure PLL source and enables */
 
@@ -751,6 +758,7 @@ static inline bool stm32_rcc_enablepll(void)
  * Pre-conditions:
  *   rcc_reset() and rcc_resetbkp() have been called and the HSI is
  *   the MCU's SYSCLK.
+ *
  ****************************************************************************/
 
 static void stm32_stdclockconfig(void)
@@ -952,6 +960,33 @@ static void stm32_stdclockconfig(void)
   regval &= ~(RCC_CFGR_PPRE1_MASK | RCC_CFGR_PPRE2_MASK);
   regval |= (STM32_RCC_CFGR_PPRE1 | STM32_RCC_CFGR_PPRE2);
   putreg32(regval, STM32_RCC_CFGR);
+
+  /* Configure I2C source clock
+   *
+   * TODO:
+   * - Set to HSI16 by default, make Kconfig option
+   */
+
+#if defined(CONFIG_STM32_I2C1)
+  regval = getreg32(STM32_RCC_CCIPR);
+  regval &= ~RCC_CCIPR_I2C1SEL_MASK;
+  regval |= RCC_CCIPR_I2C1SEL_HSI16;
+  putreg32(regval, STM32_RCC_CCIPR);
+#endif
+
+#if defined(CONFIG_STM32_I2C2)
+  regval = getreg32(STM32_RCC_CCIPR);
+  regval &= ~RCC_CCIPR_I2C2SEL_MASK;
+  regval |= RCC_CCIPR_I2C2SEL_HSI16;
+  putreg32(regval, STM32_RCC_CCIPR);
+#endif
+
+#if defined(CONFIG_STM32_I2C3)
+  regval = getreg32(STM32_RCC_CCIPR);
+  regval &= ~RCC_CCIPR_I2C3SEL_MASK;
+  regval |= RCC_CCIPR_I2C3SEL_HSI16;
+  putreg32(regval, STM32_RCC_CCIPR);
+#endif
 
   /* Configure FDCAN source clock */
 

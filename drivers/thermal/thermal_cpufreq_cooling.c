@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/thermal/thermal_cpufreq_cooling.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -205,7 +207,7 @@ FAR struct thermal_cooling_device_s *thermal_cpufreq_cooling_register(void)
  *   Unregister cpufreq cooling device
  *
  * Input Parameters:
- *   cdev - Addr of cpufre cooling devcie entry
+ *   cdev - Addr of cpufre cooling device entry
  *
  * Returned Value:
  *   None

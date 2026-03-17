@@ -110,10 +110,10 @@
  * remaining: number of bytes remaining in attribute stream
  */
 
-#define nla_ok(nla, remaining)        \
-  ((remaining) >= sizeof(*(nla)) &&   \
-  (nla)->nla_len >= sizeof(*(nla)) && \
-  (nla)->nla_len <= (remaining))
+#define nla_ok(nla, remaining)         \
+  ((remaining) >= sizeof(*(nla)) &&    \
+   (nla)->nla_len >= sizeof(*(nla)) && \
+   (nla)->nla_len <= (remaining))
 
 /* nlmsg_msg_size - length of netlink message not including padding
  * payload: length of message payload
@@ -301,17 +301,6 @@ extern "C"
 EXTERN const struct sock_intf_s g_netlink_sockif;
 
 /****************************************************************************
- * Name: netlink_initialize()
- *
- * Description:
- *   Initialize the NetLink connection structures.  Called once and only
- *   from the networking layer.
- *
- ****************************************************************************/
-
-void netlink_initialize(void);
-
-/****************************************************************************
  * Name: netlink_alloc()
  *
  * Description:
@@ -385,7 +374,7 @@ int netlink_notifier_setup(worker_t worker, FAR struct netlink_conn_s *conn,
  *
  ****************************************************************************/
 
-void netlink_notifier_teardown(FAR struct netlink_conn_s *conn);
+void netlink_notifier_teardown(FAR void *conn);
 
 /****************************************************************************
  * Name: netlink_notifier_signal
@@ -641,6 +630,26 @@ void netlink_conntrack_notify(uint8_t type, uint8_t domain,
                               FAR const void *nat_entry);
 
 #endif /* CONFIG_NETLINK_NETFILTER */
+
+/****************************************************************************
+ * Name: netlink_lock
+ *
+ * Description:
+ *   Take the global netlink lock
+ *
+ ****************************************************************************/
+
+void netlink_lock(void);
+
+/****************************************************************************
+ * Name: netlink_unlock
+ *
+ * Description:
+ *   Release the global netlink lock
+ *
+ ****************************************************************************/
+
+void netlink_unlock(void);
 
 #undef EXTERN
 #ifdef __cplusplus

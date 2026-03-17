@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_check_capability.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -56,9 +58,9 @@
 
 void x86_64_check_and_enable_capability(void)
 {
-  unsigned long ebx;
-  unsigned long ecx;
-  unsigned long require = 0;
+  uint32_t ebx;
+  uint32_t ecx;
+  uint32_t require = 0;
 
   /* Check SSE3 instructions availability */
 
@@ -66,7 +68,7 @@ void x86_64_check_and_enable_capability(void)
   require |= X86_64_CPUID_01_SSE3;
 #endif
 
-  /* Check Suplement SSE3 instructions availability */
+  /* Check Supplement SSE3 instructions availability */
 
 #ifdef CONFIG_ARCH_X86_64_SSEE3
   require |= X86_64_CPUID_01_SSEE3;

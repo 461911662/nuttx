@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-a/arm_gicv2m.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@
 
 #include <errno.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/bits.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/pci/pci.h>
@@ -54,7 +57,7 @@ struct gic_v2m_s
 
 static struct gic_v2m_s g_v2m =
 {
-  SP_LOCKED
+  SP_UNLOCKED
 };
 
 /****************************************************************************
@@ -115,7 +118,7 @@ int up_alloc_irq_msi(uint8_t busno, uint32_t devfn, int *pirq, int num)
   irq = g_v2m.spi_start + offset;
   for (i = 0; i < num; i++)
     {
-      arm_gic_irq_trigger(i + irq, true);
+      up_set_irq_type(i + irq, IRQ_RISING_EDGE);
       pirq[i] = i + irq;
     }
 

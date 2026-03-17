@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/clk/clk.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,7 +44,7 @@
 #define CLK_PROCFS_LINELEN                  80
 
 /****************************************************************************
- * Private Datas
+ * Private Data
  ****************************************************************************/
 
 static rmutex_t g_clk_list_lock = NXRMUTEX_INITIALIZER;
@@ -1337,8 +1339,9 @@ FAR struct clk_s *clk_register(FAR const char *name,
       return clk;
     }
 
-out:
   clk_list_unlock(irqflags);
+
+out:
   if (clk->parents)
     {
       kmm_free(clk->parents);

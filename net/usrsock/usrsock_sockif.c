@@ -102,9 +102,10 @@ static int usrsock_sockif_setup(FAR struct socket *psock)
 {
   int ret;
 
-  if (psock->s_domain != PF_INET && psock->s_domain != PF_INET6)
+  if (psock->s_domain != PF_INET && psock->s_domain != PF_INET6 &&
+      psock->s_domain != PF_NETLINK)
     {
-      return -ENOTSUP; /* Only ipv4 and ipv6 support the offload */
+      return -ENOTSUP; /* Only ipv4, ipv6 and netlink support the offload */
     };
 
   /* Let the user socket logic handle the setup...
@@ -137,7 +138,7 @@ static int usrsock_sockif_setup(FAR struct socket *psock)
  *           queried.
  *
  * Returned Value:
- *   The non-negative set of socket cababilities is returned.
+ *   The non-negative set of socket capabilities is returned.
  *
  ****************************************************************************/
 

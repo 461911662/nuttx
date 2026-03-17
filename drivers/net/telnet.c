@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/net/telnet.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -941,7 +943,7 @@ static int telnet_session(FAR struct telnet_session_s *session)
     }
 
   ret = psock_dup2(psock, &priv->td_psock);
-  fs_putfilep(filep);
+  file_put(filep);
   if (ret < 0)
     {
       nerr("ERROR: psock_dup2 failed: %d\n", ret);

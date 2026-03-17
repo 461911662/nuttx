@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/nuttsbi/sbi_mscratch.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -37,7 +39,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define STACK_SIZE  (STACK_ALIGN_DOWN(MMODE_IRQSTACK))
+#define STACK_SIZE  (STACKFRAME_ALIGN_DOWN(MMODE_IRQSTACK))
 
 /****************************************************************************
  * Public Data
@@ -81,5 +83,5 @@ void sbi_mscratch_assign(uintptr_t hartid)
 
   /* Make sure mscratch is updated before continuing */
 
-  __MB();
+  UP_DSB();
 }

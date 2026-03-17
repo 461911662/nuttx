@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/usbdev/cdcncm.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -717,7 +719,7 @@ static ssize_t cdcmbim_write(FAR struct file *filep, FAR const char *buffer,
   if (ret < 0)
     {
       iob_free_chain(iob);
-      uerr("CDCMBIM copyin failed: %d\n", ret);
+      uerr("CDCMBIM copying failed: %d\n", ret);
       goto errout;
     }
 
@@ -1073,7 +1075,7 @@ static void cdcncm_receive(FAR struct cdcncm_driver_s *self)
       if ((ndplen < opts->ndpsize + 2 * (opts->dgramitemlen * 2)) ||
           (ndplen % opts->ndpalign != 0))
         {
-          uerr("Bad NDP length: %x\n", ndplen);
+          uerr("Bad NDP length: %04" PRIx32 " \n", ndplen);
           return;
         }
 
@@ -1784,7 +1786,7 @@ static int cdcncm_setinterface(FAR struct cdcncm_driver_s *self,
     }
   else
     {
-      uerr("invailid interface %d\n", interface);
+      uerr("invalid interface %d\n", interface);
       return -EINVAL;
     }
 
@@ -2017,7 +2019,9 @@ static int cdcncm_mkepdesc(int epidx, FAR struct usb_epdesc_s *epdesc,
   int len = sizeof(struct usb_epdesc_s);
 
 #ifdef CONFIG_USBDEV_SUPERSPEED
-  if (speed == USB_SPEED_SUPER || speed == USB_SPEED_SUPER_PLUS)
+  if (speed == USB_SPEED_SUPER ||
+      speed == USB_SPEED_SUPER_PLUS ||
+      speed == USB_SPEED_UNKNOWN)
     {
       /* Maximum packet size (super speed) */
 
@@ -2111,7 +2115,9 @@ static int16_t cdcnm_mkcfgdesc(FAR uint8_t *desc,
                                FAR struct usbdev_devinfo_s *devinfo,
                                uint8_t speed, uint8_t type, bool isncm)
 {
+#ifndef CONFIG_CDCNCM_COMPOSITE
   FAR struct usb_cfgdesc_s *cfgdesc = NULL;
+#endif
   int16_t len = 0;
   int ret;
 
@@ -2360,11 +2366,13 @@ static int16_t cdcnm_mkcfgdesc(FAR uint8_t *desc,
 
   len += ret;
 
+#ifndef CONFIG_CDCNCM_COMPOSITE
   if (cfgdesc)
     {
       cfgdesc->totallen[0] = LSBYTE(len);
       cfgdesc->totallen[1] = MSBYTE(len);
     }
+#endif
 
   DEBUGASSERT(len <= CDCECM_MXDESCLEN);
   return len;
@@ -2783,7 +2791,7 @@ static int cdcncm_setup(FAR struct usbdevclass_driver_s *driver,
               if (ret < 0)
                 {
                   iob_free_chain(iob);
-                  uerr("CDCMBIM copyin failed: %d\n", ret);
+                  uerr("CDCMBIM copying failed: %d\n", ret);
                   return ret;
                 }
 
@@ -2856,6 +2864,9 @@ static int cdcncm_setup(FAR struct usbdevclass_driver_s *driver,
 static void cdcncm_disconnect(FAR struct usbdevclass_driver_s *driver,
                               FAR struct usbdev_s *dev)
 {
+  FAR struct cdcncm_driver_s *self = (FAR struct cdcncm_driver_s *)driver;
+
+  cdcncm_resetconfig(self);
   uinfo("\n");
 }
 

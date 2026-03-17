@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/espressif/esp_timer.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,6 +33,7 @@
 #include <stdio.h>
 
 #include <nuttx/timers/timer.h>
+#include <nuttx/lib/lib.h>
 
 #include "esp_irq.h"
 #include "esp_timer.h"
@@ -39,12 +42,22 @@
 #include "esp_attr.h"
 #include "hal/timer_hal.h"
 #include "hal/timer_ll.h"
+#include "hal/timer_periph.h"
 #include "periph_ctrl.h"
 #include "soc/clk_tree_defs.h"
+#include "esp_private/esp_clk_tree_common.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define DEFAULT_TIMER_ID 0
+
+#if SOC_PERIPH_CLK_CTRL_SHARED
+#  define TIMER_CLOCK_SRC_ATOMIC() PERIPH_RCC_ATOMIC()
+#else
+#  define TIMER_CLOCK_SRC_ATOMIC()
+#endif
 
 /****************************************************************************
  * Private Types
@@ -59,12 +72,11 @@ struct esp_timer_lowerhalf_s
 {
   const struct timer_ops_s *ops;       /* Lower half operations */
   timer_hal_context_t       hal;       /* HAL context */
-  int                       source;    /* Timer interrupt source */
-  int                       irq;       /* IRQ associated with this Timer */
   tccb_t                    callback;  /* Current user interrupt callback */
   void                     *arg;       /* Argument passed to upper half callback */
   bool                      started;   /* True: Timer has been started */
   void                     *upper;     /* Pointer to timer_upperhalf_s */
+  int                       group_id;  /* Timer group number */
 };
 
 /****************************************************************************
@@ -110,8 +122,7 @@ static const struct timer_ops_s g_timer_ops =
 static struct esp_timer_lowerhalf_s g_timer0_lowerhalf =
 {
   .ops = &g_timer_ops,
-  .source = TG0_T0_LEVEL_INTR_SOURCE,
-  .irq = ESP_IRQ_TG0_T0_LEVEL
+  .group_id = 0
 };
 
 /* TIMER1 lower-half */
@@ -119,8 +130,7 @@ static struct esp_timer_lowerhalf_s g_timer0_lowerhalf =
 static struct esp_timer_lowerhalf_s g_timer1_lowerhalf =
 {
   .ops = &g_timer_ops,
-  .source = TG1_T0_LEVEL_INTR_SOURCE,
-  .irq = ESP_IRQ_TG1_T0_LEVEL
+  .group_id = 1
 };
 
 /****************************************************************************
@@ -148,6 +158,7 @@ static int esp_timer_start(struct timer_lowerhalf_s *lower)
   struct esp_timer_lowerhalf_s *priv = (struct esp_timer_lowerhalf_s *)lower;
   uint32_t counter_src_hz = 0;
   uint32_t prescale;
+  int ret = OK;
 
   DEBUGASSERT(priv != NULL);
 
@@ -168,16 +179,30 @@ static int esp_timer_start(struct timer_lowerhalf_s *lower)
 
   /* Configure clock source */
 
-  timer_ll_set_clock_source(hal->dev, hal->timer_id,
-                            GPTIMER_CLK_SRC_DEFAULT);
+  ret = esp_clk_tree_enable_src((soc_module_clk_t)GPTIMER_CLK_SRC_DEFAULT,
+                                true);
+  if (ret != ESP_OK)
+    {
+      return -EINVAL;
+    }
+
+  TIMER_CLOCK_SRC_ATOMIC()
+    {
+      timer_ll_set_clock_source(priv->group_id, hal->timer_id,
+                                GPTIMER_CLK_SRC_DEFAULT);
+
+      /* Enable timer group module clock */
+
+      timer_ll_enable_clock(priv->group_id, hal->timer_id, true);
+    }
 
   /* Calculate the suitable prescaler according to the current APB
    * frequency to generate a period of 1 us.
    */
 
   esp_clk_tree_src_get_freq_hz((soc_module_clk_t)GPTIMER_CLK_SRC_DEFAULT,
-                           ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED,
-                           &counter_src_hz);
+                               ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED,
+                               &counter_src_hz);
   prescale = counter_src_hz / USEC_PER_SEC;
 
   /* Configure TIMER prescaler */
@@ -299,7 +324,12 @@ static int esp_timer_getstatus(struct timer_lowerhalf_s *lower,
     {
       /* TIMER is running */
 
+      current_counter_value = timer_hal_capture_and_get_counter_value(hal);
       status->flags |= TCFLAGS_ACTIVE;
+    }
+  else
+    {
+      current_counter_value = 0;
     }
 
   if (priv->callback != NULL)
@@ -310,10 +340,6 @@ static int esp_timer_getstatus(struct timer_lowerhalf_s *lower,
 
       status->flags |= TCFLAGS_HANDLER;
     }
-
-  /* Get the current counter value */
-
-  current_counter_value = timer_hal_capture_and_get_counter_value(hal);
 
   /* Get the current configured timeout */
 
@@ -495,9 +521,13 @@ IRAM_ATTR static int esp_timer_isr(int irq, void *context, void *arg)
  *
  * Description:
  *   Initialize a timer device.
+ *   Important: ESP32-C3|C6|H2 each has two timer groups.
+ *   Each group has one timer and one watchdog timer.
+ *   This initialization function is used to initialize the timer 0 of the
+ *   specified group.
  *
  * Input Parameters:
- *   timer_id      - ID of the hardware timer to be initialized.
+ *   group_id      - ID of the hardware timer group to be initialized.
  *
  * Returned Values:
  *   Zero (OK) is returned on success; a negated errno value is returned on
@@ -505,31 +535,26 @@ IRAM_ATTR static int esp_timer_isr(int irq, void *context, void *arg)
  *
  ****************************************************************************/
 
-int esp_timer_initialize(uint32_t timer_id)
+int esp_timer_initialize(int group_id)
 {
   struct esp_timer_lowerhalf_s *lower = NULL;
-  char devpath[PATH_MAX];
-  uint32_t group_num;
-  uint32_t timer_num;
+  int timer_id = DEFAULT_TIMER_ID;
+  char *devpath;
+  shared_periph_module_t periph;
+  int irq;
 
-  switch (timer_id)
+  switch (group_id)
     {
       case 0:
         {
-          periph_module_enable(PERIPH_TIMG0_MODULE);
-          group_num = 0;
-          timer_num = 0;
-
           lower = &g_timer0_lowerhalf;
+          lower->hal.timer_id = timer_id;
         }
         break;
       case 1:
         {
-          periph_module_enable(PERIPH_TIMG1_MODULE);
-          group_num = 1;
-          timer_num = 0;
-
           lower = &g_timer1_lowerhalf;
+          lower->hal.timer_id = timer_id;
         }
         break;
       default:
@@ -539,13 +564,31 @@ int esp_timer_initialize(uint32_t timer_id)
         break;
     }
 
-  snprintf(devpath, sizeof(devpath), "/dev/timer%" PRIu32, timer_id);
+  devpath = lib_get_pathbuffer();
+  if (devpath == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  snprintf(devpath, PATH_MAX, "/dev/timer%" PRIu32, lower->hal.timer_id);
 
   /* Initialize the elements of lower half state structure */
 
   lower->callback = NULL;
   lower->started = false;
-  timer_hal_init(&lower->hal, group_num, timer_num);
+
+  periph = soc_timg_gptimer_signals[group_id][timer_id].parent_module;
+
+  PERIPH_RCC_ACQUIRE_ATOMIC(periph, ref_count)
+    {
+      if (ref_count == 0)
+        {
+          timg_ll_enable_bus_clock(group_id, true);
+          timg_ll_reset_register(group_id);
+        }
+    }
+
+  timer_hal_init(&lower->hal, lower->group_id, lower->hal.timer_id);
 
   /* Register the timer driver as /dev/timerX. If the registration goes
    * right the returned value from timer_register is a pointer to
@@ -562,20 +605,25 @@ int esp_timer_initialize(uint32_t timer_id)
        * indicate the failure (implying the non-unique devpath).
        */
 
+      lib_put_pathbuffer(devpath);
       return -EEXIST;
     }
 
-  esp_setup_irq(lower->source,
+  lib_put_pathbuffer(devpath);
+
+  irq = soc_timg_gptimer_signals[group_id][timer_id].irq_id;
+
+  esp_setup_irq(irq,
                 ESP_IRQ_PRIORITY_DEFAULT,
-                ESP_IRQ_TRIGGER_LEVEL);
-
-  /* Attach the handler for the timer IRQ */
-
-  irq_attach(lower->irq, (xcpt_t)esp_timer_isr, lower);
+                ESP_IRQ_TRIGGER_LEVEL,
+                esp_timer_isr,
+                lower);
 
   /* Enable the allocated CPU interrupt */
 
-  up_enable_irq(lower->irq);
+  up_enable_irq(ESP_SOURCE2IRQ(irq));
 
+  tmrinfo("init timer group %d, timer_id: %ld\n",
+          group_id, lower->hal.timer_id);
   return OK;
 }

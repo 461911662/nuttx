@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/imxrt/imxrt_flexcan.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -265,6 +267,7 @@ struct imxrt_driver_s
   bool bifup;                   /* true:ifup false:ifdown */
   bool canfd_capable;
   int mb_address_offset;
+  spinlock_t lock;
 #ifdef TX_TIMEOUT_WQ
   struct wdog_s txtimeout[TXMBCOUNT]; /* TX timeout timer */
 #endif
@@ -710,9 +713,9 @@ static int imxrt_transmit(struct imxrt_driver_s *priv)
   mb->cs = cs; /* Go. */
 
   /* Errata ER005829 step 8: Write twice into the first TX MB
-   * Errata mentions writng 0x8 value, but this one couses
+   * Errata mentions writing 0x8 value, but this one causes
    * the ESR2_LPTM register to choose the reserved MB for
-   * transmiting the package, hence we write 0x3
+   * transmitting the package, hence we write 0x3.
    */
 
   struct mb_s *buffer = flexcan_get_mb(priv, RXMBCOUNT);
@@ -775,7 +778,7 @@ static int imxrt_txpoll(struct net_driver_s *dev)
    * the field d_len is set to a value > 0.
    */
 
-  flags = spin_lock_irqsave(NULL);
+  flags = spin_lock_irqsave(&priv->lock);
 
   if (priv->dev.d_len > 0)
     {
@@ -791,12 +794,12 @@ static int imxrt_txpoll(struct net_driver_s *dev)
 
       if (imxrt_txringfull(priv))
         {
-          spin_unlock_irqrestore(NULL, flags);
+          spin_unlock_irqrestore(&priv->lock, flags);
           return -EBUSY;
         }
     }
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
 
   /* If zero is returned, the polling will continue until all connections
    * have been examined.
@@ -1368,6 +1371,8 @@ static int imxrt_ifup(struct net_driver_s *dev)
 
   up_enable_irq(priv->config->irq);
 
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1395,6 +1400,9 @@ static int imxrt_ifdown(struct net_driver_s *dev)
   imxrt_reset(priv);
 
   priv->bifup = false;
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -1514,11 +1522,11 @@ static int imxrt_ioctl(struct net_driver_s *dev, int cmd,
         {
           struct can_ioctl_data_s *req =
               (struct can_ioctl_data_s *)((uintptr_t)arg);
-          req->arbi_bitrate = priv->arbi_timing.bitrate / 1000; /* kbit/s */
+          req->arbi_bitrate = priv->arbi_timing.bitrate;
           req->arbi_samplep = priv->arbi_timing.samplep;
           if (priv->canfd_capable)
             {
-              req->data_bitrate = priv->data_timing.bitrate / 1000; /* kbit/s */
+              req->data_bitrate = priv->data_timing.bitrate;
               req->data_samplep = priv->data_timing.samplep;
             }
           else
@@ -1537,7 +1545,7 @@ static int imxrt_ioctl(struct net_driver_s *dev, int cmd,
               (struct can_ioctl_data_s *)((uintptr_t)arg);
 
           struct flexcan_timeseg arbi_timing;
-          arbi_timing.bitrate = req->arbi_bitrate * 1000;
+          arbi_timing.bitrate = req->arbi_bitrate;
           arbi_timing.samplep = req->arbi_samplep;
 
           if (imxrt_bitratetotimeseg(&arbi_timing, 10, 0))
@@ -1551,7 +1559,7 @@ static int imxrt_ioctl(struct net_driver_s *dev, int cmd,
 
           if (priv->canfd_capable)
           {
-            data_timing.bitrate = req->data_bitrate * 1000;
+            data_timing.bitrate = req->data_bitrate;
             data_timing.samplep = req->data_samplep;
 
             if (ret == OK && imxrt_bitratetotimeseg(&data_timing, 10, 1))
@@ -1566,15 +1574,13 @@ static int imxrt_ioctl(struct net_driver_s *dev, int cmd,
 
           if (ret == OK)
             {
-              /* Reset CAN controller and start with new timings */
+              /* Apply the new timings (interface is guaranteed to be down) */
 
               priv->arbi_timing = arbi_timing;
               if (priv->canfd_capable)
               {
                 priv->data_timing = data_timing;
               }
-
-              imxrt_ifup(dev);
             }
         }
         break;
@@ -1749,9 +1755,9 @@ static int imxrt_initialize(struct imxrt_driver_s *priv)
     }
 
   /*  Errata ER005829 step 7: Reserve first TX MB
-   *  Errata mentions writng 0x8 value, but this one couses
+   *  Errata mentions writing 0x8 value, but this one causes
    *  the ESR2_LPTM register to choose the reserved MB for
-   *  transmiting the package, hence we write 0x3
+   *  transmitting the package, hence we write 0x3.
    */
 
       struct mb_s *buffer = flexcan_get_mb(priv, RXMBCOUNT);
@@ -2030,6 +2036,7 @@ int imxrt_caninitialize(int intf)
   priv->dev.d_ioctl   = imxrt_ioctl;     /* Support CAN ioctl() calls */
 #endif
   priv->dev.d_private = (void *)priv;      /* Used to recover private state from dev */
+  spin_lock_init(&priv->lock);
 
   /* Put the interface in the down state.  This usually amounts to resetting
    * the device and/or calling imxrt_ifdown().

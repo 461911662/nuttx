@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/tricore/src/common/tricore_allocateheap.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -66,6 +68,6 @@
 
 void up_allocate_heap(void **heap_start, size_t *heap_size)
 {
-  *heap_start = _edata;
-  *heap_size = (size_t)((uintptr_t)_eheap - (uintptr_t)_edata);
+  *heap_start = _sheap;
+  *heap_size = (size_t)((uintptr_t)_eheap - (uintptr_t)_sheap);
 }

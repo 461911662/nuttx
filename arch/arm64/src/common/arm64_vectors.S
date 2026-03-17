@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_vectors.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,19 +40,6 @@
     .file    "arm64_vectors.S"
 
 /****************************************************************************
- * Assembly Macros
- ****************************************************************************/
-
-.macro arm64_exception_context_save xreg0, xreg1 xfp
-
-    /* Save the current task's SP_EL0 and exception depth */
-    mrs    \xreg0, sp_el0
-    mrs    \xreg1, tpidrro_el0
-    stp    \xreg0, \xreg1, [\xfp, #8 * REG_SP_EL0]
-
-.endm
-
-/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -59,7 +48,7 @@
  *
  * Description:
  *   Take a snapshot of the thread GP registers context
- *   x0 --- pointer to struct regs_context
+ *   x0 --- pointer to stack context
  *
  ****************************************************************************/
 GTEXT(up_saveusercontext)
@@ -95,7 +84,10 @@ SECTION_FUNC(text, up_saveusercontext)
 #endif
     stp    x4,  x5,  [x0, #8 * REG_ELR]
 
-    arm64_exception_context_save x4 x5 x0
+#ifdef CONFIG_ARM64_MTE
+    mrs    x4,  sctlr_el1
+    str    x4,  [x0, #8 * REG_SCTLR_EL1]
+#endif
 
     ret
 
@@ -115,19 +107,26 @@ SECTION_FUNC(text, up_saveusercontext)
  *
  ****************************************************************************/
 
-#ifndef CONFIG_BUILD_FLAT
+#if defined(CONFIG_BUILD_KERNEL) || defined(CONFIG_BUILD_PROTECTED)
 GTEXT(arm64_jump_to_user)
 SECTION_FUNC(text, arm64_jump_to_user)
     msr daifset, #IRQ_DAIF_MASK
-    mov sp,  x4
+    mov sp,  x5
     str x0,  [sp, #8 * REG_ELR]
     str x1,  [sp, #8 * REG_X0]
     str x2,  [sp, #8 * REG_X1]
-    str x3,  [sp, #8 * REG_SP_EL0]
+    str x3,  [sp, #8 * REG_X2]
+    str x4,  [sp, #8 * REG_SP_EL0]
     mrs x0,  spsr_el1
     and x0,  x0, #~SPSR_MODE_MASK
     #orr x0, x0, #SPSR_MODE_EL0T # EL0T=0x00, out of range for orr
     str x0,  [sp, #8 * REG_SPSR]
+
+#ifdef CONFIG_ARM64_MTE
+    mrs x0,  sctlr_el1
+    str x0,  [sp, #8 * REG_SCTLR_EL1]
+#endif
+
     b arm64_exit_exception
 #endif
 
@@ -156,7 +155,7 @@ SECTION_FUNC(text, arm64_sync_exc)
 
     /* if this is a svc call ?*/
 
-    bne    arm64_fatal_handler
+    bne    2f
 
 #ifdef CONFIG_LIB_SYSCALL
     /* Handle user system calls separately */
@@ -204,6 +203,13 @@ reserved_syscall:
 
     mov    sp, x0
     b      arm64_exit_exception
+2:
+    mov    x0, sp
+    adrp   x5, arm64_fatal_handler
+    add    x5, x5, #:lo12:arm64_fatal_handler
+    blr    x5
+    mov    sp, x0
+    b      arm64_exit_exception
 
 /****************************************************************************
  * Name: arm64_irq_handler
@@ -248,7 +254,9 @@ SECTION_FUNC(text, arm64_irq_handler)
 GTEXT(arm64_serror_handler)
 SECTION_FUNC(text, arm64_serror_handler)
     mov    x0, sp
-    bl     arm64_fatal_handler
+    adrp   x5, arm64_fatal_handler
+    add    x5, x5, #:lo12:arm64_fatal_handler
+    br     x5
     /* Return here only in case of recoverable error */
 
     b      arm64_exit_exception
@@ -264,7 +272,9 @@ SECTION_FUNC(text, arm64_serror_handler)
 GTEXT(arm64_mode32_handler)
 SECTION_FUNC(text, arm64_mode32_handler)
     mov    x0, sp
-    bl     arm64_fatal_handler
+    adrp   x5, arm64_fatal_handler
+    add    x5, x5, #:lo12:arm64_fatal_handler
+    br     x5
     /* Return here only in case of recoverable error */
 
     b      arm64_exit_exception
@@ -282,7 +292,9 @@ SECTION_FUNC(text, arm64_fiq_handler)
 #ifndef CONFIG_ARM64_DECODEFIQ
 
     mov    x0, sp
-    bl     arm64_fatal_handler
+    adrp   x5, arm64_fatal_handler
+    add    x5, x5, #:lo12:arm64_fatal_handler
+    br     x5
 
     /* Return here only in case of recoverable error */
 
@@ -305,7 +317,7 @@ SECTION_FUNC(text, arm64_fiq_handler)
      * with interrupts disabled
      */
 
-    bl     arm64_decodeirq
+    bl     arm64_decodefiq
 
     mov    sp, x0
     b      arm64_exit_exception

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_eventfd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -253,6 +255,8 @@ static int eventfd_blocking_io(FAR struct eventfd_priv_s *dev,
                   cur_sem->next = sem->next;
                   break;
                 }
+
+              cur_sem = cur_sem->next;
             }
         }
 
@@ -526,8 +530,8 @@ int eventfd(unsigned int count, int flags)
     }
 
   new_dev->counter = count;
-  new_fd = file_allocate(&g_eventfd_inode, O_RDWR | flags,
-                         0, new_dev, 0, true);
+  new_fd = file_allocate_from_inode(&g_eventfd_inode, O_RDWR | flags,
+                                    0, new_dev, 0);
   if (new_fd < 0)
     {
       ret = new_fd;

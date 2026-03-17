@@ -29,6 +29,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
+#include <nuttx/streams.h>
 
 #ifdef CONFIG_ARCH_DEBUG_H
 #  include <arch/debug.h>
@@ -1012,6 +1013,24 @@
 #  define rpmsginfo     _none
 #endif
 
+#ifdef CONFIG_DEBUG_RPTUN_ERROR
+#  define rptunerr     _err
+#else
+#  define rptunerr     _none
+#endif
+
+#ifdef CONFIG_DEBUG_RPTUN_WARN
+#  define rptunwarn    _warn
+#else
+#  define rptunwarn    _none
+#endif
+
+#ifdef CONFIG_DEBUG_RPTUN_INFO
+#  define rptuninfo    _info
+#else
+#  define rptuninfo    _none
+#endif
+
 #ifdef CONFIG_DEBUG_CORESIGHT_ERROR
 #  define cserr       _err
 #else
@@ -1028,6 +1047,24 @@
 #  define csinfo     _info
 #else
 #  define csinfo     _none
+#endif
+
+#ifdef CONFIG_DEBUG_PTP_ERROR
+#  define ptperr     _err
+#else
+#  define ptperr     _none
+#endif
+
+#ifdef CONFIG_DEBUG_PTP_WARN
+#  define ptpwarn    _warn
+#else
+#  define ptpwarn    _none
+#endif
+
+#ifdef CONFIG_DEBUG_PTP_INFO
+#  define ptpinfo    _info
+#else
+#  define ptpinfo    _none
 #endif
 
 /* Buffer dumping macros do not depend on varargs */
@@ -1317,6 +1354,26 @@
 #  define reseterrdumpbuffer(m,b,n)
 #  define resetinfodumpbuffer(m,b,n)
 #endif
+
+/****************************************************************************
+ * Name: lowsyslog
+ *
+ * Description:
+ *   lowsyslog() is used for output debug information at early boot-stage.
+ *
+ *   The NuttX implementation does not support any special formatting
+ *   characters beyond those supported by printf.
+ *
+ ****************************************************************************/
+
+#define lowsyslog(...) \
+  do \
+    { \
+       struct lib_outstream_s stream; \
+       lib_lowoutstream(&stream); \
+       lib_sprintf(&stream, __VA_ARGS__); \
+    } \
+  while (0)
 
 /****************************************************************************
  * Public Function Prototypes

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/v9fs/virtio_9p.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,6 +27,7 @@
 #include <debug.h>
 #include <errno.h>
 
+#include <nuttx/nuttx.h>
 #include <nuttx/spinlock.h>
 #include <nuttx/virtio/virtio.h>
 
@@ -124,6 +127,13 @@ static int virtio_9p_create(FAR struct v9fs_transport_s **transport,
   priv->transport.ops = &g_virtio_9p_transport_ops;
   *transport = &priv->transport;
   ret = virtio_register_driver(&priv->vdrv);
+  if (priv->vdev == NULL)
+    {
+      /* No corresponding driver was found, we should return an error */
+
+      ret = -ENODEV;
+    }
+
   if (ret < 0)
     {
       fs_heap_free(priv);
@@ -221,7 +231,7 @@ static int virtio_9p_probe(FAR struct virtio_device *vdev)
   int ret;
 
   virtio_set_status(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
-  virtio_negotiate_features(vdev, 1 << VIRTIO_9P_MOUNT_TAG);
+  virtio_negotiate_features(vdev, 1 << VIRTIO_9P_MOUNT_TAG, NULL);
   virtio_set_status(vdev, VIRTIO_CONFIG_FEATURES_OK);
 
   if (!virtio_has_feature(vdev, VIRTIO_9P_MOUNT_TAG))
@@ -232,8 +242,8 @@ static int virtio_9p_probe(FAR struct virtio_device *vdev)
 
   virtio_read_config_member(vdev, struct virtio_9p_config_s, tag_len,
                             &config.tag_len);
-  virtio_read_config(vdev, offsetof(struct virtio_9p_config_s, tag),
-                     &config.tag, config.tag_len);
+  virtio_read_config_bytes(vdev, offsetof(struct virtio_9p_config_s, tag),
+                           &config.tag, config.tag_len);
   config.tag[config.tag_len] = '\0';
   if (strcmp(config.tag, priv->tag))
     {
@@ -243,7 +253,7 @@ static int virtio_9p_probe(FAR struct virtio_device *vdev)
 
   vqname[0] = "virtio_9p_vq";
   callback[0] = virtio_9p_done;
-  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback);
+  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/fs_initialize.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,11 +28,10 @@
 #include <nuttx/reboot_notifier.h>
 #include <nuttx/trace.h>
 
-#include "notify/notify.h"
 #include "rpmsgfs/rpmsgfs.h"
 #include "inode/inode.h"
 #include "aio/aio.h"
-#include "vfs/lock.h"
+#include "vfs/vfs.h"
 #include "fs_heap.h"
 
 /****************************************************************************

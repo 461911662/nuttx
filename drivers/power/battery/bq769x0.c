@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/power/battery/bq769x0.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1620,7 +1622,7 @@ static int bq769x0_getcurrent(FAR struct bq769x0_dev_s *priv,
 
       /* Sample is not complete, wait and try again */
 
-      nxsig_usleep(BQ769X0_CC_POLL_INTERVAL * USEC_PER_MSEC);
+      nxsched_usleep(BQ769X0_CC_POLL_INTERVAL * USEC_PER_MSEC);
     }
 
   /* CC value didn't become available in the expected amount of time */

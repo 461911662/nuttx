@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_cpustart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -74,6 +76,8 @@ uint64_t *const g_cpu_int_stacktop[CONFIG_SMP_NCPUS] =
 #endif /* CONFIG_SMP_NCPUS > 1 */
 };
 
+uint32_t g_smp_busy_wait_flag;
+
 #ifdef CONFIG_ARM64_DECODEFIQ
 uint64_t *const g_cpu_int_fiq_stacktop[CONFIG_SMP_NCPUS] =
 {
@@ -104,16 +108,9 @@ uint64_t *const g_cpu_int_fiq_stacktop[CONFIG_SMP_NCPUS] =
  * Private Functions
  ****************************************************************************/
 
-static inline void local_delay(void)
-{
-  for (volatile int i = 0; i < 1000; i++)
-    {
-    }
-}
-
 static void arm64_smp_init_top(void)
 {
-  struct tcb_s *tcb = this_task();
+  struct tcb_s *tcb = current_task(this_cpu());
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
   /* And finally, enable interrupts */
@@ -127,10 +124,6 @@ static void arm64_smp_init_top(void)
 
   sched_note_cpu_started(tcb);
 #endif
-
-  /* Reset scheduler parameters */
-
-  nxsched_resume_scheduler(tcb);
 
   /* core n, idle n */
 
@@ -161,7 +154,7 @@ static void arm64_start_cpu(int cpu_num)
       return;
     }
 #else
-  SP_SEV();
+  UP_SEV();
 #endif
 }
 
@@ -207,10 +200,10 @@ int up_cpu_start(int cpu)
   sched_note_cpu_start(this_task(), cpu);
 #endif
 
-#ifdef CONFIG_ARM64_SMP_BUSY_WAIT
-  uint32_t *address = (uint32_t *)CONFIG_ARM64_SMP_BUSY_WAIT_FLAG_ADDR;
+#ifdef CONFIG_SMP
+  uint32_t *address = &g_smp_busy_wait_flag;
   *address = 1;
-  up_flush_dcache((uintptr_t)address, sizeof(address));
+  up_flush_dcache((uintptr_t)address, (uintptr_t)address + sizeof(address));
 #endif
 
   arm64_start_cpu(cpu);
@@ -230,9 +223,17 @@ void arm64_boot_secondary_c_routine(void)
   arm64_mmu_init(false);
 #endif
 
+  /* We need to confirm that current_task has been initialized. */
+
+  while (!current_task(this_cpu()));
+
+  /* Init idle task to percpu reg */
+
+  up_update_task(current_task(this_cpu()));
+
   arm64_gic_secondary_init();
 
-  up_perf_init(NULL);
+  arm64_timer_secondary_init();
 
   arm64_smp_init_top();
 }

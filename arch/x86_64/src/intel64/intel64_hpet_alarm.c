@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_hpet_alarm.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,5 +40,10 @@ void up_timer_initialize(void)
   struct oneshot_lowerhalf_s *lower =
     oneshot_initialize(CONFIG_ARCH_INTEL64_HPET_ALARM_CHAN, 10);
   up_alarm_set_lowerhalf(lower);
+}
+
+void intel64_timer_secondary_init(void)
+{
+  /* Secondary CPU initialization is not required. */
 }
 #endif

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/cypress_mbr3108.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -401,7 +403,7 @@ static int mbr3108_save_check_crc(FAR struct mbr3108_dev_s *dev)
       return ret;
     }
 
-  nxsig_usleep(MBR3108_CMD_MSECS_CHECK_CONFIG_CRC * 1000);
+  nxsched_usleep(MBR3108_CMD_MSECS_CHECK_CONFIG_CRC * 1000);
 
   ret = mbr3108_check_cmd_status(dev);
   if (ret != 0)
@@ -425,7 +427,7 @@ static int mbr3108_software_reset(FAR struct mbr3108_dev_s *dev)
       return ret;
     }
 
-  nxsig_usleep(MBR3108_CMD_MSECS_SOFTWARE_RESET * 1000);
+  nxsched_usleep(MBR3108_CMD_MSECS_SOFTWARE_RESET * 1000);
 
   ret = mbr3108_check_cmd_status(dev);
   if (ret != 0)
@@ -470,7 +472,7 @@ static int mbr3108_clear_latched(FAR struct mbr3108_dev_s *dev)
       return ret;
     }
 
-  nxsig_usleep(MBR3108_CMD_MSECS_CLEAR_LATCHED * 1000);
+  nxsched_usleep(MBR3108_CMD_MSECS_CLEAR_LATCHED * 1000);
 
   ret = mbr3108_check_cmd_status(dev);
   if (ret != 0)
@@ -886,7 +888,7 @@ static int mbr3108_open(FAR struct file *filep)
 
       /* Let chip to power up before probing */
 
-      nxsig_usleep(100 * 1000);
+      nxsched_usleep(100 * 1000);
 
       /* Check that device exists on I2C. */
 

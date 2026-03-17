@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/serial/serial_dma.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -353,7 +355,6 @@ void uart_recvchars_done(FAR uart_dev_t *dev)
   if (signo != 0)
     {
       nxsig_kill(dev->pid, signo);
-      uart_reset_sem(dev);
     }
 #endif
 }

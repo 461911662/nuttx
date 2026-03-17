@@ -1,6 +1,7 @@
 /****************************************************************************
  * drivers/sensors/l3gd20_uorb.c
- * Character driver for the ST L3GD20 3-Axis gyroscope.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -32,6 +33,7 @@
 #include <string.h>
 #include <math.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/nuttx.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/wqueue.h>
@@ -43,10 +45,6 @@
 #include <nuttx/sensors/l3gd20.h>
 
 #if defined(CONFIG_SPI) && defined(CONFIG_SENSORS_L3GD20)
-
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
 
 /****************************************************************************
  * Private Types
@@ -82,7 +80,7 @@ static void l3gd20_write_register(FAR struct l3gd20_dev_s *dev,
                                   uint8_t const reg_data);
 static void l3gd20_reset(FAR struct l3gd20_dev_s *dev);
 static void l3gd20_read_measurement_data(FAR struct l3gd20_dev_s *dev,
-                                         FAR struct sensor_gyro *data);
+                                         FAR struct sensor_gyro_uncal *data);
 static void l3gd20_read_gyroscope_data(FAR struct l3gd20_dev_s *dev,
                                        uint16_t *x_gyr, uint16_t *y_gyr,
                                        uint16_t *z_gyr);
@@ -218,7 +216,7 @@ static void l3gd20_reset(FAR struct l3gd20_dev_s *dev)
  ****************************************************************************/
 
 static void l3gd20_read_measurement_data(FAR struct l3gd20_dev_s *dev,
-                                         FAR struct sensor_gyro *data)
+                                         FAR struct sensor_gyro_uncal *data)
 {
   uint16_t x_gyr = 0;
   uint16_t y_gyr = 0;
@@ -382,7 +380,7 @@ static int l3gd20_interrupt_handler(int irq, FAR void *context,
 
 static void l3gd20_worker(FAR void *arg)
 {
-  struct sensor_gyro temp;
+  struct sensor_gyro_uncal temp;
 
   FAR struct l3gd20_dev_s *priv = (FAR struct l3gd20_dev_s *)(arg);
   DEBUGASSERT(priv != NULL);
@@ -394,7 +392,7 @@ static void l3gd20_worker(FAR void *arg)
   /* push data to upper half driver */
 
   priv->lower.push_event(priv->lower.priv, &temp,
-                         sizeof(struct sensor_gyro));
+                         sizeof(struct sensor_gyro_uncal));
 }
 
 #else
@@ -411,16 +409,16 @@ static int l3gd20_fetch(FAR struct sensor_lowerhalf_s *lower,
                                                FAR struct l3gd20_dev_s,
                                                lower);
 
-  if (buflen != sizeof(struct sensor_gyro))
+  if (buflen != sizeof(struct sensor_gyro_uncal))
       return 0;
 
   DEBUGASSERT(priv != NULL);
 
   /* Read out the latest sensor data */
 
-  l3gd20_read_measurement_data(priv, (FAR struct sensor_gyro *)buffer);
+  l3gd20_read_measurement_data(priv, (FAR struct sensor_gyro_uncal *)buffer);
 
-  return sizeof(struct sensor_gyro);
+  return sizeof(struct sensor_gyro_uncal);
 }
 #endif
 
@@ -434,7 +432,7 @@ static int l3gd20_activate(FAR struct sensor_lowerhalf_s *lower,
   FAR struct l3gd20_dev_s *priv = container_of(lower,
                                                FAR struct l3gd20_dev_s,
                                                lower);
-  struct sensor_gyro temp;
+  struct sensor_gyro_uncal temp;
 
 #ifdef CONFIG_DEBUG_SENSORS_INFO
   uint8_t reg_content;
@@ -560,10 +558,9 @@ int l3gd20_register(int devno, FAR struct spi_dev_s *spi,
 #endif
   priv->timestamp        = 0;
 
-  priv->lower.type = SENSOR_TYPE_GYROSCOPE;
+  priv->lower.type = SENSOR_TYPE_GYROSCOPE_UNCALIBRATED;
   priv->lower.nbuffer = CONFIG_SENSORS_L3GD20_BUFFER_SIZE;
   priv->lower.ops = &g_l2gd20_ops;
-  priv->lower.uncalibrated = true;
 
   /* Setup SPI frequency and mode */
 

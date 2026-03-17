@@ -52,14 +52,13 @@
  *   ts - Location to return the time
  *
  * Returned Value:
- *   Current version almost always returns OK. Currently errors are
- *   possible with CONFIG_RTC_HIRES only.
+ *   None
  *
  * Assumptions:
  *
  ****************************************************************************/
 
-int clock_systime_timespec(FAR struct timespec *ts)
+void clock_systime_timespec(FAR struct timespec *ts)
 {
 #ifdef CONFIG_RTC_HIRES
   if (g_rtc_enabled)
@@ -68,25 +67,20 @@ int clock_systime_timespec(FAR struct timespec *ts)
 
       up_rtc_gettime(ts);
 
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_basetime_lock);
       clock_timespec_subtract(ts, &g_basetime, ts);
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_basetime_lock, flags);
     }
   else
     {
       ts->tv_sec = 0;
       ts->tv_nsec = 0;
     }
-#elif defined(CONFIG_SCHED_TICKLESS_TICK_ARGUMENT)
-  clock_t ticks = 0;
-
-  up_timer_gettick(&ticks);
-  clock_ticks2time(ts, ticks);
-#elif defined(CONFIG_SCHED_TICKLESS)
+#elif defined(CONFIG_ALARM_ARCH) || \
+      defined(CONFIG_TIMER_ARCH) || \
+      defined(CONFIG_SCHED_TICKLESS)
   up_timer_gettime(ts);
 #else
-  clock_ticks2time(ts, g_system_ticks);
+  clock_ticks2time(ts, clock_get_sched_ticks());
 #endif
-  return 0;
 }
-

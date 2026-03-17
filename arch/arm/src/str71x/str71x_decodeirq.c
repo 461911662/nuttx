@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/str71x/str71x_decodeirq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -58,7 +60,9 @@ uint32_t *arm_decodeirq(uint32_t *regs)
 
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
   board_autoled_on(LED_INIRQ);
-  up_set_current_regs(regs);
+
+  tcb->xcp.regs = regs;
+  up_set_interrupt_context(true);
   err("ERROR: Unexpected IRQ\n");
   PANIC();
   return NULL;
@@ -76,15 +80,12 @@ uint32_t *arm_decodeirq(uint32_t *regs)
 
   if (irq < NR_IRQS)
     {
-      uint32_t *savestate;
+      uint32_t *saveregs;
+      bool savestate;
 
-      /* Current regs non-zero indicates that we are processing an
-       * interrupt; current_regs is also used to manage interrupt level
-       * context switches.
-       */
-
-      savestate = up_current_regs();
-      up_set_current_regs(regs);
+      savestate = up_interrupt_context();
+      saveregs = tcb->xcp.regs;
+      up_set_interrupt_context(true);
       tcb->xcp.regs = regs;
 
       /* Acknowledge the interrupt */
@@ -95,12 +96,10 @@ uint32_t *arm_decodeirq(uint32_t *regs)
 
       irq_dispatch(irq, regs);
 
-      /* Restore the previous value of current_regs.
-       *  NULL would indicate that we are no longer in an interrupt handler.
-       *  It will be non-NULL if we are returning from a nested interrupt.
-       */
+      /* Restore the previous value of saveregs. */
 
-      up_set_current_regs(savestate);
+      up_set_interrupt_context(savestate);
+      tcb->xcp.regs = saveregs;
     }
 #ifdef CONFIG_DEBUG_FEATURES
   else

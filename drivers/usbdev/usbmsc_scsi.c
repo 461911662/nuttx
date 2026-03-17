@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/usbdev/usbmsc_scsi.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -358,9 +360,10 @@ static void usbmsc_putle32(FAR uint8_t *buf, uint32_t val)
  *
  ****************************************************************************/
 
-static int usbmsc_scsi_wait(FAR struct usbmsc_dev_s *priv)
+static int usbmsc_scsi_wait(FAR struct usbmsc_dev_s *priv,
+                            FAR irqstate_t *flags)
 {
-  irqstate_t flags;
+  bool waiting;
   int ret;
   int ret2;
 
@@ -370,13 +373,13 @@ static int usbmsc_scsi_wait(FAR struct usbmsc_dev_s *priv)
 
   /* A flag is used to prevent driving up the semaphore count.  This function
    * is called (primarily) from the SCSI work thread so we must disable
-   * interrupts momentarily to assure that test of the flag and the wait fo
+   * interrupts momentarily to assure that test of the flag and the wait for
    * the semaphore count are atomic.  Interrupts will, of course, be re-
    * enabled while we wait for the event.
    */
 
-  flags = enter_critical_section();
   priv->thwaiting = true;
+  spin_unlock_irqrestore(&priv->spinlock, *flags);
 
   /* Relinquish our lock on the SCSI state data */
 
@@ -387,13 +390,16 @@ static int usbmsc_scsi_wait(FAR struct usbmsc_dev_s *priv)
   do
     {
       ret = nxsem_wait_uninterruptible(&priv->thwaitsem);
+      *flags = spin_lock_irqsave(&priv->spinlock);
+      waiting = priv->thwaiting;
+      spin_unlock_irqrestore(&priv->spinlock, *flags);
     }
-  while (priv->thwaiting && ret >= 0);
+  while (waiting && ret >= 0);
 
   /* Re-acquire our lock on the SCSI state data */
 
   ret2 = nxmutex_lock(&priv->thlock);
-  leave_critical_section(flags);
+  *flags = spin_lock_irqsave(&priv->spinlock);
   return ret >= 0 ? ret2 : ret;
 }
 
@@ -1749,9 +1755,9 @@ static int usbmsc_idlestate(FAR struct usbmsc_dev_s *priv)
 
   /* Take a request from the rdreqlist */
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->spinlock);
   privreq = (FAR struct usbmsc_req_s *)sq_remfirst(&priv->rdreqlist);
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->spinlock, flags);
 
   /* Has anything been received? If not, just return an error.
    * This will cause us to remain in the IDLE state.  When a USB request is
@@ -2035,7 +2041,7 @@ static int usbmsc_cmdparsestate(FAR struct usbmsc_dev_s *priv)
      * case SCSI_CMD_WRITEANDVERIFY:           0x2e Optional
      */
 
-    case SCSI_CMD_VERIFY10:                 /* 0x2f Opt, excpt Windows */
+    case SCSI_CMD_VERIFY10:                 /* 0x2f Opt, except Windows */
       ret = usbmsc_cmdverify10(priv);
       break;
 
@@ -2327,9 +2333,9 @@ static int usbmsc_cmdreadstate(FAR struct usbmsc_dev_s *priv)
            * already checked that is it not NULL
            */
 
-          flags = enter_critical_section();
+          flags = spin_lock_irqsave(&priv->spinlock);
           privreq = (FAR struct usbmsc_req_s *)sq_remfirst(&priv->wrreqlist);
-          leave_critical_section(flags);
+          spin_unlock_irqrestore(&priv->spinlock, flags);
 
           /* And submit the request to the bulk IN endpoint */
 
@@ -2415,9 +2421,9 @@ static int usbmsc_cmdwritestate(FAR struct usbmsc_dev_s *priv)
        * data to be written.
        */
 
-      irqstate_t flags = enter_critical_section();
+      irqstate_t flags = spin_lock_irqsave(&priv->spinlock);
       privreq = (FAR struct usbmsc_req_s *)sq_remfirst(&priv->rdreqlist);
-      leave_critical_section(flags);
+      spin_unlock_irqrestore(&priv->spinlock, flags);
 
       /* If there no request data available, then just return an error.
        * This will cause us to remain in the CMDWRITE state.  When a filled
@@ -2620,10 +2626,10 @@ static int usbmsc_cmdfinishstate(FAR struct usbmsc_dev_s *priv)
                * that is it not NULL)
                */
 
-              flags = enter_critical_section();
+              flags = spin_lock_irqsave(&priv->spinlock);
               privreq = (FAR struct usbmsc_req_s *)
                 sq_remfirst(&priv->wrreqlist);
-              leave_critical_section(flags);
+              spin_unlock_irqrestore(&priv->spinlock, flags);
 
               /* Send the write request */
 
@@ -2655,12 +2661,12 @@ static int usbmsc_cmdfinishstate(FAR struct usbmsc_dev_s *priv)
                * endpoint
                */
 
-              nxsig_usleep (100000);
+              nxsched_usleep (100000);
               EP_STALL(priv->epbulkin);
 
               /* now wait for stall to go away .... */
 
-              nxsig_usleep (100000);
+              nxsched_usleep (100000);
 #else
               EP_STALL(priv->epbulkin);
 #endif
@@ -2678,7 +2684,6 @@ static int usbmsc_cmdfinishstate(FAR struct usbmsc_dev_s *priv)
         {
           /* Did the host stop sending unexpectedly early? */
 
-          flags = enter_critical_section();
           if (priv->shortpacket)
             {
               usbtrace(TRACE_CLSERROR(USBMSC_TRACEERR_CMDFINISHSHORTPKT),
@@ -2694,8 +2699,9 @@ static int usbmsc_cmdfinishstate(FAR struct usbmsc_dev_s *priv)
               EP_STALL(priv->epbulkout);
             }
 
-           priv->theventset |= USBMSC_EVENT_ABORTBULKOUT;
-           leave_critical_section(flags);
+          flags = spin_lock_irqsave(&priv->spinlock);
+          priv->theventset |= USBMSC_EVENT_ABORTBULKOUT;
+          spin_unlock_irqrestore(&priv->spinlock, flags);
         }
       break;
 
@@ -2741,9 +2747,9 @@ static int usbmsc_cmdstatusstate(FAR struct usbmsc_dev_s *priv)
 
   /* Take a request from the wrreqlist */
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->spinlock);
   privreq = (FAR struct usbmsc_req_s *)sq_remfirst(&priv->wrreqlist);
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->spinlock, flags);
 
   /* If there no request structures available, then just return an error.
    * This will cause us to remain in the CMDSTATUS status.  When a request
@@ -2807,9 +2813,9 @@ static int usbmsc_cmdstatusstate(FAR struct usbmsc_dev_s *priv)
     {
       usbtrace(TRACE_CLSERROR(USBMSC_TRACEERR_SNDSTATUSSUBMIT),
                (uint16_t)-ret);
-      flags = enter_critical_section();
+      flags = spin_lock_irqsave(&priv->spinlock);
       sq_addlast((FAR sq_entry_t *)privreq, &priv->wrreqlist);
-      leave_critical_section(flags);
+      spin_unlock_irqrestore(&priv->spinlock, flags);
     }
 
   /* Return to the IDLE state */
@@ -2864,28 +2870,31 @@ int usbmsc_scsi_main(int argc, FAR char *argv[])
 
   uinfo("Waiting to be signaled\n");
 
+  flags = spin_lock_irqsave(&priv->spinlock);
   priv->thstate = USBMSC_STATE_STARTED;
   while ((priv->theventset & USBMSC_EVENT_READY) == 0 &&
          (priv->theventset & USBMSC_EVENT_TERMINATEREQUEST) == 0)
     {
-      ret = usbmsc_scsi_wait(priv);
+      ret = usbmsc_scsi_wait(priv, &flags);
       if (ret < 0)
         {
           /* The thread has been canceled */
 
+          spin_unlock_irqrestore(&priv->spinlock, flags);
           nxmutex_unlock(&priv->thlock);
           return EXIT_FAILURE;
         }
     }
-
-  uinfo("Running\n");
 
   /* Transition to the INITIALIZED/IDLE state */
 
   priv->thstate    = USBMSC_STATE_IDLE;
   eventset         = priv->theventset;
   priv->theventset = USBMSC_EVENT_NOEVENTS;
+  spin_unlock_irqrestore(&priv->spinlock, flags);
   nxmutex_unlock(&priv->thlock);
+
+  uinfo("Running\n");
 
   /* Then loop until we are asked to terminate */
 
@@ -2903,15 +2912,15 @@ int usbmsc_scsi_main(int argc, FAR char *argv[])
           return EXIT_FAILURE;
         }
 
-      flags = enter_critical_section();
+      flags = spin_lock_irqsave(&priv->spinlock);
       if (priv->theventset == USBMSC_EVENT_NOEVENTS)
         {
-          ret = usbmsc_scsi_wait(priv);
+          ret = usbmsc_scsi_wait(priv, &flags);
           if (ret < 0)
             {
               /* The thread has been canceled */
 
-              leave_critical_section(flags);
+              spin_unlock_irqrestore(&priv->spinlock, flags);
               nxmutex_unlock(&priv->thlock);
               return EXIT_FAILURE;
             }
@@ -2924,6 +2933,7 @@ int usbmsc_scsi_main(int argc, FAR char *argv[])
 
       eventset         = priv->theventset;
       priv->theventset = USBMSC_EVENT_NOEVENTS;
+      spin_unlock_irqrestore(&priv->spinlock, flags);
       nxmutex_unlock(&priv->thlock);
 
       /* Were we awakened by some event that requires immediate action?
@@ -2977,8 +2987,6 @@ int usbmsc_scsi_main(int argc, FAR char *argv[])
 
           priv->thstate = USBMSC_STATE_IDLE;
         }
-
-      leave_critical_section(flags);
 
       /* Loop processing each SCSI command state.  Each state handling
        * function will do the following:
@@ -3052,20 +3060,15 @@ int usbmsc_scsi_main(int argc, FAR char *argv[])
 
 void usbmsc_scsi_signal(FAR struct usbmsc_dev_s *priv)
 {
-  irqstate_t flags;
-
   /* A flag is used to prevent driving up the semaphore count.  This function
    * is called (primarily) from interrupt level logic so we must disable
-   * interrupts momentarily to assure that test of the flag and the increment
-   * of the semaphore count are atomic.
+   * interrupts momentarily before call this function to assure that test of
+   * the flag and the increment of the semaphore count are atomic.
    */
 
-  flags = enter_critical_section();
   if (priv->thwaiting)
     {
       priv->thwaiting = false;
       nxsem_post(&priv->thwaitsem);
     }
-
-  leave_critical_section(flags);
 }

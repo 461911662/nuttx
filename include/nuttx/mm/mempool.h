@@ -32,6 +32,7 @@
 #include <nuttx/list.h>
 #include <nuttx/queue.h>
 #include <nuttx/mm/mm.h>
+#include <nuttx/nuttx.h>
 #include <nuttx/fs/procfs.h>
 #include <nuttx/spinlock.h>
 #include <nuttx/semaphore.h>
@@ -40,16 +41,10 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#if CONFIG_MM_DEFAULT_ALIGNMENT == 0
-#  define MEMPOOL_ALIGN       (2 * sizeof(uintptr_t))
-#else
-#  define MEMPOOL_ALIGN       CONFIG_MM_DEFAULT_ALIGNMENT
-#endif
-
 #if CONFIG_MM_BACKTRACE >= 0
 #  define MEMPOOL_REALBLOCKSIZE(pool) (ALIGN_UP((pool)->blocksize + \
                                        sizeof(struct mempool_backtrace_s), \
-                                       MEMPOOL_ALIGN))
+                                       MM_ALIGN))
 #else
 #  define MEMPOOL_REALBLOCKSIZE(pool) ((pool)->blocksize)
 #endif
@@ -108,7 +103,7 @@ struct mempool_s
 
   /* Private data for memory pool */
 
-  FAR char  *ibase;   /* The inerrupt mempool base pointer */
+  FAR char  *ibase;   /* The interrupt mempool base pointer */
   sq_queue_t queue;   /* The free block queue in normal mempool */
   sq_queue_t iqueue;  /* The free block queue in interrupt mempool */
   sq_queue_t equeue;  /* The expand block queue for normal mempool */
@@ -127,7 +122,9 @@ struct mempool_backtrace_s
                        * if there is any out of bounds.
                        */
   pid_t pid;
+#  ifdef CONFIG_MM_BACKTRACE_SEQNO
   unsigned long seqno; /* The sequence of memory malloc */
+#  endif
 #  if CONFIG_MM_BACKTRACE > 0
   FAR void *backtrace[CONFIG_MM_BACKTRACE];
 #  endif
@@ -328,9 +325,9 @@ void mempool_procfs_unregister(FAR struct mempool_procfs_entry_s *entry);
  *   alloc           - The alloc memory function for multiples pool.
  *   alloc_size      - Get the address size of the alloc function.
  *   free            - The free memory function for multiples pool.
- *   arg             - The alloc & free memory fuctions used arg.
+ *   arg             - The alloc & free memory functions used arg.
  *   chunksize       - The multiples pool chunk size.
- *   expandsize      - The expend mempry for all pools in multiples pool.
+ *   expandsize      - The expend memory for all pools in multiples pool.
  *   dict_expendsize - The expend size for multiple dictnoary.
  * Returned Value:
  *   Return an initialized multiple pool pointer on success,
@@ -393,7 +390,7 @@ FAR void *mempool_multiple_realloc(FAR struct mempool_multiple_s *mpool,
  * Name: mempool_multiple_free
  *
  * Description:
- *   Release an memory block to the multiple mempry pool. The blk must have
+ *   Release an memory block to the multiple memory pool. The blk must have
  *   been returned by a previous call to mempool_multiple_alloc.
  *
  * Input Parameters:

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/lcd/ft80x.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -136,7 +138,9 @@ static const struct file_operations g_ft80x_fops =
   ft80x_ioctl,   /* ioctl */
   NULL,          /* mmap */
   NULL,          /* truncate */
-  NULL           /* poll */
+  NULL,          /* poll */
+  NULL,          /* readv */
+  NULL           /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , ft80x_unlink /* unlink */
 #endif
@@ -201,7 +205,7 @@ static int ft80x_fade(FAR struct ft80x_dev_s *priv,
     {
       /* Wait for FADE_STEP_MSEC msec (or whatever we get) */
 
-      nxsig_usleep(FADE_STEP_MSEC * 1000);
+      nxsched_usleep(FADE_STEP_MSEC * 1000);
 
       /* Get the elapsed time */
 
@@ -254,6 +258,11 @@ static int ft80x_fade(FAR struct ft80x_dev_s *priv,
 static void ft80x_notify(FAR struct ft80x_dev_s *priv,
                          enum ft80x_notify_e id, int value)
 {
+#ifdef CONFIG_DISABLE_ALL_SIGNALS
+    UNUSED(priv);
+    UNUSED(id);
+    UNUSED(value);
+#else
   FAR struct ft80x_eventinfo_s *info = &priv->notify[id];
 
   /* Are notifications enabled for this event? */
@@ -267,6 +276,7 @@ static void ft80x_notify(FAR struct ft80x_dev_s *priv,
       info->event.sigev_value.sival_int = value;
       nxsig_notification(info->pid, &info->event, SI_QUEUE, &info->work);
     }
+#endif
 }
 
 /****************************************************************************
@@ -993,6 +1003,7 @@ static int ft80x_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
        *   Returns:      None
        */
 
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
       case FT80X_IOC_EVENTNOTIFY:
         {
           FAR struct ft80x_notify_s *notify =
@@ -1055,7 +1066,7 @@ static int ft80x_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
             }
         }
         break;
-
+#endif
        /* FT80X_IOC_FADE:
         *   Description:  Change the backlight intensity with a controllable
         *                 fade.

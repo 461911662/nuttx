@@ -1,6 +1,8 @@
 # ##############################################################################
 # drivers/virtio/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -53,6 +55,10 @@ endif()
 
 if(CONFIG_DRIVERS_VIRTIO_RPMB)
   list(APPEND SRCS virtio-rpmb.c)
+endif()
+
+if(CONFIG_DRIVERS_VIRTIO_RPMSG)
+  list(APPEND SRCS virtio-rpmsg.c)
 endif()
 
 if(CONFIG_DRIVERS_VIRTIO_SERIAL)

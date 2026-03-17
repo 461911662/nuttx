@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/espressif/esp_hr_timer.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -121,11 +123,11 @@ int esp_hr_timer_create(const struct esp_hr_timer_args_s *args,
  *   repeat        - Repeat mode (true: enabled, false: disabled).
  *
  * Returned Value:
- *   None.
+ *   OK on success; ERROR on failure.
  *
  ****************************************************************************/
 
-void esp_hr_timer_start(struct esp_hr_timer_s *timer,
+int esp_hr_timer_start(struct esp_hr_timer_s *timer,
                         uint64_t timeout,
                         bool repeat);
 
@@ -140,11 +142,11 @@ void esp_hr_timer_start(struct esp_hr_timer_s *timer,
  *   timeout       - Timeout value.
  *
  * Returned Value:
- *   None.
+ *   OK on success; ERROR on failure.
  *
  ****************************************************************************/
 
-void esp_hr_timer_start_once(struct esp_hr_timer_s *timer, uint64_t timeout);
+int esp_hr_timer_start_once(struct esp_hr_timer_s *timer, uint64_t timeout);
 
 /****************************************************************************
  * Name: esp_hr_timer_start_periodic
@@ -157,11 +159,11 @@ void esp_hr_timer_start_once(struct esp_hr_timer_s *timer, uint64_t timeout);
  *   timeout       - Timeout value.
  *
  * Returned Value:
- *   None.
+ *   OK on success; ERROR on failure.
  *
  ****************************************************************************/
 
-void esp_hr_timer_start_periodic(struct esp_hr_timer_s *timer,
+int esp_hr_timer_start_periodic(struct esp_hr_timer_s *timer,
                                  uint64_t timeout);
 
 /****************************************************************************
@@ -174,11 +176,12 @@ void esp_hr_timer_start_periodic(struct esp_hr_timer_s *timer,
  *   timer         - HR Timer pointer.
  *
  * Returned Value:
- *   None.
+ *   OK on success; ERROR on failure.
  *
  ****************************************************************************/
 
-void esp_hr_timer_stop(struct esp_hr_timer_s *timer);
+int esp_hr_timer_stop(struct esp_hr_timer_s *timer);
+int esp_hr_timer_stop_nolock(struct esp_hr_timer_s *timer);
 
 /****************************************************************************
  * Name: esp_hr_timer_delete
@@ -190,11 +193,11 @@ void esp_hr_timer_stop(struct esp_hr_timer_s *timer);
  *   timer         - HR Timer pointer.
  *
  * Returned Value:
- *   None.
+ *   OK on success; ERROR on failure.
  *
  ****************************************************************************/
 
-void esp_hr_timer_delete(struct esp_hr_timer_s *timer);
+int esp_hr_timer_delete(struct esp_hr_timer_s *timer);
 
 /****************************************************************************
  * Name: esp_hr_timer_time_us
@@ -243,6 +246,56 @@ uint64_t esp_hr_timer_get_alarm(void);
  ****************************************************************************/
 
 void esp_hr_timer_calibration(uint64_t time_us);
+
+/****************************************************************************
+ * Name: esp_hr_timer_set
+ *
+ * Description:
+ *   Set the High Resolution Timer counter value to a specific timestamp.
+ *
+ * Input Parameters:
+ *   new_us        - New counter value in microseconds.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+void esp_hr_timer_set(uint64_t new_us);
+
+/****************************************************************************
+ * Name: esp_hr_timer_lock
+ *
+ * Description:
+ *   Acquire the High Resolution Timer lock to protect access to hardware
+ *   registers. Must be paired with esp_hr_timer_unlock().
+ *
+ * Input Parameters:
+ *   None.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+void esp_hr_timer_lock(void);
+
+/****************************************************************************
+ * Name: esp_hr_timer_unlock
+ *
+ * Description:
+ *   Release the High Resolution Timer lock. Must be paired with
+ *   esp_hr_timer_lock().
+ *
+ * Input Parameters:
+ *   None.
+ *
+ * Returned Value:
+ *   None.
+ *
+ ****************************************************************************/
+
+void esp_hr_timer_unlock(void);
 
 /****************************************************************************
  * Name: esp_hr_timer_init

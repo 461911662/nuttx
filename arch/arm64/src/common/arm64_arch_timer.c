@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_arch_timer.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,7 @@
 #include <nuttx/arch.h>
 #include <arch/irq.h>
 #include <arch/chip/chip.h>
+#include <nuttx/kmalloc.h>
 #include <nuttx/spinlock.h>
 #include <nuttx/timers/arch_alarm.h>
 
@@ -52,33 +55,7 @@
 #define ARM_ARCH_TIMER_FLAGS                IRQ_TYPE_LEVEL
 
 /****************************************************************************
- * Private Types
- ****************************************************************************/
-
-struct arm64_oneshot_lowerhalf_s
-{
-  /* This is the part of the lower half driver that is visible to the upper-
-   * half client of the driver.  This must be the first thing in this
-   * structure so that pointers to struct oneshot_lowerhalf_s are cast
-   * compatible to struct arm64_oneshot_lowerhalf_s and vice versa.
-   */
-
-  struct oneshot_lowerhalf_s lh;      /* Common lower-half driver fields */
-
-  /* Private lower half data follows */
-
-  void *arg;                          /* Argument that is passed to the handler */
-  uint64_t cycle_per_tick;            /* cycle per tick */
-  oneshot_callback_t callback;        /* Internal handler that receives callback */
-  bool init[CONFIG_SMP_NCPUS];        /* True: timer is init */
-
-  /* which cpu timer is running, -1 indicate timer stoppd */
-
-  int running;
-};
-
-/****************************************************************************
- * Private Functions
+ * Inline Functions
  ****************************************************************************/
 
 static inline void arm64_arch_timer_set_compare(uint64_t value)
@@ -86,45 +63,21 @@ static inline void arm64_arch_timer_set_compare(uint64_t value)
   write_sysreg(value, cntv_cval_el0);
 }
 
-static inline uint64_t arm64_arch_timer_get_compare(void)
+static inline void arm64_arch_timer_set_relative(uint64_t value)
 {
-  return read_sysreg(cntv_cval_el0);
+  write_sysreg(value, cntv_tval_el0);
 }
 
 static inline void arm64_arch_timer_enable(bool enable)
 {
-  uint64_t value;
-
-  value = read_sysreg(cntv_ctl_el0);
-
-  if (enable)
-    {
-      value |= CNTV_CTL_ENABLE_BIT;
-    }
-  else
-    {
-      value &= ~CNTV_CTL_ENABLE_BIT;
-    }
-
-  write_sysreg(value, cntv_ctl_el0);
+  modify_sysreg(enable ? CNTV_CTL_ENABLE_BIT : 0u,
+                CNTV_CTL_ENABLE_BIT, cntv_ctl_el0);
 }
 
 static inline void arm64_arch_timer_set_irq_mask(bool mask)
 {
-  uint64_t value;
-
-  value = read_sysreg(cntv_ctl_el0);
-
-  if (mask)
-    {
-      value |= CNTV_CTL_IMASK_BIT;
-    }
-  else
-    {
-      value &= ~CNTV_CTL_IMASK_BIT;
-    }
-
-  write_sysreg(value, cntv_ctl_el0);
+  modify_sysreg(mask ? CNTV_CTL_IMASK_BIT : 0u,
+                CNTV_CTL_IMASK_BIT, cntv_ctl_el0);
 }
 
 static inline uint64_t arm64_arch_timer_count(void)
@@ -136,6 +89,10 @@ static inline uint64_t arm64_arch_timer_get_cntfrq(void)
 {
   return read_sysreg(cntfrq_el0);
 }
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
 
 /****************************************************************************
  * Name: arm64_arch_timer_compare_isr
@@ -155,188 +112,86 @@ static inline uint64_t arm64_arch_timer_get_cntfrq(void)
 
 static int arm64_arch_timer_compare_isr(int irq, void *regs, void *arg)
 {
-  struct arm64_oneshot_lowerhalf_s *priv =
-    (struct arm64_oneshot_lowerhalf_s *)arg;
+  struct oneshot_lowerhalf_s *priv = (struct oneshot_lowerhalf_s *)arg;
 
-  arm64_arch_timer_set_irq_mask(true);
+  arm64_arch_timer_set_compare(UINT64_MAX);
 
-  if (priv->callback && priv->running == this_cpu())
-    {
-      /* Then perform the callback */
+  /* Then perform the callback */
 
-      priv->callback(&priv->lh, priv->arg);
-    }
+  oneshot_process_callback(priv);
 
   return OK;
 }
 
-/****************************************************************************
- * Name: arm64_tick_max_delay
- *
- * Description:
- *   Determine the maximum delay of the one-shot timer (in microseconds)
- *
- * Input Parameters:
- *   lower   An instance of the lower-half oneshot state structure.  This
- *           structure must have been previously initialized via a call to
- *           oneshot_initialize();
- *   ticks   The location in which to return the maximum delay.
- *
- * Returned Value:
- *   Zero (OK) is returned on success; a negated errno value is returned
- *   on failure.
- *
- ****************************************************************************/
-
-static int arm64_tick_max_delay(struct oneshot_lowerhalf_s *lower,
-                                clock_t *ticks)
+static clkcnt_t arm64_oneshot_max_delay(struct oneshot_lowerhalf_s *lower)
 {
-  DEBUGASSERT(ticks != NULL);
+  return UINT64_MAX;
+}
 
-  *ticks = (clock_t)UINT64_MAX;
+static clkcnt_t arm64_oneshot_current(struct oneshot_lowerhalf_s *lower)
+{
+  /* We do not need memory barrier here. */
 
-  return OK;
+  return arm64_arch_timer_count();
+}
+
+static void arm64_oneshot_start_absolute(struct oneshot_lowerhalf_s *lower,
+                                         clkcnt_t expected)
+{
+  arm64_arch_timer_set_compare(expected);
+}
+
+static void arm64_oneshot_start(struct oneshot_lowerhalf_s *lower,
+                                clkcnt_t delta)
+{
+  arm64_arch_timer_set_relative(delta);
+}
+
+static void arm64_oneshot_cancel(struct oneshot_lowerhalf_s *lower)
+{
+  arm64_arch_timer_set_compare(UINT64_MAX);
 }
 
 /****************************************************************************
- * Name: arm64_tick_cancel
+ * Name: arm64_oneshot_initialize_per_cpu
  *
  * Description:
- *   Cancel the oneshot timer and return the time remaining on the timer.
- *
- *   NOTE: This function may execute at a high rate with no timer running (as
- *   when pre-emption is enabled and disabled).
- *
- * Input Parameters:
- *   lower   Caller allocated instance of the oneshot state structure.  This
- *           structure must have been previously initialized via a call to
- *           oneshot_initialize();
- *   ticks   The location in which to return the time remaining on the
- *           oneshot timer.
+ *   Initialize the ARM generic timer for secondary CPUs.
  *
  * Returned Value:
- *   Zero (OK) is returned on success.  A call to up_timer_cancel() when
- *   the timer is not active should also return success; a negated errno
- *   value is returned on any failure.
+ *   None
  *
  ****************************************************************************/
 
-static int arm64_tick_cancel(struct oneshot_lowerhalf_s *lower,
-                             clock_t *ticks)
+static void arm64_oneshot_initialize_per_cpu(void)
 {
-  struct arm64_oneshot_lowerhalf_s *priv =
-    (struct arm64_oneshot_lowerhalf_s *)lower;
+  /* Enable int */
 
-  DEBUGASSERT(priv != NULL && ticks != NULL);
+  up_enable_irq(ARM_ARCH_TIMER_IRQ);
 
-  /* Disable int */
+  arm64_arch_timer_set_compare(UINT64_MAX);
 
-  priv->running = -1;
-  arm64_arch_timer_set_irq_mask(true);
+  arm64_arch_timer_enable(true);
 
-  return OK;
-}
-
-/****************************************************************************
- * Name: arm64_tick_start
- *
- * Description:
- *   Start the oneshot timer
- *
- * Input Parameters:
- *   lower    An instance of the lower-half oneshot state structure.  This
- *            structure must have been previously initialized via a call to
- *            oneshot_initialize();
- *   handler  The function to call when when the oneshot timer expires.
- *   arg      An opaque argument that will accompany the callback.
- *   ticks    Provides the duration of the one shot timer.
- *
- * Returned Value:
- *   Zero (OK) is returned on success; a negated errno value is returned
- *   on failure.
- *
- ****************************************************************************/
-
-static int arm64_tick_start(struct oneshot_lowerhalf_s *lower,
-                            oneshot_callback_t callback, void *arg,
-                            clock_t ticks)
-{
-  struct arm64_oneshot_lowerhalf_s *priv =
-    (struct arm64_oneshot_lowerhalf_s *)lower;
-  uint64_t next_cycle;
-
-  DEBUGASSERT(priv != NULL && callback != NULL);
-
-  /* Save the new handler and its argument */
-
-  priv->callback = callback;
-  priv->arg = arg;
-
-  if (!priv->init[this_cpu()])
-    {
-      /* Enable int */
-
-      up_enable_irq(ARM_ARCH_TIMER_IRQ);
-
-      /* Start timer */
-
-      arm64_arch_timer_enable(true);
-      priv->init[this_cpu()] = true;
-    }
-
-  priv->running = this_cpu();
-
-  next_cycle =
-    arm64_arch_timer_count() / priv->cycle_per_tick * priv->cycle_per_tick +
-    ticks * priv->cycle_per_tick;
-
-  arm64_arch_timer_set_compare(next_cycle);
   arm64_arch_timer_set_irq_mask(false);
-
-  return OK;
-}
-
-/****************************************************************************
- * Name: arm64_tick_current
- *
- * Description:
- *  Get the current time.
- *
- * Input Parameters:
- *   lower   Caller allocated instance of the oneshot state structure.  This
- *           structure must have been previously initialized via a call to
- *           oneshot_initialize();
- *   ticks   The location in which to return the current time.
- *
- * Returned Value:
- *   Zero (OK) is returned on success, a negated errno value is returned on
- *   any failure.
- *
- ****************************************************************************/
-
-static int arm64_tick_current(struct oneshot_lowerhalf_s *lower,
-                              clock_t *ticks)
-{
-  struct arm64_oneshot_lowerhalf_s *priv =
-    (struct arm64_oneshot_lowerhalf_s *)lower;
-
-  DEBUGASSERT(ticks != NULL);
-
-  *ticks = arm64_arch_timer_count() / priv->cycle_per_tick;
-
-  return OK;
 }
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
-static const struct oneshot_operations_s g_oneshot_ops =
+static const struct oneshot_operations_s g_arm64_oneshot_ops =
 {
-  .tick_start     = arm64_tick_start,
-  .tick_current   = arm64_tick_current,
-  .tick_max_delay = arm64_tick_max_delay,
-  .tick_cancel    = arm64_tick_cancel,
+  .current        = arm64_oneshot_current,
+  .start          = arm64_oneshot_start,
+  .start_absolute = arm64_oneshot_start_absolute,
+  .cancel         = arm64_oneshot_cancel,
+  .max_delay      = arm64_oneshot_max_delay
+};
+
+static struct oneshot_lowerhalf_s g_arm64_oneshot_lowerhalf =
+{
+  .ops = &g_arm64_oneshot_ops
 };
 
 /****************************************************************************
@@ -358,35 +213,35 @@ static const struct oneshot_operations_s g_oneshot_ops =
 
 struct oneshot_lowerhalf_s *arm64_oneshot_initialize(void)
 {
-  struct arm64_oneshot_lowerhalf_s *priv;
+  struct oneshot_lowerhalf_s *priv = &g_arm64_oneshot_lowerhalf;
+  uint64_t freq;
 
   tmrinfo("oneshot_initialize\n");
-
-  /* Allocate an instance of the lower half driver */
-
-  priv = (struct arm64_oneshot_lowerhalf_s *)
-    kmm_zalloc(sizeof(struct arm64_oneshot_lowerhalf_s));
-
-  if (priv == NULL)
-    {
-      tmrerr("ERROR: Failed to initialized state structure\n");
-
-      return NULL;
-    }
-
-  /* Initialize the lower-half driver structure */
-
-  priv->lh.ops = &g_oneshot_ops;
-  priv->running = -1;
-  priv->cycle_per_tick = arm64_arch_timer_get_cntfrq() / TICK_PER_SEC;
-  tmrinfo("cycle_per_tick %" PRIu64 "\n", priv->cycle_per_tick);
 
   /* Attach handler */
 
   irq_attach(ARM_ARCH_TIMER_IRQ,
              arm64_arch_timer_compare_isr, priv);
 
-  tmrinfo("oneshot_initialize ok %p \n", &priv->lh);
+  arm64_oneshot_initialize_per_cpu();
 
-  return &priv->lh;
+  freq = arm64_arch_timer_get_cntfrq();
+
+  DEBUGASSERT(freq <= UINT32_MAX);
+
+  oneshot_count_init(priv, (uint32_t)freq);
+
+  tmrinfo("oneshot_initialize ok %p \n", priv);
+
+  return priv;
+}
+
+void up_timer_initialize(void)
+{
+  up_alarm_set_lowerhalf(arm64_oneshot_initialize());
+}
+
+void arm64_timer_secondary_init(void)
+{
+  arm64_oneshot_initialize_per_cpu();
 }

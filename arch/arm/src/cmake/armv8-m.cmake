@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm/src/cmake/armv8-m.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -19,6 +21,31 @@
 # ##############################################################################
 
 set(PLATFORM_FLAGS)
+
+# LLVM Configuration
+if(CONFIG_ARCH_CORTEXM23)
+  set(LLVM_ARCHTYPE thumbv8m.base)
+  set(LLVM_CPUTYPE cortex-m23)
+elseif(CONFIG_ARCH_CORTEXM33)
+  set(LLVM_ARCHTYPE thumbv8m.main)
+  set(LLVM_CPUTYPE cortex-m33)
+elseif(CONFIG_ARCH_CORTEXM35P)
+  set(LLVM_ARCHTYPE thumbv8m.main)
+  set(LLVM_CPUTYPE cortex-m35p)
+elseif(CONFIG_ARCH_CORTEXM55)
+  set(LLVM_ARCHTYPE thumbv8.1m.main)
+  set(LLVM_CPUTYPE cortex-m55)
+elseif(CONFIG_ARCH_CORTEXM85)
+  set(LLVM_ARCHTYPE thumbv8.1m.main)
+  set(LLVM_CPUTYPE cortex-m85)
+endif()
+
+# Set ABI type based on FPU configuration
+if(CONFIG_ARCH_FPU)
+  set(LLVM_ABITYPE eabihf)
+else()
+  set(LLVM_ABITYPE eabi)
+endif()
 
 if(CONFIG_ARM_DSP)
   set(EXTCPUFLAGS +dsp)
@@ -42,7 +69,7 @@ elseif(CONFIG_ARCH_CORTEXM35P)
 elseif(CONFIG_ARCH_CORTEXM55)
   list(APPEND PLATFORM_FLAGS -mtune=cortex-m55)
   if(CONFIG_ARM_HAVE_MVE)
-    list(APPEND PLATFORM_FLAGS -march=armv8.1-m.main+mve.fp+fp.dp)
+    list(APPEND PLATFORM_FLAGS -march=armv8.1-m.main${EXTCPUFLAGS}+mve.fp+fp.dp)
   else()
     list(APPEND PLATFORM_FLAGS -march=armv8.1-m.main${EXTCPUFLAGS})
   endif()

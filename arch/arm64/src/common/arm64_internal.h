@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_internal.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -62,6 +64,9 @@
 #  elif defined(CONFIG_RPMSG_UART_CONSOLE)
 #    undef  USE_SERIALDRIVER
 #    undef  USE_EARLYSERIALINIT
+#  elif defined(CONFIG_RPMSG_UART_RAW_CONSOLE)
+#    undef  USE_SERIALDRIVER
+#    undef  USE_EARLYSERIALINIT
 #  else
 #    define USE_SERIALDRIVER 1
 #    define USE_EARLYSERIALINIT 1
@@ -91,31 +96,21 @@
 #define STACK_COLOR    0xdeaddead
 #define HEAP_COLOR     'h'
 
-/* AArch64 the stack-pointer must be 128-bit aligned */
-
-#define STACK_ALIGNMENT     16
-
-/* Stack alignment macros */
-
-#define STACK_ALIGN_MASK    (STACK_ALIGNMENT - 1)
-#define STACK_ALIGN_DOWN(a) ((a) & ~STACK_ALIGN_MASK)
-#define STACK_ALIGN_UP(a)   (((a) + STACK_ALIGN_MASK) & ~STACK_ALIGN_MASK)
-
 #ifdef CONFIG_SMP
 /* The size of interrupt and idle stack.  This is the configured
  * value aligned the 8-bytes as required by the ARM EABI.
  */
 
-#  define SMP_STACK_SIZE    STACK_ALIGN_UP(CONFIG_IDLETHREAD_STACKSIZE)
+#  define SMP_STACK_SIZE    STACKFRAME_ALIGN_UP(CONFIG_IDLETHREAD_STACKSIZE)
 #  define SMP_STACK_WORDS   (SMP_STACK_SIZE >> 2)
 #endif
 
 /* Context switching */
 
-#define arm64_fullcontextrestore(restoreregs) \
+#define arm64_fullcontextrestore() \
   do \
     { \
-      sys_call1(SYS_restore_context, (uintptr_t)restoreregs); \
+      sys_call0(SYS_restore_context); \
     } \
   while (1)
 
@@ -155,9 +150,9 @@ extern "C"
     EXTERN char sym[n][size]
 
 #define STACK_PTR_TO_FRAME(type, ptr) \
-    (type *)STACK_ALIGN_DOWN((uintptr_t)(ptr) - sizeof(type))
+    (type *)STACKFRAME_ALIGN_DOWN((uintptr_t)(ptr) - sizeof(type))
 
-#define INTSTACK_SIZE        (CONFIG_ARCH_INTERRUPTSTACK & ~STACK_ALIGN_MASK)
+#define INTSTACK_SIZE        (CONFIG_ARCH_INTERRUPTSTACK & ~STACKFRAME_ALIGN_MASK)
 
 #ifdef CONFIG_SMP
 
@@ -260,7 +255,9 @@ EXTERN uint8_t g_idle_topstack[];   /* End+1 of heap */
  ****************************************************************************/
 
 void arm64_new_task(struct tcb_s *tak_new);
-void arm64_jump_to_user(uint64_t entry, uint64_t x0, uint64_t x1,
+
+void arm64_jump_to_user(uint64_t entry, uint64_t x0,
+                        uint64_t x1, uint64_t x2,
                         uint64_t sp_el0, uint64_t *regs) noreturn_function;
 
 /* Low level initialization provided by chip logic */
@@ -328,7 +325,7 @@ void arm64_serialinit(void);
  *
  * Description:
  *   Performs the low level UART initialization early in debug so that the
- *   serial console will be available during bootup.  This must be called
+ *   serial console will be available during boot up.  This must be called
  *   before arm64_serialinit.
  *
  * Note:
@@ -389,6 +386,10 @@ void arm64_usbuninitialize(void);
 #ifdef CONFIG_STACK_COLORATION
 size_t arm64_stack_check(void *stackbase, size_t nbytes);
 void arm64_stack_color(void *stackbase, size_t nbytes);
+#endif
+
+#ifdef CONFIG_ARCH_HAVE_DEBUG
+void arm64_enable_dbgmonitor(void);
 #endif
 
 #undef EXTERN

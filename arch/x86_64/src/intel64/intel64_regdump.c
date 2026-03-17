@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_regdump.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,21 +30,12 @@
 #include <debug.h>
 #include <nuttx/irq.h>
 
+#include "sched/sched.h"
 #include "x86_64_internal.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: up_getusrsp
- ****************************************************************************/
-
-uintptr_t up_getusrsp(void *regs)
-{
-  uint64_t *ptr = regs;
-  return ptr[REG_RSP];
-}
 
 /****************************************************************************
  * Name: x86_64_registerdump
@@ -90,7 +83,7 @@ void backtrace(uint64_t rbp)
 
   for (i = 0; i < 16; i++)
     {
-      if ((rbp < 0x200000) || (rbp > 0xffffffff))
+      if ((rbp < 0x200000) || (rbp > 0xfffffffff))
         {
           break;
         }
@@ -111,7 +104,7 @@ void backtrace(uint64_t rbp)
 
 void up_dump_register(void *dumpregs)
 {
-  volatile uint64_t *regs = dumpregs ? dumpregs : up_current_regs();
+  volatile uint64_t *regs = dumpregs ? dumpregs : running_regs();
   uint64_t mxcsr;
   uint64_t cr2;
 
@@ -120,7 +113,7 @@ void up_dump_register(void *dumpregs)
                     ::"m"(cr2):"memory", "rax");
 
   _alert("----------------CUT HERE-----------------\n");
-  _alert("Gerneral Informations:\n");
+  _alert("General Information:\n");
   _alert("CPL: %" PRId64 ", RPL: %" PRId64 "\n",
          regs[REG_CS] & 0x3, regs[REG_DS] & 0x3);
   _alert("RIP: %016" PRIx64 ", RSP: %016" PRIx64 "\n",

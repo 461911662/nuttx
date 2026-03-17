@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/misc/rpmsgblk.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,19 +56,19 @@ struct rpmsgblk_s
   FAR const char         *remotecpu;   /* The server cpu name */
   FAR const char         *remotepath;  /* The device path in the server cpu */
   sem_t                   wait;        /* Wait sem, used for preventing any
-                                        * opreation until the connection
+                                        * operation until the connection
                                         * between two cpu established.
                                         */
   mutex_t                 lock;        /* Lock for thread-safe */
-  struct geometry         geo;         /* block geomerty */
-  int                     refs;        /* refence count */
+  struct geometry         geo;         /* block geometry */
+  int                     refs;        /* reference count */
 };
 
 /* Rpmsg device cookie used to handle the response from the remote cpu */
 
 struct rpmsgblk_cookie_s
 {
-  sem_t     sem;     /* Semaphore used fo rpmsg */
+  sem_t     sem;     /* Semaphore used for rpmsg */
   int       result;  /* The return value of the remote call */
   FAR void *data;    /* The return data buffer of the remote call */
 };
@@ -395,6 +397,7 @@ static ssize_t rpmsgblk_write(FAR struct inode *inode,
                               sizeof(*msg) - 1 + msg->nsectors * sectorsize);
       if (ret < 0)
         {
+          rpmsg_release_tx_buffer(&priv->ept, msg);
           goto out;
         }
     }
@@ -420,7 +423,7 @@ out:
  *
  * Parameters:
  *   inode    - the blk device inode
- *   geometry - pointer to the application geomoetry struct
+ *   geometry - pointer to the application geometry struct
  *
  * Returned Values:
  *   On success, the number of bytes written are returned (zero indicates
@@ -447,7 +450,7 @@ static int rpmsgblk_geometry(FAR struct inode *inode,
       return ret;
     }
 
-  /* Return the perviously got geometry */
+  /* Return the previously got geometry */
 
   if (priv->geo.geo_sectorsize != 0)
     {
@@ -613,7 +616,7 @@ static int rpmsgblk_mmc_multi_cmd_ioctl(FAR struct inode *inode,
 
   msglen = sizeof(*msg) + arglen - 1;
   rsplen += sizeof(*msg) - 1;
-  if (MAX(msglen, rsplen) > rpmsg_get_tx_buffer_size(priv->ept.rdev))
+  if (MAX(msglen, rsplen) > rpmsg_get_tx_buffer_size(&priv->ept))
     {
       int ret = 0;
 
@@ -777,7 +780,7 @@ static int rpmsgblk_unlink(FAR struct inode *inode)
  *
  * Parameters:
  *   priv  - The rpmsg-blk handle
- *   len   - The got memroy size
+ *   len   - The got memory size
  *
  * Returned Values:
  *   NULL     - failure
@@ -859,6 +862,11 @@ static int rpmsgblk_send_recv(FAR struct rpmsgblk_s *priv,
 
   if (ret < 0)
     {
+      if (copy == false)
+        {
+          rpmsg_release_tx_buffer(&priv->ept, msg);
+        }
+
       goto fail;
     }
 
@@ -885,8 +893,8 @@ fail:
  *   ept  - The rpmsg endpoint
  *   data - The return message
  *   len  - The return message length
- *   src  - unknow
- *   priv - unknow
+ *   src  - unknown
+ *   priv - unknown
  *
  * Returned Values:
  *   Always OK
@@ -921,8 +929,8 @@ static int rpmsgblk_default_handler(FAR struct rpmsg_endpoint *ept,
  *   ept  - The rpmsg endpoint
  *   data - The return message
  *   len  - The return message length
- *   src  - unknow
- *   priv - unknow
+ *   src  - unknown
+ *   priv - unknown
  *
  * Returned Values:
  *   Always OK
@@ -968,8 +976,8 @@ static int rpmsgblk_read_handler(FAR struct rpmsg_endpoint *ept,
  *   ept  - The rpmsg endpoint
  *   data - The return message
  *   len  - The return message length
- *   src  - unknow
- *   priv - unknow
+ *   src  - unknown
+ *   priv - unknown
  *
  * Returned Values:
  *   Always OK
@@ -1055,8 +1063,8 @@ rpmsgblk_mmc_multi_cmd_handler(FAR struct rpmsgblk_cookie_s *cookie,
  *   ept  - The rpmsg endpoint
  *   data - The return message
  *   len  - The return message length
- *   src  - unknow
- *   priv - unknow
+ *   src  - unknown
+ *   priv - unknown
  *
  * Returned Values:
  *   Always OK
@@ -1188,8 +1196,8 @@ static void rpmsgblk_device_destroy(FAR struct rpmsg_device *rdev,
  *   ept  - The rpmsg-blk end point
  *   data - The received data
  *   len  - The received data length
- *   src  - unknow
- *   priv - unknow
+ *   src  - unknown
+ *   priv - unknown
  *
  * Returned Values:
  *   OK on success; A negated errno value is returned on any failure.
@@ -1226,7 +1234,7 @@ static int rpmsgblk_ept_cb(FAR struct rpmsg_endpoint *ept,
  *   remotecpu  - the server cpu name
  *   remotepath - the device you want to access in the remote cpu
  *   localpath  - the device path in local cpu, if NULL, the localpath is
- *                same as the remotepath, provide this argument to supoort
+ *                same as the remotepath, provide this argument to support
  *                custom device path
  *
  * Returned Values:

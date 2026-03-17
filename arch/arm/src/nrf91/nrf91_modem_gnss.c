@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/nrf91/nrf91_modem_gnss.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 
 #include <debug.h>
 #include <string.h>
+#include <sys/param.h>
 #include <time.h>
 
 #include <nuttx/sensors/gnss.h>
@@ -689,6 +692,13 @@ static int nrf91_gnss_thread(int argc, char** argv)
 int nrf91_gnss_register(int devno, uint32_t batch_number)
 {
   int ret = OK;
+  uint32_t nbuffer[] = {
+    [SENSOR_GNSS_IDX_GNSS] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_SATELLITE] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_MEASUREMENT] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_CLOCK] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_GEOFENCE] = batch_number,
+  };
 
   if (!nrf_modem_is_initialized())
     {
@@ -728,5 +738,5 @@ int nrf91_gnss_register(int devno, uint32_t batch_number)
 
   g_nrf91_gnss.lower.ops = &g_nrf91_gnss_ops;
 
-  return gnss_register(&g_nrf91_gnss.lower, devno, batch_number);
+  return gnss_register(&g_nrf91_gnss.lower, devno, nbuffer, nitems(nbuffer));
 }

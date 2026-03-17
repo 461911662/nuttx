@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/nxffs/nxffs_open.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -508,7 +510,7 @@ static inline int nxffs_wropen(FAR struct nxffs_volume_s *volume,
 
   /* Save a copy of the inode name. */
 
-  wrfile->ofile.entry.name = strdup(name);
+  wrfile->ofile.entry.name = fs_heap_strdup(name);
   if (!wrfile->ofile.entry.name)
     {
       ret = -ENOMEM;
@@ -603,7 +605,7 @@ static inline int nxffs_wropen(FAR struct nxffs_volume_s *volume,
                 }
 
               /* Then just break out of the loop reporting success.  Note
-               * that the alllocated inode name string is retained; it
+               * that the allocated inode name string is retained; it
                * will be needed later to calculate the inode CRC.
                */
 
@@ -655,7 +657,7 @@ static inline int nxffs_wropen(FAR struct nxffs_volume_s *volume,
   return OK;
 
 errout_with_name:
-  lib_free(wrfile->ofile.entry.name);
+  fs_heap_free(wrfile->ofile.entry.name);
 errout_with_ofile:
 #ifndef CONFIG_NXFFS_PREALLOCATED
   fs_heap_free(wrfile);

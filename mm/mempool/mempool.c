@@ -33,18 +33,18 @@
 #include <nuttx/kmalloc.h>
 #include <nuttx/mm/kasan.h>
 #include <nuttx/mm/mempool.h>
+#include <nuttx/nuttx.h>
 #include <nuttx/sched.h>
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-#undef  ALIGN_UP
-#define ALIGN_UP(x, a) (((x) + ((a) - 1)) & (~((a) - 1)))
+#define MEMPOOL_HEADER_SIZE (sizeof(sq_entry_t) + CONFIG_MM_NODE_GUARDSIZE)
 
 #if CONFIG_MM_BACKTRACE >= 0
-#define MEMPOOL_MAGIC_FREE  0xAAAAAAAA
-#define MEMPOOL_MAGIC_ALLOC 0x55555555
+#define MEMPOOL_MAGIC_FREE  0x55555555
+#define MEMPOOL_MAGIC_ALLOC 0xAAAAAAAA
 
 /****************************************************************************
  * Private Types
@@ -107,7 +107,7 @@ static inline void mempool_add_backtrace(FAR struct mempool_s *pool,
   DEBUGASSERT(buf->magic == MEMPOOL_MAGIC_FREE);
   buf->magic = MEMPOOL_MAGIC_ALLOC;
   buf->pid = _SCHED_GETTID();
-  buf->seqno = g_mm_seqno++;
+  MM_INCSEQNO(buf);
 #  if CONFIG_MM_BACKTRACE > 0
   if (pool->procfs.backtrace)
     {
@@ -150,7 +150,7 @@ static void mempool_foreach(FAR struct mempool_s *pool,
 
   sq_for_every(&pool->equeue, entry)
     {
-      nblks = (pool->expandsize - sizeof(sq_entry_t)) / blocksize;
+      nblks = (pool->expandsize - MEMPOOL_HEADER_SIZE) / blocksize;
       base = (FAR char *)entry - (nblks * blocksize);
 
       while (nblks--)
@@ -176,10 +176,8 @@ static void mempool_info_task_callback(FAR struct mempool_s *pool,
       return;
     }
 
-  if ((MM_DUMP_ASSIGN(task->pid, buf->pid) ||
-       MM_DUMP_ALLOC(task->pid, buf->pid) ||
-       MM_DUMP_LEAK(task->pid, buf->pid)) &&
-      buf->seqno >= task->seqmin && buf->seqno <= task->seqmax)
+  if ((MM_DUMP_ASSIGN(task, buf) || MM_DUMP_ALLOC(task, buf) ||
+       MM_DUMP_LEAK(task, buf)) && MM_DUMP_SEQNO(task, buf))
     {
       info->aordblks++;
       info->uordblks += blocksize;
@@ -191,6 +189,7 @@ static void mempool_memdump_callback(FAR struct mempool_s *pool,
                                      FAR const void *input, FAR void *output)
 {
   size_t blocksize = MEMPOOL_REALBLOCKSIZE(pool);
+  size_t overhead = blocksize - pool->blocksize;
   FAR const struct mm_memdump_s *dump = input;
 
   if (buf->magic == MEMPOOL_MAGIC_FREE)
@@ -198,29 +197,27 @@ static void mempool_memdump_callback(FAR struct mempool_s *pool,
       return;
     }
 
-  if ((MM_DUMP_ASSIGN(dump->pid, buf->pid) ||
-       MM_DUMP_ALLOC(dump->pid, buf->pid) ||
-       MM_DUMP_LEAK(dump->pid, buf->pid)) &&
-      buf->seqno >= dump->seqmin && buf->seqno <= dump->seqmax)
+  if ((MM_DUMP_ASSIGN(dump, buf) || MM_DUMP_ALLOC(dump, buf) ||
+       MM_DUMP_LEAK(dump, buf)) && MM_DUMP_SEQNO(dump, buf))
     {
-      char tmp[CONFIG_MM_BACKTRACE * BACKTRACE_PTR_FMT_WIDTH + 1] = "";
-
 #  if CONFIG_MM_BACKTRACE > 0
-      FAR const char *format = " %0*p";
-      int i;
+      char tmp[BACKTRACE_BUFFER_SIZE(CONFIG_MM_BACKTRACE)];
 
-      for (i = 0; i < CONFIG_MM_BACKTRACE &&
-                      buf->backtrace[i]; i++)
-        {
-          snprintf(tmp + i * BACKTRACE_PTR_FMT_WIDTH,
-                   sizeof(tmp) - i * BACKTRACE_PTR_FMT_WIDTH,
-                   format, BACKTRACE_PTR_FMT_WIDTH - 1,
-                   buf->backtrace[i]);
-        }
+      backtrace_format(tmp, sizeof(tmp), buf->backtrace,
+                       CONFIG_MM_BACKTRACE);
+#  else
+      FAR const char *tmp = "";
 #  endif
 
-      syslog(LOG_INFO, "%6d%12zu%12lu%*p%s\n",
-             buf->pid, blocksize, buf->seqno,
+      syslog(LOG_INFO, "%6d%12zu%9zu"
+#ifdef CONFIG_MM_BACKTRACE_SEQNO
+             "%12lu"
+#endif
+             "%*p %s\n",
+             buf->pid, blocksize, overhead,
+#ifdef CONFIG_MM_BACKTRACE_SEQNO
+             buf->seqno,
+#endif
              BACKTRACE_PTR_FMT_WIDTH,
              ((FAR char *)buf - pool->blocksize), tmp);
     }
@@ -232,11 +229,12 @@ mempool_memdump_free_callback(FAR struct mempool_s *pool,
                               FAR const void *input, FAR void *output)
 {
   size_t blocksize = MEMPOOL_REALBLOCKSIZE(pool);
+  size_t overhead = blocksize - pool->blocksize;
 
   if (buf->magic == MEMPOOL_MAGIC_FREE)
     {
-      syslog(LOG_INFO, "%12zu%*p\n",
-             blocksize, BACKTRACE_PTR_FMT_WIDTH,
+      syslog(LOG_INFO, "%12zu%9zu%*p\n",
+             blocksize, overhead, BACKTRACE_PTR_FMT_WIDTH,
              ((FAR char *)buf - pool->blocksize));
     }
 }
@@ -291,10 +289,11 @@ int mempool_init(FAR struct mempool_s *pool, FAR const char *name)
       pool->ibase = NULL;
     }
 
-  if (pool->initialsize >= blocksize + sizeof(sq_entry_t))
+  if (pool->initialsize >= blocksize + MEMPOOL_HEADER_SIZE)
     {
-      size_t ninitial = (pool->initialsize - sizeof(sq_entry_t)) / blocksize;
-      size_t size = ninitial * blocksize + sizeof(sq_entry_t);
+      size_t ninitial = (pool->initialsize - MEMPOOL_HEADER_SIZE) /
+                        blocksize;
+      size_t size = ninitial * blocksize + MEMPOOL_HEADER_SIZE;
       FAR char *base;
 
       base = pool->alloc(pool, size);
@@ -315,7 +314,7 @@ int mempool_init(FAR struct mempool_s *pool, FAR const char *name)
       kasan_poison(base, size);
     }
 
-  spin_initialize(&pool->lock, SP_UNLOCKED);
+  spin_lock_init(&pool->lock);
   if (pool->wait && pool->expandsize == 0)
     {
       nxsem_init(&pool->waitsem, 0, 0);
@@ -325,6 +324,8 @@ int mempool_init(FAR struct mempool_s *pool, FAR const char *name)
   mempool_procfs_register(&pool->procfs, name);
 #  ifdef CONFIG_MM_BACKTRACE_DEFAULT
   pool->procfs.backtrace = true;
+#  elif CONFIG_MM_BACKTRACE > 0
+  pool->procfs.backtrace = false;
 #  endif
 #endif
 
@@ -372,11 +373,11 @@ retry:
           size_t blocksize = MEMPOOL_REALBLOCKSIZE(pool);
 
           spin_unlock_irqrestore(&pool->lock, flags);
-          if (pool->expandsize >= blocksize + sizeof(sq_entry_t))
+          if (pool->expandsize >= blocksize + MEMPOOL_HEADER_SIZE)
             {
-              size_t nexpand = (pool->expandsize - sizeof(sq_entry_t)) /
+              size_t nexpand = (pool->expandsize - MEMPOOL_HEADER_SIZE) /
                                blocksize;
-              size_t size = nexpand * blocksize + sizeof(sq_entry_t);
+              size_t size = nexpand * blocksize + MEMPOOL_HEADER_SIZE;
               FAR char *base = pool->alloc(pool, size);
 
               if (base == NULL)
@@ -393,6 +394,7 @@ retry:
               blk = mempool_remove_queue(pool, &pool->queue);
             }
           else if (!pool->wait ||
+                   pool->expandsize > 0 ||
                    nxsem_wait_uninterruptible(&pool->waitsem) < 0)
             {
               return NULL;
@@ -406,14 +408,15 @@ retry:
 
   pool->nalloc++;
   spin_unlock_irqrestore(&pool->lock, flags);
-  blk = kasan_unpoison(blk, pool->blocksize);
-#ifdef CONFIG_MM_FILL_ALLOCATIONS
-  memset(blk, MM_ALLOC_MAGIC, pool->blocksize);
-#endif
 
 #if CONFIG_MM_BACKTRACE >= 0
   mempool_add_backtrace(pool, (FAR struct mempool_backtrace_s *)
                               ((FAR char *)blk + pool->blocksize));
+#endif
+
+  blk = kasan_unpoison(blk, pool->blocksize);
+#ifdef CONFIG_MM_FILL_ALLOCATIONS
+  memset(blk, MM_ALLOC_MAGIC, pool->blocksize);
 #endif
 
   return blk;
@@ -433,7 +436,6 @@ retry:
 void mempool_release(FAR struct mempool_s *pool, FAR void *blk)
 {
   irqstate_t flags = spin_lock_irqsave(&pool->lock);
-  size_t blocksize = MEMPOOL_REALBLOCKSIZE(pool);
 #if CONFIG_MM_BACKTRACE >= 0
   FAR struct mempool_backtrace_s *buf =
     (FAR struct mempool_backtrace_s *)((FAR char *)blk + pool->blocksize);
@@ -451,10 +453,10 @@ void mempool_release(FAR struct mempool_s *pool, FAR void *blk)
   memset(blk, MM_FREE_MAGIC, pool->blocksize);
 #endif
 
-  if (pool->interruptsize > blocksize)
+  if (pool->ibase)
     {
       if ((FAR char *)blk >= pool->ibase &&
-          (FAR char *)blk < pool->ibase + pool->interruptsize - blocksize)
+          (FAR char *)blk < pool->ibase + pool->interruptsize)
         {
           sq_addlast(blk, &pool->iqueue);
         }
@@ -507,7 +509,7 @@ int mempool_info(FAR struct mempool_s *pool, FAR struct mempoolinfo_s *info)
   info->ordblks = sq_count(&pool->queue);
   info->iordblks = sq_count(&pool->iqueue);
   info->aordblks = pool->nalloc;
-  info->arena = sq_count(&pool->equeue) * sizeof(sq_entry_t) +
+  info->arena = sq_count(&pool->equeue) * MEMPOOL_HEADER_SIZE +
     (info->aordblks + info->ordblks + info->iordblks) * blocksize;
   spin_unlock_irqrestore(&pool->lock, flags);
   info->sizeblks = blocksize;
@@ -598,11 +600,12 @@ void mempool_memdump(FAR struct mempool_s *pool,
     }
 #else
   size_t blocksize = MEMPOOL_REALBLOCKSIZE(pool);
+  size_t overhead = blocksize - pool->blocksize;
 
   /* Avoid race condition */
 
-  syslog(LOG_INFO, "%12zu%*p skip block dump\n",
-         blocksize, BACKTRACE_PTR_FMT_WIDTH, pool);
+  syslog(LOG_INFO, "%12zu%9zu%*p skip block dump\n",
+         blocksize, overhead, BACKTRACE_PTR_FMT_WIDTH, pool);
 #endif
 }
 
@@ -627,16 +630,16 @@ int mempool_deinit(FAR struct mempool_s *pool)
       return -EBUSY;
     }
 
-  if (pool->initialsize >= blocksize + sizeof(sq_entry_t))
+  if (pool->initialsize >= blocksize + MEMPOOL_HEADER_SIZE)
     {
-      count = (pool->initialsize - sizeof(sq_entry_t)) / blocksize;
+      count = (pool->initialsize - MEMPOOL_HEADER_SIZE) / blocksize;
     }
 
   if (count == 0)
     {
-      if (pool->expandsize >= blocksize + sizeof(sq_entry_t))
+      if (pool->expandsize >= blocksize + MEMPOOL_HEADER_SIZE)
         {
-          count = (pool->expandsize - sizeof(sq_entry_t)) / blocksize;
+          count = (pool->expandsize - MEMPOOL_HEADER_SIZE) / blocksize;
         }
     }
 
@@ -648,11 +651,11 @@ int mempool_deinit(FAR struct mempool_s *pool)
     {
       blk = (FAR sq_entry_t *)((FAR char *)blk - count * blocksize);
 
-      blk = kasan_unpoison(blk, count * blocksize + sizeof(sq_entry_t));
+      blk = kasan_unpoison(blk, count * blocksize + MEMPOOL_HEADER_SIZE);
       pool->free(pool, blk);
-      if (pool->expandsize >= blocksize + sizeof(sq_entry_t))
+      if (pool->expandsize >= blocksize + MEMPOOL_HEADER_SIZE)
         {
-          count = (pool->expandsize - sizeof(sq_entry_t)) / blocksize;
+          count = (pool->expandsize - MEMPOOL_HEADER_SIZE) / blocksize;
         }
     }
 

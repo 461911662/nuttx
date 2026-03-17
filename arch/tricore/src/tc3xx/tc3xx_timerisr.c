@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/tricore/src/tc3xx/tc3xx_timerisr.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,12 +35,6 @@
 #include "IfxStm.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-#define SCU_FREQUENCY 100000000UL
-
-/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -55,7 +51,9 @@ void up_timer_initialize(void)
 {
   struct oneshot_lowerhalf_s *lower;
 
-  lower = tricore_systimer_initialize(&MODULE_STM0, 192, SCU_FREQUENCY);
+  lower = tricore_systimer_initialize(&MODULE_STM0,
+                                      TRICORE_SRC2IRQ(&SRC_STM0SR0),
+                                      SCU_FREQUENCY);
 
   DEBUGASSERT(lower != NULL);
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mmap/fs_msync.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -76,13 +78,19 @@ int msync(FAR void *start, size_t length, int flags)
       goto out;
     }
 
-  if (entry->msync == NULL)
+  /* Don't synchronize a file if this is private mapping or there is
+   * no msync handler for this file.
+   */
+
+  if (entry->msync && (entry->flags & MAP_PRIVATE) == 0)
+    {
+      ret = entry->msync(entry, start, length, flags);
+    }
+  else
     {
       ret = OK;
-      goto out;
     }
 
-  ret = entry->msync(entry, start, length, flags);
 out:
   mm_map_unlock();
   if (ret < 0)

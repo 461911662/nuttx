@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mqueue/mq_unlink.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -34,7 +36,7 @@
 
 #include "inode/inode.h"
 #include "mqueue/mqueue.h"
-#include "notify/notify.h"
+#include "vfs/vfs.h"
 
 /****************************************************************************
  * Private Functions
@@ -56,7 +58,7 @@
 
 static void mq_inode_release(FAR struct inode *inode)
 {
-  if (atomic_load(&inode->i_crefs) <= 1)
+  if (atomic_read(&inode->i_crefs) <= 1)
     {
       FAR struct mqueue_inode_s *msgq = inode->i_private;
 
@@ -65,9 +67,9 @@ static void mq_inode_release(FAR struct inode *inode)
           nxmq_free_msgq(msgq);
           inode->i_private = NULL;
         }
-
-      inode_release(inode);
     }
+
+  inode_release(inode);
 }
 
 /****************************************************************************
@@ -151,12 +153,14 @@ int file_mq_unlink(FAR const char *mq_name)
 
   ret = inode_remove(fullpath);
 
-  /* inode_remove() should always fail with -EBUSY because we hae a reference
-   * on the inode.  -EBUSY means that the inode was, indeed, unlinked but
-   * thatis could not be freed because there are references.
+  /* The inode may has been unlinked from the tree in other core,
+   * but it is not yet freed.
    */
 
-  DEBUGASSERT(ret >= 0 || ret == -EBUSY);
+  if (ret < 0 && ret != -EBUSY)
+    {
+      goto errout_with_lock;
+    }
 
   /* Now we do not release the reference count in the normal way (by calling
    * inode release.  Rather, we call mq_inode_release().  mq_inode_release

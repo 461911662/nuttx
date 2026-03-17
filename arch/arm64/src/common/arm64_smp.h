@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_smp.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -77,6 +79,19 @@ void arm64_cpu_boot(int cpu);
  ****************************************************************************/
 
 void arm64_enable_smp(int cpu);
+
+/****************************************************************************
+ * Name: arm64_timer_secondary_init
+ *
+ * Description:
+ *   Initialize the ARM timer for secondary CPUs.
+ *
+ * Returned Value:
+ *   None
+ *
+ ****************************************************************************/
+
+void arm64_timer_secondary_init(void);
 
 #endif /* __ASSEMBLY__ */
 #endif /* CONFIG_SMP */

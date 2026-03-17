@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/rtl8720c/ameba_uart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,7 +33,7 @@
 #include <string.h>
 #include <errno.h>
 #include <debug.h>
-#include <nuttx/irq.h>
+#include <nuttx/spinlock.h>
 #include <nuttx/arch.h>
 #include <nuttx/serial/serial.h>
 #include <nuttx/fs/ioctl.h>
@@ -105,6 +107,7 @@ struct ameba_s
   bool                flow;      /* flow control (RTS/CTS) enabled */
 #endif
 #endif
+  spinlock_t          lock;      /* Ensure mutually exclusive access */
 };
 
 /****************************************************************************
@@ -211,6 +214,7 @@ static struct ameba_s g_uart0priv =
   .flow           = true,
 #endif
 #endif
+  .lock           = SP_UNLOCKED,
 };
 
 static uart_dev_t g_uart0port =
@@ -249,6 +253,7 @@ static struct ameba_s g_uart1priv =
   .flow           = true,
 #endif
 #endif
+  .lock           = SP_UNLOCKED,
 };
 
 static uart_dev_t g_uart1port =
@@ -287,6 +292,7 @@ static struct ameba_s g_uart2priv =
   .flow           = true,
 #endif
 #endif
+  .lock           = SP_UNLOCKED,
 };
 
 static uart_dev_t g_uart2port =
@@ -325,6 +331,7 @@ static struct ameba_s g_uart3priv =
   .flow           = true,
 #endif
 #endif
+  .lock           = SP_UNLOCKED,
 };
 
 static uart_dev_t g_uart3port =
@@ -751,7 +758,7 @@ static int ameba_ioctl(struct file *filep, int cmd, unsigned long arg)
           break;
         }
 
-      flags = enter_critical_section();
+      flags = spin_lock_irqsave(&priv->lock);
       cfsetispeed(termiosp, priv->baud);
       termiosp->c_cflag = ((priv->parity != 0) ? PARENB : 0) |
                           ((priv->parity == 1) ? PARODD : 0);
@@ -776,7 +783,7 @@ static int ameba_ioctl(struct file *filep, int cmd, unsigned long arg)
           break;
         }
 
-      leave_critical_section(flags);
+      spin_unlock_irqrestore(&priv->lock, flags);
     }
 
     break;
@@ -790,7 +797,7 @@ static int ameba_ioctl(struct file *filep, int cmd, unsigned long arg)
           break;
         }
 
-      flags = enter_critical_section();
+      flags = spin_lock_irqsave(&priv->lock);
       switch (termiosp->c_cflag & CSIZE)
         {
         case CS5:
@@ -824,7 +831,7 @@ static int ameba_ioctl(struct file *filep, int cmd, unsigned long arg)
       priv->flow      = (termiosp->c_cflag & CRTSCTS) != 0;
 #endif
       ameba_setup(dev);
-      leave_critical_section(flags);
+      spin_unlock_irqrestore(&priv->lock, flags);
     }
 
     break;
@@ -1017,7 +1024,7 @@ static void ameba_putc(struct ameba_s *priv, int ch)
  *
  * Description:
  *   Performs the low level UART initialization early in debug so that the
- *   serial console will be available during bootup.  This must be called
+ *   serial console will be available during boot up.  This must be called
  *   before uart_serialinit.
  *
  *   NOTE: Configuration of the CONSOLE UART was performed by uart_lowsetup()
@@ -1074,21 +1081,11 @@ void arm_serialinit(void)
  ****************************************************************************/
 
 #ifdef HAVE_AMEBA_CONSOLE
-int up_putc(int ch)
+void up_putc(int ch)
 {
   struct ameba_s *priv = (struct ameba_s *)CONSOLE_DEV.priv;
 
-  /* Check for LF */
-
-  if (ch == '\n')
-    {
-      /* Add CR */
-
-      ameba_putc(priv, '\r');
-    }
-
   ameba_putc(priv, ch);
-  return ch;
 }
 
 #endif

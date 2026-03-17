@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/power/pm/pm_activity.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -195,7 +197,7 @@ void pm_relax(int domain, enum pm_state_e state)
  *   This function is called by a device driver to indicate that it is
  *   performing meaningful activities (non-idle), needs the power kept at
  *   the last the specified level.
- *   And this will timeout after time (ms), menas auto pm_relax
+ *   And this will timeout after time (ms), means auto pm_relax
  *
  * Input Parameters:
  *   domain - The domain of the PM activity
@@ -313,10 +315,10 @@ void pm_wakelock_uninit(FAR struct pm_wakelock_s *wakelock)
     }
 
   wakelock->count = 0;
-  wd_cancel(wdog);
   pm_wakelock_stats_rm(wakelock);
 
   spin_unlock_irqrestore(&pdom->lock, flags);
+  wd_cancel(wdog);
 }
 
 /****************************************************************************
@@ -421,7 +423,7 @@ void pm_wakelock_relax(FAR struct pm_wakelock_s *wakelock)
  *   This function is called by a device driver to indicate that it is
  *   performing meaningful activities (non-idle), needs the power at kept
  *   last the specified level.
- *   And this will be timeout after time (ms), menas auto pm_wakelock_relax
+ *   And this will be timeout after time (ms), means auto pm_wakelock_relax
  *
  * Input Parameters:
  *   wakelock - wakelock ID

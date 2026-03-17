@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/smartfs/smartfs_smart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -145,6 +147,8 @@ const struct mountpt_operations g_smartfs_operations =
   NULL,                  /* mmap */
   smartfs_truncate,      /* truncate */
   NULL,                  /* poll */
+  NULL,                  /* readv */
+  NULL,                  /* writev */
 
   smartfs_sync,          /* sync */
   smartfs_dup,           /* dup */
@@ -791,6 +795,28 @@ static ssize_t smartfs_write(FAR struct file *filep, FAR const char *buffer,
           sf->currsector = SMARTFS_NEXTSECTOR(header);
         }
     }
+
+#ifdef CONFIG_SMARTFS_USE_SECTOR_BUFFER
+
+  /* If data is written to a forward position using seek, the sector
+   * buffer must be updated because it may be referenced later.
+   */
+
+  if (byteswritten > 0)
+    {
+      readwrite.logsector = sf->currsector;
+      readwrite.offset = 0;
+      readwrite.count = fs->fs_llformat.availbytes;
+      readwrite.buffer = (FAR uint8_t *)sf->buffer;
+      ret = FS_IOCTL(fs, BIOC_READSECT, (unsigned long)&readwrite);
+      if (ret < 0)
+        {
+          ferr("ERROR: Error %d reading sector %d\n", ret, sf->currsector);
+          goto errout_with_lock;
+        }
+    }
+
+#endif /* CONFIG_SMARTFS_USE_SECTOR_BUFFER */
 
   /* Now append data to end of the file. */
 

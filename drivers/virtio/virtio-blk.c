@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-blk.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,6 +33,7 @@
 #include <nuttx/semaphore.h>
 #include <nuttx/spinlock.h>
 #include <nuttx/virtio/virtio.h>
+#include <nuttx/init.h>
 
 #include "virtio-blk.h"
 
@@ -114,7 +117,7 @@ begin_packed_struct struct virtio_blk_config_s
 
 struct virtio_blk_priv_s
 {
-  FAR struct virtio_device     *vdev;           /* Virtio deivce */
+  FAR struct virtio_device     *vdev;           /* Virtio device */
   spinlock_t                    lock;           /* Lock */
   uint64_t                      nsectors;       /* Sectore numbers */
   uint32_t                      block_size;     /* Block size */
@@ -195,7 +198,7 @@ static void virtio_blk_wait_complete(FAR struct virtqueue *vq,
   FAR struct virtio_blk_priv_s *priv = vq->vq_dev->priv;
   FAR sem_t *sem;
 
-  if (up_interrupt_context())
+  if (up_interrupt_context() || OSINIT_IS_PANIC())
     {
       for (; ; )
         {
@@ -517,12 +520,12 @@ static int virtio_blk_init(FAR struct virtio_blk_priv_s *priv,
   virtio_set_status(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
   virtio_negotiate_features(vdev, (1UL << VIRTIO_BLK_F_RO) |
                                   (1UL << VIRTIO_BLK_F_BLK_SIZE) |
-                                  (1UL << VIRTIO_BLK_F_FLUSH));
+                                  (1UL << VIRTIO_BLK_F_FLUSH), NULL);
   virtio_set_status(vdev, VIRTIO_CONFIG_FEATURES_OK);
 
   vqname[0]   = "virtio_blk_vq";
   callback[0] = virtio_blk_done;
-  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback);
+  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);

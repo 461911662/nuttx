@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-rpmb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -90,6 +92,8 @@ static const struct file_operations g_virtio_rpmb_ops =
   NULL,               /* mmap */
   NULL,               /* truncate */
   NULL,               /* poll */
+  NULL,               /* readv */
+  NULL,               /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   NULL,               /* unlink */
 #endif
@@ -161,7 +165,7 @@ static int virtio_rpmb_transact(FAR struct virtio_rpmb_priv_s *priv,
   virtqueue_kick(vq);
   spin_unlock_irqrestore(&priv->lock, flags);
 
-  /* Wait fot completion */
+  /* Wait for completion */
 
   nxsem_wait_uninterruptible(&cookie.sem);
   return cookie.len;
@@ -211,7 +215,7 @@ static int virtio_rpmb_init(FAR struct virtio_rpmb_priv_s *priv,
 
   vqname[0]   = "virtio_rpmb_vq";
   callback[0] = virtio_rpmb_done;
-  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback);
+  ret = virtio_create_virtqueues(vdev, 0, 1, vqname, callback, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);

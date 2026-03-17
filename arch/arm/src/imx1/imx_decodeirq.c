@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/imx1/imx_decodeirq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -60,7 +62,8 @@ uint32_t *arm_decodeirq(uint32_t *regs)
   struct tcb_s *tcb = this_task();
 
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
-  up_set_current_regs(regs);
+  tcb->xcp.regs = regs;
+  up_set_interrupt_context(true);
   err("ERROR: Unexpected IRQ\n");
   PANIC();
   return NULL;
@@ -68,14 +71,13 @@ uint32_t *arm_decodeirq(uint32_t *regs)
   uint32_t regval;
   int irq;
 
-  /* Current regs non-zero indicates that we are processing an interrupt;
-   * current_regs is also used to manage interrupt level context switches.
-   *
-   * Nested interrupts are not supported.
-   */
+  /* Nested interrupts are not supported. */
 
-  DEBUGASSERT(up_current_regs() == NULL);
-  up_set_current_regs(regs);
+  DEBUGASSERT(!up_interrupt_context());
+
+  /* Set irq flag */
+
+  up_set_interrupt_context(true);
   tcb->xcp.regs = regs;
 
   /* Loop while there are pending interrupts to be processed */
@@ -105,12 +107,7 @@ uint32_t *arm_decodeirq(uint32_t *regs)
           tcb = this_task();
 
 #ifdef CONFIG_ARCH_ADDRENV
-          /* Check for a context switch.  If a context switch occurred, then
-           * current_regs will have a different value than it did on entry.
-           * If an interrupt level context switch has occurred, then
-           * establish the correct address environment before returning
-           * from the interrupt.
-           */
+          /* Check for a context switch. */
 
           if (regs != tcb->xcp.regs)
             {
@@ -120,18 +117,16 @@ uint32_t *arm_decodeirq(uint32_t *regs)
                * thread at the head of the ready-to-run list.
                */
 
-              addrenv_switch(NULL);
+              addrenv_switch(tcb);
             }
 #endif
         }
     }
   while (irq < NR_IRQS);
 
-  /* Set current_regs to NULL to indicate that we are no longer in
-   * an interrupt handler.
-   */
+  /* Set irq flag */
 
-  up_set_current_regs(NULL);
+  up_set_interrupt_context(false);
   return NULL;  /* Return not used in this architecture */
 #endif
 }

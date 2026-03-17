@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-m/arm_sigdeliver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -87,11 +89,7 @@ retry:
 
   while (rtcb->irqcount > 0)
     {
-#ifdef CONFIG_ARMV7M_USEBASEPRI
       leave_critical_section((uint8_t)regs[REG_BASEPRI]);
-#else
-      leave_critical_section((uint16_t)regs[REG_PRIMASK]);
-#endif
     }
 #endif /* CONFIG_SMP */
 
@@ -137,11 +135,7 @@ retry:
       (rtcb->flags & TCB_FLAG_SIGNAL_ACTION) == 0)
     {
 #ifdef CONFIG_SMP
-#  ifdef CONFIG_ARMV7M_USEBASEPRI
       leave_critical_section((uint8_t)regs[REG_BASEPRI]);
-#  else
-      leave_critical_section((uint16_t)regs[REG_PRIMASK]);
-#  endif
 #endif
       goto retry;
     }
@@ -166,13 +160,10 @@ retry:
 #ifdef CONFIG_SMP
   /* We need to keep the IRQ lock until task switching */
 
-  rtcb->irqcount++;
-#ifdef CONFIG_ARMV7M_USEBASEPRI
-  leave_critical_section((uint8_t)regs[REG_BASEPRI]);
-#else
-  leave_critical_section((uint16_t)regs[REG_PRIMASK]);
+  leave_critical_section(up_irq_save());
 #endif
-  rtcb->irqcount--;
-#endif
-  arm_fullcontextrestore(regs);
+
+  rtcb->xcp.regs = rtcb->xcp.saved_regs;
+  arm_fullcontextrestore();
+  UNUSED(regs);
 }

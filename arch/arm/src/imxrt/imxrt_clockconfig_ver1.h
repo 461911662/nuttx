@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/imxrt/imxrt_clockconfig_ver1.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -19,7 +21,7 @@
  ****************************************************************************/
 
 #ifndef __ARCH_ARM_SRC_IMXRT_IMXRT_CLOCKCONFIG_VER1_H
-#define __ARCH_ARM_SRC_IMXRT_IMXRT_CLOCKCONFIG_VER2_H
+#define __ARCH_ARM_SRC_IMXRT_IMXRT_CLOCKCONFIG_VER1_H
 
 /****************************************************************************
  * Included Files

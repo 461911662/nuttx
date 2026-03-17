@@ -45,6 +45,7 @@
 
 #include <nuttx/net/netdev.h>
 #include <nuttx/net/radiodev.h>
+#include <nuttx/net/vlan.h>
 
 #ifdef CONFIG_NET_6LOWPAN
 #  include <nuttx/net/sixlowpan.h>
@@ -393,11 +394,11 @@ static int netdev_bluetooth_ioctl(FAR struct socket *psock, int cmd,
 {
   FAR struct net_driver_s *dev;
   FAR char *ifname;
-  int ret = -EINVAL;
+  int ret = -ENOTTY;
 
-  if (arg != 0ul)
+  if (_BLUETOOTHIOCVALID(cmd))
     {
-      if (_BLUETOOTHIOCVALID(cmd))
+      if (arg != 0ul)
         {
           /* Get the name of the Bluetooth device to receive the IOCTL
            * command
@@ -410,9 +411,9 @@ static int netdev_bluetooth_ioctl(FAR struct socket *psock, int cmd,
         }
       else
         {
-          /* Not a Bluetooth IOCTL command */
+          /* Argument is invalid */
 
-          return -ENOTTY;
+          return -EINVAL;
         }
 
       /* Find the device with this name */
@@ -458,9 +459,9 @@ static int netdev_iee802154_ioctl(FAR struct socket *psock, int cmd,
   FAR char *ifname;
   int ret = -ENOTTY;
 
-  if (arg != 0ul)
+  if (_MAC802154IOCVALID(cmd))
     {
-      if (_MAC802154IOCVALID(cmd))
+      if (arg != 0ul)
         {
           /* Get the IEEE802.15.4 MAC device to receive the radio IOCTL
            * command
@@ -473,9 +474,9 @@ static int netdev_iee802154_ioctl(FAR struct socket *psock, int cmd,
         }
       else
         {
-          /* Not an EEE802.15.4 MAC IOCTL command */
+          /* Argument is invalid */
 
-          return -ENOTTY;
+          return -EINVAL;
         }
 
       /* Find the device with this name */
@@ -519,9 +520,9 @@ static int netdev_pktradio_ioctl(FAR struct socket *psock, int cmd,
   FAR char *ifname;
   int ret = -ENOTTY;
 
-  if (arg != 0ul)
+  if (_PKRADIOIOCVALID(cmd))
     {
-      if (_PKRADIOIOCVALID(cmd))
+      if (arg != 0ul)
         {
           /* Get the packet radio device to receive the radio IOCTL
            * command
@@ -534,10 +535,9 @@ static int netdev_pktradio_ioctl(FAR struct socket *psock, int cmd,
         }
       else
         {
-          /* Not a packet radio IOCTL command */
+          /* Argument is invalid */
 
-          nwarn("WARNING: Not a packet radio IOCTL command: %d\n", cmd);
-          return -ENOTTY;
+          return -EINVAL;
         }
 
       /* Find the device with this name */
@@ -579,19 +579,19 @@ static int netdev_cell_ioctl(FAR struct socket *psock, int cmd,
   FAR struct net_driver_s *dev = NULL;
   int ret = -ENOTTY;
 
-  ninfo("cmd: %d\n", cmd);
-  net_lock();
+  ninfo("cmd: 0x%04x\n", cmd);
 
   if (_CELLIOCVALID(cmd))
     {
       dev = netdev_findbyname(req->ifr_name);
       if (dev && dev->d_ioctl)
         {
+          netdev_lock(dev);
           ret = dev->d_ioctl(dev, cmd, (unsigned long)(uintptr_t)req);
+          netdev_unlock(dev);
         }
     }
 
-  net_unlock();
   return ret;
 }
 #endif
@@ -630,7 +630,7 @@ static int netdev_wifr_ioctl(FAR struct socket *psock, int cmd,
       dev = netdev_findbyname(req->ifr_name);
       if (cmd == SIOCGIWNAME)
         {
-          if (dev == NULL)
+          if (dev == NULL || dev->d_lltype != NET_LL_IEEE80211)
             {
               ret = -ENODEV;
             }
@@ -646,6 +646,53 @@ static int netdev_wifr_ioctl(FAR struct socket *psock, int cmd,
           /* Just forward the IOCTL to the wireless driver */
 
           ret = dev->d_ioctl(dev, cmd, (unsigned long)(uintptr_t)req);
+        }
+    }
+
+  return ret;
+}
+#endif
+
+/****************************************************************************
+ * Name: netdev_vlan_ioctl
+ *
+ * Description:
+ *   Perform VLAN network device specific operations.
+ *
+ * Input Parameters:
+ *   psock    Socket structure
+ *   cmd      The ioctl command
+ *   req      The argument of the ioctl cmd
+ *
+ * Returned Value:
+ *   >=0 on success (positive non-zero values are cmd-specific)
+ *   Negated errno returned on failure.
+ *
+ ****************************************************************************/
+
+#if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NET_VLAN)
+static int netdev_vlan_ioctl(FAR struct socket *psock, int cmd,
+                             FAR struct vlan_ioctl_args *req)
+{
+  FAR struct net_driver_s *dev;
+  int ret = -ENOTTY;
+
+  /* Verify that this is a valid VLAN IOCTL command */
+
+  if (cmd == SIOCGIFVLAN || cmd == SIOCSIFVLAN)
+    {
+      /* Get the network device associated with the IOCTL command */
+
+      dev = netdev_findbyname(req->device1);
+      if (dev != NULL)
+        {
+          /* Just forward the IOCTL to the network driver */
+
+          ret = dev->d_ioctl(dev, cmd, (unsigned long)(uintptr_t)req);
+        }
+      else
+        {
+          ret = -ENODEV;
         }
     }
 
@@ -726,6 +773,8 @@ static ssize_t net_ioctl_ifreq_arglen(uint8_t domain, int cmd)
       case SIOCACANSTDFILTER:
       case SIOCDCANSTDFILTER:
       case SIOCCANRECOVERY:
+      case SIOCGCANSTATE:
+      case SIOCSCANSTATE:
       case SIOCSIFNAME:
       case SIOCGIFNAME:
       case SIOCGIFINDEX:
@@ -778,9 +827,7 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
   unsigned int idx = 0;
   int ret = OK;
 
-  ninfo("cmd: %d\n", cmd);
-
-  net_lock();
+  ninfo("cmd: 0x%04x\n", cmd);
 
   /* Execute commands that do not need ifr_name or lifr_name */
 
@@ -836,7 +883,6 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
       default:
         if (req == NULL)
           {
-            net_unlock();
             return -ENOTTY;
           }
 
@@ -863,9 +909,10 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
 
   if (dev == NULL)
     {
-      net_unlock();
       return ret;
     }
+
+  netdev_lock(dev);
 
   /* Execute commands that need ifr_name or lifr_name */
 
@@ -976,29 +1023,50 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
 #endif
 
       case SIOCSIFFLAGS:  /* Sets the interface flags */
+#ifdef CONFIG_NET_ARP
 
-        /* Is this a request to bring the interface up? */
+        /* Is this a request to set the IFF_NOARP flag? */
 
-        if ((req->ifr_flags & IFF_UP) != 0)
+        if (IFF_IS_NOARP(req->ifr_flags) != IFF_IS_NOARP(dev->d_flags))
           {
-            /* Yes.. bring the interface up */
+            if (IFF_IS_NOARP(req->ifr_flags))
+              {
+                /* Yes. Set the IFF_NOARP flag */
 
-            ret = netdev_ifup(dev);
+                IFF_SET_NOARP(dev->d_flags);
+              }
+            else
+              {
+                /* No. Clear the IFF_NOARP flag */
+
+                IFF_CLR_NOARP(dev->d_flags);
+              }
+          }
+#endif
+
+        /* Is this a request to bring the interface up/down? */
+
+        if (IFF_IS_UP(req->ifr_flags) != IFF_IS_UP(dev->d_flags))
+          {
+            if (IFF_IS_UP(req->ifr_flags))
+              {
+                /* Yes.. bring the interface up */
+
+                ret = netdev_ifup(dev);
 #ifdef CONFIG_NET_ARP_ACD
-            /* having address then start acd */
+                /* having address then start acd */
 
-            arp_acd_setup(dev);
+                arp_acd_setup(dev);
 #endif /* CONFIG_NET_ARP_ACD */
+              }
+            else
+              {
+                /* Yes.. take the interface down */
+
+                ret = netdev_ifdown(dev);
+              }
           }
 
-        /* Is this a request to take the interface down? */
-
-        else if ((req->ifr_flags & IFF_DOWN) != 0)
-          {
-            /* Yes.. take the interface down */
-
-            ret = netdev_ifdown(dev);
-          }
         break;
 
       case SIOCGIFFLAGS:  /* Gets the interface flags */
@@ -1177,8 +1245,18 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
 #endif
 
 #if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NETDEV_CAN_BITRATE_IOCTL)
-      case SIOCGCANBITRATE:  /* Get bitrate from a CAN controller */
       case SIOCSCANBITRATE:  /* Set bitrate of a CAN controller */
+        if (dev->d_flags & IFF_UP)
+          {
+            /* Cannot set bitrate if the interface is up. */
+
+            ret = -EBUSY;
+            break;
+          }
+
+        /* If down, fall-through to common code in SIOCGCANBITRATE. */
+
+      case SIOCGCANBITRATE:  /* Get bitrate from a CAN controller */
         if (dev->d_ioctl)
           {
             FAR struct can_ioctl_data_s *can_bitrate_data =
@@ -1213,6 +1291,23 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
         break;
 #endif
 
+#if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NETDEV_CAN_STATE_IOCTL)
+      case SIOCGCANSTATE:  /* Get state from a CAN/LIN controller */
+      case SIOCSCANSTATE:  /* Set the LIN/CAN controller state */
+        if (dev->d_ioctl)
+          {
+            FAR struct can_ioctl_state_s *can_state =
+              &req->ifr_ifru.ifru_can_state;
+            ret = dev->d_ioctl(dev, cmd,
+                          (unsigned long)(uintptr_t)can_state);
+          }
+        else
+          {
+            ret = -ENOSYS;
+          }
+        break;
+#endif
+
 #ifdef CONFIG_NETDEV_IFINDEX
       case SIOCGIFINDEX:  /* Index to name mapping */
         req->ifr_ifindex = dev->d_ifindex;
@@ -1224,7 +1319,7 @@ static int netdev_ifr_ioctl(FAR struct socket *psock, int cmd,
         break;
     }
 
-  net_unlock();
+  netdev_unlock(dev);
   return ret;
 }
 
@@ -1283,9 +1378,7 @@ static int netdev_imsf_ioctl(FAR struct socket *psock, int cmd,
   FAR struct net_driver_s *dev;
   int ret = -EINVAL;
 
-  ninfo("cmd: %d\n", cmd);
-
-  net_lock();
+  ninfo("cmd: 0x%04x\n", cmd);
 
   /* Execute the command */
 
@@ -1296,6 +1389,7 @@ static int netdev_imsf_ioctl(FAR struct socket *psock, int cmd,
           dev = netdev_imsfdev(imsf);
           if (dev)
             {
+              netdev_lock(dev);
               if (imsf->imsf_fmode == MCAST_INCLUDE)
                 {
                   ret = igmp_joingroup(dev, &imsf->imsf_multiaddr);
@@ -1305,6 +1399,8 @@ static int netdev_imsf_ioctl(FAR struct socket *psock, int cmd,
                   DEBUGASSERT(imsf->imsf_fmode == MCAST_EXCLUDE);
                   ret = igmp_leavegroup(dev, &imsf->imsf_multiaddr);
                 }
+
+              netdev_unlock(dev);
             }
         }
         break;
@@ -1315,7 +1411,6 @@ static int netdev_imsf_ioctl(FAR struct socket *psock, int cmd,
         break;
     }
 
-  net_unlock();
   return ret;
 }
 #endif
@@ -1345,7 +1440,7 @@ static bool ioctl_arpreq_parse(FAR struct arpreq *req,
     {
       *addr = (FAR struct sockaddr_in *)&req->arp_pa;
       *dev  = req->arp_dev[0] != '\0' ?
-              netdev_findbyname((FAR const char *)req->arp_dev) :
+              netdev_findbyname(req->arp_dev) :
               netdev_findby_ripv4addr(INADDR_ANY, (*addr)->sin_addr.s_addr);
       return true;
     }
@@ -1395,7 +1490,8 @@ static int netdev_arp_ioctl(FAR struct socket *psock, int cmd,
                */
 
               ret = arp_update(dev, addr->sin_addr.s_addr,
-                               (FAR const uint8_t *)req->arp_ha.sa_data);
+                               (FAR const uint8_t *)req->arp_ha.sa_data,
+                               req->arp_flags);
             }
           else
             {
@@ -1836,6 +1932,16 @@ int psock_vioctl(FAR struct socket *psock, int cmd, va_list ap)
     {
       ret = netdev_cell_ioctl(psock, cmd,
                               (FAR struct icellreq *)(uintptr_t)arg);
+    }
+#endif
+
+#if defined(CONFIG_NETDEV_IOCTL) && defined(CONFIG_NET_VLAN)
+  /* Check for a VLAN command */
+
+  if (ret == -ENOTTY)
+    {
+      ret = netdev_vlan_ioctl(psock, cmd,
+                              (FAR struct vlan_ioctl_args *)(uintptr_t)arg);
     }
 #endif
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_vector_table.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -40,7 +42,7 @@
 
 /* Save Corruptible Registers and exception context
  * on the task stack
- * note: allocate stackframe with XCPTCONTEXT_GP_REGS
+ * note: allocate stackframe with ARM64_CONTEXT_REGS
  *     which is ARM64_ESF_REGS + ARM64_CS_REGS
  *     but only save ARM64_ESF_REGS
  */
@@ -78,21 +80,22 @@
 #endif
     stp    \xreg0, \xreg1,  [sp, #8 * REG_ELR]
 
+    mrs    \xreg0, sctlr_el1
+    str    \xreg0,  [sp, #8 * REG_SCTLR_EL1]
+
     mrs    \xreg0, sp_el0
     mrs    \xreg1, tpidrro_el0
-    stp    \xreg0, \xreg1,  [sp, #8 * REG_SP_EL0]
+    stp    \xreg0, \xreg1, [sp, #8 * REG_SP_EL0]
 
     /* Increment exception depth */
 
-    mrs    \xreg0, tpidrro_el0
-    mov    \xreg1, #1
-    add    \xreg0, \xreg0, \xreg1
-    msr    tpidrro_el0, \xreg0
+    add    \xreg1, \xreg1, #1
+    msr    tpidrro_el0, \xreg1
 
     /* Save the FPU registers */
 
 #ifdef CONFIG_ARCH_FPU
-    add    x0, sp, #8 * XCPTCONTEXT_GP_REGS
+    add    x0, sp, #8 * ARM64_CONTEXT_REGS
     bl     arm64_fpu_save
     ldr    x0, [sp, #8 * REG_X0]
 #endif
@@ -140,12 +143,13 @@
  * +------------------+------------------+-------------------------+
  */
 
-GTEXT(_vector_table)
+SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
 
     /* The whole table must be 2K aligned */
 
     .align 11
-SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
+
+GTEXT(_vector_table)
 
     /* Current EL with SP0 / Synchronous */
 
@@ -250,7 +254,7 @@ SECTION_SUBSEC_FUNC(exc_vector_table,_vector_table_section,_vector_table)
 GTEXT(arm64_exit_exception)
 SECTION_FUNC(text, arm64_exit_exception)
 #ifdef CONFIG_ARCH_FPU
-    add    x0, sp, #8 * XCPTCONTEXT_GP_REGS
+    add    x0, sp, #8 * ARM64_CONTEXT_REGS
     bl     arm64_fpu_restore
 #endif
 
@@ -263,6 +267,11 @@ SECTION_FUNC(text, arm64_exit_exception)
 #else
     msr    elr_el1,   x0
     msr    spsr_el1,  x1
+#endif
+
+#ifdef CONFIG_ARM64_MTE
+    ldr    x0,   [sp, #8 * REG_SCTLR_EL1]
+    msr    sctlr_el1, x0
 #endif
 
     ldp    x0, x1,   [sp, #8 * REG_SP_EL0]

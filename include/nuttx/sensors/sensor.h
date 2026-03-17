@@ -29,6 +29,7 @@
 
 #include <nuttx/config.h>
 
+#include <debug.h>
 #include <sys/types.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -160,6 +161,26 @@
  */
 
 #define SENSOR_BODY_COORDINATE_P7                   7
+
+#ifdef CONFIG_SENSORS_MONITOR
+#  define smlog(level, name, fmt, ...) \
+    do  \
+      { \
+        if (level <= sensor_monitor_level(name)) \
+          { \
+            sninfo("[topic: %s] "fmt, name, ##__VA_ARGS__); \
+          } \
+      } \
+    while (0)
+#else
+#  define smlog(log_level, name, fmt,...)
+#endif
+
+#define smerr(name, fmt, ...)    smlog(LOG_ERR, name, fmt, ##__VA_ARGS__)
+#define smwarn(name, fmt, ...)   smlog(LOG_WARN, name, fmt, ##__VA_ARGS__)
+#define smnotice(name, fmt, ...) smlog(LOG_NOTICE, name, fmt, ##__VA_ARGS__)
+#define sminfo(name, fmt, ...)   smlog(LOG_INFO, name, fmt, ##__VA_ARGS__)
+#define smdebug(name, fmt, ...)  smlog(LOG_DEBUG, name, fmt, ##__VA_ARGS__)
 
 /****************************************************************************
  * Inline Functions
@@ -479,6 +500,25 @@ struct sensor_ops_s
                        FAR struct sensor_device_info_s *info);
 
   /**************************************************************************
+   * Name: set_nonwakeup
+   *
+   * With this method, the user can disable wakeup capacity for the sensor
+   * when data or fifo ready to avoid wakeup cpu, and save power.
+   *
+   * Input Parameters:
+   *   lower      - The instance of lower half sensor driver.
+   *   filep      - The pointer of file, represents each user using sensor.
+   *   nonwakeup  - true(nonwakeup) and false(wakeup)
+   *
+   * Returned Value:
+   *   Zero (OK) on success; a negated errno value on failure.
+   *
+   **************************************************************************/
+
+  CODE int (*set_nonwakeup)(FAR struct sensor_lowerhalf_s *lower,
+                            FAR struct file *filep, bool nonwakeup);
+
+  /**************************************************************************
    * Name: control
    *
    * With this method, the user can set some special config for the sensor,
@@ -532,13 +572,6 @@ struct sensor_lowerhalf_s
 
   uint32_t nbuffer;
 
-  /* The uncalibrated use to describe whether the sensor event is
-   * uncalibrated. True is uncalibrated data, false is calibrated data,
-   * default false.
-   */
-
-  bool uncalibrated;
-
   /* The lower half sensor driver operations */
 
   FAR const struct sensor_ops_s *ops;
@@ -560,6 +593,7 @@ struct sensor_lowerhalf_s
        * Returned Value:
        *   The bytes of push is returned when success;
        *   A negated errno value is returned on any failure.
+       *
        **********************************************************************/
 
       sensor_push_event_t push_event;
@@ -576,6 +610,7 @@ struct sensor_lowerhalf_s
        *
        * Input Parameters:
        *   priv   - Upper half driver handle
+       *
        **********************************************************************/
 
       sensor_notify_event_t notify_event;
@@ -589,6 +624,7 @@ struct sensor_lowerhalf_s
  *
  * Input Parameters:
  *   priv   - Upper half driver handle
+ *
  ****************************************************************************/
 
   CODE void (*sensor_lock)(FAR void * priv);
@@ -658,7 +694,7 @@ void sensor_remap_vector_raw16(FAR const int16_t *in, FAR int16_t *out,
  *           instance is bound to the sensor driver and must persist as long
  *           as the driver persists.
  *   devno - The user specifies which device of this type, from 0. If the
- *           devno alerady exists, -EEXIST will be returned.
+ *           devno already exists, -EEXIST will be returned.
  *
  * Returned Value:
  *   OK if the driver was successfully register; A negated errno value is
@@ -707,6 +743,7 @@ int sensor_custom_register(FAR struct sensor_lowerhalf_s *dev,
  *           instance is bound to the sensor driver and must persists as long
  *           as the driver persists.
  *   devno - The user specifies which device of this type, from 0.
+ *
  ****************************************************************************/
 
 void sensor_unregister(FAR struct sensor_lowerhalf_s *dev, int devno);
@@ -723,6 +760,7 @@ void sensor_unregister(FAR struct sensor_lowerhalf_s *dev, int devno);
  *           instance is bound to the sensor driver and must persists as long
  *           as the driver persists.
  *   path  - The user specifies path of device, ex: /dev/uorb/xxx
+ *
  ****************************************************************************/
 
 void sensor_custom_unregister(FAR struct sensor_lowerhalf_s *dev,
@@ -734,7 +772,8 @@ void sensor_custom_unregister(FAR struct sensor_lowerhalf_s *dev,
  * Description:
  *   This function registers usensor character node "/dev/usensor", so that
  *   application can register user sensor by this node. The node will
- *   manager all user sensor in this character dirver.
+ *   manage all user sensor in this character driver.
+ *
  ****************************************************************************/
 
 #ifdef CONFIG_USENSOR
@@ -754,6 +793,7 @@ int usensor_initialize(void);
  *
  * Returned Value:
  *   The takeover rpmsg lowerhalf returned on success, NULL on failure.
+ *
  ****************************************************************************/
 
 #ifdef CONFIG_SENSORS_RPMSG
@@ -772,6 +812,7 @@ FAR struct sensor_lowerhalf_s *sensor_rpmsg_register(
  *
  * Input Parameters:
  *   lower - The instance of lower half sensor driver.
+ *
  ****************************************************************************/
 
 #ifdef CONFIG_SENSORS_RPMSG
@@ -783,14 +824,45 @@ void sensor_rpmsg_unregister(FAR struct sensor_lowerhalf_s *lower);
  *
  * Description:
  *   This function initializes the context of sensor rpmsg, registers
- *   rpmsg callback and prepares enviroment to intercat with remote sensor.
+ *   rpmsg callback and prepares environment to interact with remote sensor.
  *
  * Returned Value:
  *   OK on success; A negated errno value is returned on any failure.
+ *
  ****************************************************************************/
 
 #ifdef CONFIG_SENSORS_RPMSG
 int sensor_rpmsg_initialize(void);
+#endif
+
+/****************************************************************************
+ *Name: sensor_monitor_initialize
+ *
+ * Description:
+ *   Initialize sensor procfs.
+ *
+ * Return Value:
+ *   0 on success, or negative error code on failure.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_SENSORS_MONITOR
+int sensor_monitor_initialize(void);
+#endif
+
+/****************************************************************************
+ * Name: sensor_monitor_level
+ *
+ * Description:
+ *   get sensor monitor log level
+ *
+ * Return Value:
+ *   syslog level
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_SENSORS_MONITOR
+int sensor_monitor_level(FAR const char *name);
 #endif
 
 #undef EXTERN

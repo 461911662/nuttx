@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/bh1749nuc_uorb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,15 +37,7 @@
 #include "bh1749nuc_base.h"
 
 /****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-/****************************************************************************
- * Pre-processor Definitions
- ****************************************************************************/
-
-/****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 enum bh1749nuc_idx_e
@@ -119,6 +113,7 @@ static const struct sensor_ops_s g_bh1749nuc_sensor_ops =
   NULL,                 /* set_calibvalue */
   NULL,                 /* calibrate */
   NULL,                 /* get_info */
+  NULL,                 /* set_nonwakeup */
   bh1749nuc_control
 };
 
@@ -390,7 +385,7 @@ static int bh1749nuc_thread(int argc, FAR char **argv)
       /* Sleeping thread before fetching the next sensor data */
 
       min_interval = MIN(rgb->interval, ir->interval);
-      nxsig_usleep(min_interval);
+      nxsched_usleep(min_interval);
     }
 
   return OK;

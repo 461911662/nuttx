@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_epoll.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -40,6 +42,7 @@
 #include <nuttx/list.h>
 #include <nuttx/mutex.h>
 #include <nuttx/signal.h>
+#include <nuttx/tls.h>
 
 #include "inode/inode.h"
 #include "fs_heap.h"
@@ -54,6 +57,7 @@ struct epoll_node_s
   epoll_data_t             data;
   bool                     notified;
   struct pollfd            pfd;
+  FAR struct file         *filep;
   FAR struct epoll_head_s *eph;
 };
 
@@ -141,7 +145,7 @@ static FAR epoll_head_t *epoll_head_from_fd(int fd, FAR struct file **filep)
 
   /* Get file pointer by file descriptor */
 
-  ret = fs_getfilep(fd, filep);
+  ret = file_get(fd, filep);
   if (ret < 0)
     {
       set_errno(-ret);
@@ -152,7 +156,7 @@ static FAR epoll_head_t *epoll_head_from_fd(int fd, FAR struct file **filep)
 
   if ((*filep)->f_inode->u.i_ops != &g_epoll_ops)
     {
-      fs_putfilep(*filep);
+      file_put(*filep);
       set_errno(EBADF);
       return NULL;
     }
@@ -196,7 +200,18 @@ static int epoll_do_close(FAR struct file *filep)
       nxmutex_destroy(&eph->lock);
       list_for_every_entry(&eph->setup, epn, epoll_node_t, node)
         {
-          poll_fdsetup(epn->pfd.fd, &epn->pfd, false);
+          file_poll(epn->filep, &epn->pfd, false);
+          file_put(epn->filep);
+        }
+
+      list_for_every_entry(&eph->teardown, epn, epoll_node_t, node)
+        {
+          file_put(epn->filep);
+        }
+
+      list_for_every_entry(&eph->oneshot, epn, epoll_node_t, node)
+        {
+          file_put(epn->filep);
         }
 
       list_for_every_entry_safe(&eph->extend, epn, tmp, epoll_node_t, node)
@@ -254,7 +269,7 @@ static int epoll_do_create(int size, int flags)
 
   /* Alloc the file descriptor */
 
-  fd = file_allocate(&g_epoll_inode, flags, 0, eph, 0, true);
+  fd = file_allocate_from_inode(&g_epoll_inode, flags, 0, eph, 0);
   if (fd < 0)
     {
       nxmutex_destroy(&eph->lock);
@@ -300,11 +315,11 @@ static int epoll_setup(FAR epoll_head_t *eph)
 
       epn->notified    = false;
       epn->pfd.revents = 0;
-      ret = poll_fdsetup(epn->pfd.fd, &epn->pfd, true);
+      ret = file_poll(epn->filep, &epn->pfd, true);
       if (ret < 0)
         {
-          ferr("epoll setup failed, fd=%d, events=%08" PRIx32 ", ret=%d\n",
-               epn->pfd.fd, epn->pfd.events, ret);
+          ferr("epoll setup failed, filep=%p, events=%08" PRIx32 ", "
+               "ret=%d\n", epn->filep, epn->pfd.events, ret);
           break;
         }
 
@@ -320,7 +335,7 @@ static int epoll_setup(FAR epoll_head_t *eph)
  * Name: epoll_teardown
  *
  * Description:
- *   Teardown all the notifed fd and check the notified fd's event with user
+ *   Teardown all the notified fd and check the notified fd's event with user
  *   expected event.
  *
  * Input Parameters:
@@ -329,7 +344,7 @@ static int epoll_setup(FAR epoll_head_t *eph)
  *   maxevents - The epoll events array size
  *
  * Returned Value:
- *   Return the number of fd that notifed and the events is also user
+ *   Return the number of fd that notified and the events is also user
  *   expected.
  *
  ****************************************************************************/
@@ -345,7 +360,7 @@ static int epoll_teardown(FAR epoll_head_t *eph, FAR struct epoll_event *evs,
 
   list_for_every_entry_safe(&eph->setup, epn, tepn, epoll_node_t, node)
     {
-      /* Only check the notifed fd */
+      /* Only check the notified fd */
 
       if (!epn->notified)
         {
@@ -354,7 +369,7 @@ static int epoll_teardown(FAR epoll_head_t *eph, FAR struct epoll_event *evs,
 
       /* Teradown all the notified fd */
 
-      poll_fdsetup(epn->pfd.fd, &epn->pfd, false);
+      file_poll(epn->filep, &epn->pfd, false);
       list_delete(&epn->node);
 
       if (epn->pfd.revents != 0 && i < maxevents)
@@ -378,6 +393,19 @@ static int epoll_teardown(FAR epoll_head_t *eph, FAR struct epoll_event *evs,
 
   nxmutex_unlock(&eph->lock);
   return i;
+}
+
+/****************************************************************************
+ * Name: epoll_cleanup
+ *
+ * Description:
+ *   Cleanup the epoll operation.
+ *
+ ****************************************************************************/
+
+static void epoll_cleanup(FAR void *arg)
+{
+  file_put(arg);
 }
 
 /****************************************************************************
@@ -486,6 +514,7 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
   eph = epoll_head_from_fd(epfd, &filep);
   if (eph == NULL)
     {
+      set_errno(EBADF);
       return ERROR;
     }
 
@@ -563,9 +592,17 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
         epn->pfd.cb      = epoll_default_cb;
         epn->pfd.revents = 0;
 
-        ret = poll_fdsetup(fd, &epn->pfd, true);
+        ret = file_get(fd, &epn->filep);
         if (ret < 0)
           {
+            list_add_tail(&eph->free, &epn->node);
+            goto err;
+          }
+
+        ret = file_poll(epn->filep, &epn->pfd, true);
+        if (ret < 0)
+          {
+            file_put(epn->filep);
             list_add_tail(&eph->free, &epn->node);
             goto err;
           }
@@ -579,7 +616,8 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
           {
             if (epn->pfd.fd == fd)
               {
-                poll_fdsetup(fd, &epn->pfd, false);
+                file_poll(epn->filep, &epn->pfd, false);
+                file_put(epn->filep);
                 list_delete(&epn->node);
                 list_add_tail(&eph->free, &epn->node);
                 goto out;
@@ -590,6 +628,7 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
           {
             if (epn->pfd.fd == fd)
               {
+                file_put(epn->filep);
                 list_delete(&epn->node);
                 list_add_tail(&eph->free, &epn->node);
                 goto out;
@@ -600,6 +639,7 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
           {
             if (epn->pfd.fd == fd)
               {
+                file_put(epn->filep);
                 list_delete(&epn->node);
                 list_add_tail(&eph->free, &epn->node);
                 goto out;
@@ -616,15 +656,14 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
               {
                 if (epn->pfd.events != (ev->events | POLLALWAYS))
                   {
-                    poll_fdsetup(fd, &epn->pfd, false);
+                    file_poll(epn->filep, &epn->pfd, false);
 
                     epn->notified    = false;
                     epn->data        = ev->data;
                     epn->pfd.events  = ev->events | POLLALWAYS;
-                    epn->pfd.fd      = fd;
                     epn->pfd.revents = 0;
 
-                    ret = poll_fdsetup(fd, &epn->pfd, true);
+                    ret = file_poll(epn->filep, &epn->pfd, true);
                     if (ret < 0)
                       {
                         goto err;
@@ -644,10 +683,9 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
                     epn->notified    = false;
                     epn->data        = ev->data;
                     epn->pfd.events  = ev->events | POLLALWAYS;
-                    epn->pfd.fd      = fd;
                     epn->pfd.revents = 0;
 
-                    ret = poll_fdsetup(fd, &epn->pfd, true);
+                    ret = file_poll(epn->filep, &epn->pfd, true);
                     if (ret < 0)
                       {
                         goto err;
@@ -668,10 +706,9 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
                 epn->notified    = false;
                 epn->data        = ev->data;
                 epn->pfd.events  = ev->events | POLLALWAYS;
-                epn->pfd.fd      = fd;
                 epn->pfd.revents = 0;
 
-                ret = poll_fdsetup(fd, &epn->pfd, true);
+                ret = file_poll(epn->filep, &epn->pfd, true);
                 if (ret < 0)
                   {
                     goto err;
@@ -692,12 +729,12 @@ int epoll_ctl(int epfd, int op, int fd, FAR struct epoll_event *ev)
 
 out:
   nxmutex_unlock(&eph->lock);
-  fs_putfilep(filep);
+  file_put(filep);
   return OK;
 err:
   nxmutex_unlock(&eph->lock);
 err_without_lock:
-  fs_putfilep(filep);
+  file_put(filep);
   set_errno(-ret);
   return ERROR;
 }
@@ -731,6 +768,12 @@ retry:
 
   nxsig_procmask(SIG_SETMASK, sigmask, &oldsigmask);
 
+  /* Push a cancellation point onto the stack.  This will be called if
+   * the thread is canceled.
+   */
+
+  tls_cleanup_push(tls_get_info(), epoll_cleanup, filep);
+
   if (timeout == 0)
     {
       ret = -ETIMEDOUT;
@@ -743,6 +786,10 @@ retry:
     {
       ret = nxsem_wait(&eph->sem);
     }
+
+  /* Pop the cancellation point */
+
+  tls_cleanup_pop(tls_get_info(), 0);
 
   nxsig_procmask(SIG_SETMASK, &oldsigmask, NULL);
   if (ret < 0 && ret != -ETIMEDOUT)
@@ -760,11 +807,11 @@ retry:
       ret = num;
     }
 
-  fs_putfilep(filep);
+  file_put(filep);
   return ret;
 
 err:
-  fs_putfilep(filep);
+  file_put(filep);
   set_errno(-ret);
 out:
   ferr("epoll wait failed:%d, timeout:%d\n", errno, timeout);
@@ -802,6 +849,12 @@ retry:
       goto err;
     }
 
+  /* Push a cancellation point onto the stack.  This will be called if
+   * the thread is canceled.
+   */
+
+  tls_cleanup_push(tls_get_info(), epoll_cleanup, filep);
+
   /* Wait the poll ready */
 
   if (timeout == 0)
@@ -816,6 +869,10 @@ retry:
     {
       ret = nxsem_wait(&eph->sem);
     }
+
+  /* Pop the cancellation point */
+
+  tls_cleanup_pop(tls_get_info(), 0);
 
   if (ret < 0 && ret != -ETIMEDOUT)
     {
@@ -832,11 +889,11 @@ retry:
       ret = num;
     }
 
-  fs_putfilep(filep);
+  file_put(filep);
   return ret;
 
 err:
-  fs_putfilep(filep);
+  file_put(filep);
   set_errno(-ret);
 out:
   ferr("epoll wait failed:%d, timeout:%d\n", errno, timeout);

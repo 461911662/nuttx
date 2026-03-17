@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/bmp280_uorb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,6 +32,7 @@
 #include <errno.h>
 #include <debug.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/i2c/i2c_master.h>
@@ -122,7 +125,7 @@
 #define COMBINE(d) (((int)(d)[0] << 12) | ((int)(d)[1] << 4) | ((int)(d)[2] >> 4))
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Type
  ****************************************************************************/
 
 struct bmp280_dev_s
@@ -424,13 +427,13 @@ static int bmp280_initialize(FAR struct bmp280_dev_s *priv)
  * Name: bmp280_compensate
  *
  * Description:
- *   calculate compensate tempreture
+ *   calculate compensate temperature
  *
  * Input Parameters:
- *   temp - uncompensate value of tempreture.
+ *   temp - uncompensate value of temperature.
  *
  * Returned Value:
- *   calculate result of compensate tempreture.
+ *   calculate result of compensate temperature.
  *
  ****************************************************************************/
 

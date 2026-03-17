@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/include/armv6-m/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,6 +44,10 @@
 /****************************************************************************
  * Pre-processor Prototypes
  ****************************************************************************/
+
+#ifdef __ghs__
+#  define __ARM_ARCH 6
+#endif
 
 /* Configuration ************************************************************/
 
@@ -152,6 +158,7 @@ struct xcpt_syscall_s
 
 struct xcptcontext
 {
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   /* These are saved copies of the context used during
    * signal processing.
    */
@@ -165,6 +172,7 @@ struct xcptcontext
 
   uint32_t sigreturn;
 #endif
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
 
 #ifdef CONFIG_LIB_SYSCALL
   /* The following array holds the return address and the exc_return value
@@ -188,18 +196,6 @@ struct xcptcontext
  * Public Data
  ****************************************************************************/
 
-/* g_current_regs[] holds a references to the current interrupt level
- * register storage structure.  If is non-NULL only during interrupt
- * processing.  Access to g_current_regs[] must be through the
- * [get/set]_current_regs for portability.
- */
-
-/* For the case of architectures with multiple CPUs, then there must be one
- * such value for each processor that can receive an interrupt.
- */
-
-extern volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
-
 /****************************************************************************
  * Inline functions
  ****************************************************************************/
@@ -215,8 +211,7 @@ extern volatile uint32_t *g_current_regs[CONFIG_SMP_NCPUS];
 
 /* Get/set the PRIMASK register */
 
-static inline uint8_t getprimask(void) always_inline_function;
-static inline uint8_t getprimask(void)
+static always_inline_function uint8_t getprimask(void)
 {
   uint32_t primask;
   __asm__ __volatile__
@@ -229,8 +224,7 @@ static inline uint8_t getprimask(void)
   return (uint8_t)primask;
 }
 
-static inline void setprimask(uint32_t primask) always_inline_function;
-static inline void setprimask(uint32_t primask)
+static always_inline_function void setprimask(uint32_t primask)
 {
   __asm__ __volatile__
     (
@@ -242,16 +236,14 @@ static inline void setprimask(uint32_t primask)
 
 /* Disable IRQs */
 
-static inline void up_irq_disable(void) always_inline_function;
-static inline void up_irq_disable(void)
+static always_inline_function void up_irq_disable(void)
 {
   __asm__ __volatile__ ("\tcpsid  i\n");
 }
 
 /* Save the current primask state & disable IRQs */
 
-static inline irqstate_t up_irq_save(void) always_inline_function;
-static inline irqstate_t up_irq_save(void)
+static always_inline_function irqstate_t up_irq_save(void)
 {
   unsigned short primask;
 
@@ -272,16 +264,14 @@ static inline irqstate_t up_irq_save(void)
 
 /* Enable IRQs */
 
-static inline void up_irq_enable(void) always_inline_function;
-static inline void up_irq_enable(void)
+static always_inline_function void up_irq_enable(void)
 {
   __asm__ __volatile__ ("\tcpsie  i\n");
 }
 
 /* Restore saved primask state */
 
-static inline void up_irq_restore(irqstate_t flags) always_inline_function;
-static inline void up_irq_restore(irqstate_t flags)
+static always_inline_function void up_irq_restore(irqstate_t flags)
 {
   /* If bit 0 of the primask is 0, then we need to restore
    * interrupts.
@@ -297,8 +287,7 @@ static inline void up_irq_restore(irqstate_t flags)
 
 /* Get/set IPSR */
 
-static inline uint32_t getipsr(void) always_inline_function;
-static inline uint32_t getipsr(void)
+static always_inline_function uint32_t getipsr(void)
 {
   uint32_t ipsr;
   __asm__ __volatile__
@@ -313,8 +302,7 @@ static inline uint32_t getipsr(void)
 
 /* Get/set CONTROL */
 
-static inline uint32_t getcontrol(void) always_inline_function;
-static inline uint32_t getcontrol(void)
+static always_inline_function uint32_t getcontrol(void)
 {
   uint32_t control;
   __asm__ __volatile__
@@ -327,8 +315,7 @@ static inline uint32_t getcontrol(void)
   return control;
 }
 
-static inline void setcontrol(uint32_t control) always_inline_function;
-static inline void setcontrol(uint32_t control)
+static always_inline_function void setcontrol(uint32_t control)
 {
   __asm__ __volatile__
     (
@@ -338,29 +325,33 @@ static inline void setcontrol(uint32_t control)
       : "memory");
 }
 
+static always_inline_function uint32_t getpsp(void)
+{
+  uint32_t psp;
+
+  __asm__ __volatile__
+    (
+     "\tmrs  %0, psp\n"
+     : "=r" (psp)
+     :
+     : "memory");
+
+  return psp;
+}
+
 /****************************************************************************
  * Name: up_cpu_index
  *
  * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
+ *   Return the real core number regardless CONFIG_SMP setting
  *
  ****************************************************************************/
 
-#ifdef CONFIG_SMP
+#ifdef CONFIG_ARCH_HAVE_MULTICPU
 int up_cpu_index(void) noinstrument_function;
-#else
-#  define up_cpu_index() 0
-#endif /* CONFIG_SMP */
+#endif /* CONFIG_ARCH_HAVE_MULTICPU */
 
-static inline_function uint32_t up_getsp(void)
+static always_inline_function uint32_t up_getsp(void)
 {
   register uint32_t sp;
 
@@ -373,20 +364,13 @@ static inline_function uint32_t up_getsp(void)
   return sp;
 }
 
-noinstrument_function
-static inline_function uint32_t *up_current_regs(void)
+static always_inline_function uintptr_t up_getusrsp(void *regs)
 {
-  return (uint32_t *)g_current_regs[up_cpu_index()];
+  uint32_t *ptr = (uint32_t *)regs;
+  return ptr[REG_SP];
 }
 
-noinstrument_function
-static inline_function void up_set_current_regs(uint32_t *regs)
-{
-  g_current_regs[up_cpu_index()] = regs;
-}
-
-noinstrument_function
-static inline_function bool up_interrupt_context(void)
+static always_inline_function bool up_interrupt_context(void)
 {
   return getipsr() != 0;
 }

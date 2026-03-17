@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/risc-v/esp32h2/common/include/esp_board_rmt.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -59,7 +61,6 @@ extern "C"
  *   Initialize the RMT peripheral and register an RX device.
  *
  * Input Parameters:
- *   ch  - The RMT's channel that will be used
  *   pin - The pin used for the RX channel
  *
  * Returned Value:
@@ -67,7 +68,7 @@ extern "C"
  *
  ****************************************************************************/
 
-int board_rmt_rxinitialize(int ch, int pin);
+int board_rmt_rxinitialize(int pin);
 
 /****************************************************************************
  * Name: board_rmt_txinitialize
@@ -76,7 +77,6 @@ int board_rmt_rxinitialize(int ch, int pin);
  *   Initialize the RMT peripheral and register an TX device.
  *
  * Input Parameters:
- *   ch  - The RMT's channel that will be used
  *   pin - The pin used for the TX channel
  *
  * Returned Value:
@@ -84,7 +84,7 @@ int board_rmt_rxinitialize(int ch, int pin);
  *
  ****************************************************************************/
 
-int board_rmt_txinitialize(int ch, int pin);
+int board_rmt_txinitialize(int pin);
 
 #endif /* CONFIG_ESP_RMT */
 

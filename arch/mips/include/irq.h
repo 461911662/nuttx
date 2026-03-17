@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/mips/include/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,6 +56,16 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* MIPS requires at least a 4-byte stack alignment.  For floating point use,
+ * however, the stack must be aligned to 8-byte addresses.
+ */
+
+#ifdef CONFIG_LIBC_FLOATINGPOINT
+#  define STACKFRAME_ALIGN   8
+#else
+#  define STACKFRAME_ALIGN   4
+#endif
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -73,7 +85,7 @@ extern "C"
 
 /* Return the current value of the stack pointer */
 
-static inline uint32_t up_getsp(void)
+static inline_function uint32_t up_getsp(void)
 {
   register uint32_t sp;
   __asm__
@@ -105,24 +117,6 @@ EXTERN volatile uint32_t *g_current_regs;
  ****************************************************************************/
 
 /****************************************************************************
- * Name: up_cpu_index
- *
- * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- ****************************************************************************/
-
-#define up_cpu_index() (0)
-
-/****************************************************************************
  * Inline functions
  ****************************************************************************/
 
@@ -146,6 +140,20 @@ static inline_function void up_set_current_regs(uint32_t *regs)
  ****************************************************************************/
 
 #define up_interrupt_context() (up_current_regs() != NULL)
+
+/****************************************************************************
+ * Name: up_getusrpc
+ ****************************************************************************/
+
+#define up_getusrpc(regs) \
+    (((uint32_t *)((regs) ? (regs) : up_current_regs()))[REG_EPC])
+
+/****************************************************************************
+ * Name: up_getusrsp
+ ****************************************************************************/
+
+#define up_getusrsp(regs) \
+    ((uintptr_t)((uint32_t*)(regs))[REG_SP])
 
 #undef EXTERN
 #ifdef __cplusplus

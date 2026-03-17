@@ -162,6 +162,7 @@ all: $(BIN)
 .PHONY: context clean_context config oldconfig menuconfig nconfig qconfig gconfig export subdir_clean clean subdir_distclean distclean apps_clean apps_distclean
 .PHONY: pass1 pass1dep
 .PHONY: pass2 pass2dep
+.PHONY: host_info checkpython3
 
 # Target used to copy include/nuttx/lib/math.h.  If CONFIG_ARCH_MATH_H is
 # defined, then there is an architecture specific math.h header file
@@ -209,6 +210,15 @@ endif
 ifeq ($(CONFIG_ARCH_STDARG_H),y)
 include/stdarg.h: include/nuttx/lib/stdarg.h
 	$(Q) cp -f include/nuttx/lib/stdarg.h include/stdarg.h
+endif
+
+# Target used to copy include/nuttx/lib/stdbit.h.  If CONFIG_ARCH_STDBIT_H or
+# CONFIG_LIBC_STDBIT_GENERIC is set, copy stdbit.h to include/ for C23 bit
+# utilities.
+
+ifeq ($(firstword $(filter y, $(CONFIG_ARCH_STDBIT_H) $(CONFIG_LIBC_STDBIT_GENERIC))),y)
+include/stdbit.h: include/nuttx/lib/stdbit.h
+	$(Q) cp -f include/nuttx/lib/stdbit.h include/stdbit.h
 endif
 
 # Target used to copy include/nuttx/lib/setjmp.h.  If CONFIG_ARCH_SETJMP_H is
@@ -416,7 +426,7 @@ DIRLINKS_FILE += $(DIRLINKS_EXTERNAL_DEP)
 # The symlink subfolders need to be removed before the parent symlinks
 
 .PHONY: clean_dirlinks
-clean_dirlinks:
+clean_dirlinks: tools/incdir$(HOSTEXEEXT)
 	$(Q) $(call DELFILE, $(DIRLINKS_FILE))
 	$(Q) $(call DELFILE, .dirlinks)
 	$(Q) $(DIRUNLINK) drivers/platform
@@ -467,6 +477,10 @@ endif
 
 ifeq ($(CONFIG_ARCH_STDARG_H),y)
 context: include/stdarg.h
+endif
+
+ifeq ($(firstword $(filter y, $(CONFIG_ARCH_STDBIT_H) $(CONFIG_LIBC_STDBIT_GENERIC))),y)
+context: include/stdbit.h
 endif
 
 ifeq ($(CONFIG_ARCH_SETJMP_H),y)
@@ -618,6 +632,32 @@ bootloader:
 clean_bootloader:
 	$(Q) $(MAKE) -C $(ARCH_SRC) clean_bootloader
 
+checkpython3:
+	@if [ -z "$$(which python3)" ]; then \
+		echo "ERROR: python3 not found in PATH"; \
+		echo "       Please install python3 or fix the PATH"; \
+		exit 1; \
+	fi
+
+# host_info target flags to get diagnostic info without building nxdiag application
+
+SYSINFO_PARSE_FLAGS = "$(realpath $(TOPDIR))"
+SYSINFO_PARSE_FLAGS += "-finclude/sysinfo.h"
+
+SYSINFO_FLAGS = -c
+SYSINFO_FLAGS += -p
+SYSINFO_FLAGS += --target_info
+
+# host_info: Parse nxdiag example output file (sysinfo.h) and print
+
+host_info: checkpython3
+	@if [[ ! -f "include/sysinfo.h" ]]; then \
+		echo "file sysinfo.h not exists"; \
+		python3 $(TOPDIR)$(DELIM)tools$(DELIM)host_info_dump.py $(SYSINFO_FLAGS) \
+		 $(realpath $(TOPDIR)) > include/sysinfo.h; \
+	fi
+	@python3 $(TOPDIR)$(DELIM)tools$(DELIM)host_info_parse.py $(SYSINFO_PARSE_FLAGS)
+
 # pass1dep: Create pass1 build dependencies
 # pass2dep: Create pass2 build dependencies
 
@@ -657,7 +697,9 @@ define kconfig_tweak_disable
 	kconfig-tweak --file $1 -u $2
 endef
 else
-  KCONFIG_WARNING  = 2> >(tee kwarning) | cat && if [ -s kwarning ]; \
+  OVERWRITE_WARNING = "set more than once"
+  KCONFIG_WARNING   = 2> >(grep -v ${OVERWRITE_WARNING} | tee kwarning) | \
+                                                  cat && if [ -s kwarning ]; \
                                                   then rm kwarning; \
                                                   exit 1; \
                                                  else \
@@ -721,6 +763,7 @@ savedefconfig: apps_preconfig
 	$(Q) grep "^CONFIG_ARCH_CHIP_" .config >> defconfig.tmp; true
 	$(Q) grep "CONFIG_ARCH_CHIP=" .config >> defconfig.tmp; true
 	$(Q) grep "CONFIG_ARCH_BOARD=" .config >> defconfig.tmp; true
+	$(Q) grep "CONFIG_ARCH_BOARD_COMMON=" .config >> defconfig.tmp; true
 	$(Q) grep "^CONFIG_ARCH_CUSTOM" .config >> defconfig.tmp; true
 	$(Q) grep "^CONFIG_ARCH_BOARD_CUSTOM" .config >> defconfig.tmp; true
 	$(Q) export LC_ALL=C; cat defconfig.tmp | sort | uniq > sortedconfig.tmp
@@ -745,8 +788,7 @@ savedefconfig: apps_preconfig
 # that the archiver is 'ar'
 
 export: $(NUTTXLIBS)
-	$(Q) ZIG="${ZIG}" ZIGFLAGS="${ZIGFLAGS}" MAKE="${MAKE}" \
-		$(MKEXPORT) $(MKEXPORT_ARGS) -l "$(EXPORTLIBS)"
+	$(Q) MAKE="${MAKE}" $(MKEXPORT) $(MKEXPORT_ARGS) -l "$(EXPORTLIBS)"
 
 # General housekeeping targets:  dependencies, cleaning, etc.
 #
@@ -797,7 +839,9 @@ endif
 	$(call DELFILE, .config)
 	$(call DELFILE, .config.old)
 	$(call DELFILE, .config.orig)
+	$(call DELFILE, .config.backup)
 	$(call DELFILE, .gdbinit)
+	$(call DELFILE, include/sysinfo.h)
 
 # Application housekeeping targets.  The APPDIR variable refers to the user
 # application directory.  A sample apps/ directory is included with NuttX,
@@ -813,7 +857,7 @@ endif
 # apps_distclean: Perform the distclean operation only in the user application
 #                 directory.
 
-apps_preconfig: .dirlinks
+apps_preconfig: tools/incdir$(HOSTEXEEXT) .dirlinks
 ifneq ($(APPDIR),)
 	$(Q) $(MAKE) -C $(APPDIR) preconfig
 endif

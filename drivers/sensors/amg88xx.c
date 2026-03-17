@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/amg88xx.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -193,6 +208,7 @@ static const struct file_operations g_amg88xx_fops =
  *   Write to an amg88xx register transaction pattern:
  *   Write COMMAND at REGISTER
  *   Sensor Address / W - Register Address - Command
+ *
  ****************************************************************************/
 
 static inline int amg88xx_i2c_write_addr(FAR struct amg88xx_dev_s *priv,
@@ -228,6 +244,7 @@ static inline int amg88xx_i2c_write_addr(FAR struct amg88xx_dev_s *priv,
  *   Read to an amg88xx register transaction pattern:
  *   Read COMMAND from REGISTER
  *   Sensor Address / W - Register Address - Sensor Address / R - Command
+ *
  ****************************************************************************/
 
 static inline int amg88xx_i2c_read_addr(FAR struct amg88xx_dev_s *priv,
@@ -495,7 +512,7 @@ static int amg88xx_ioctl(FAR struct file *filep, int cmd,
     break;
 
     /* Enabling and disabling the moving average requires following
-     * a precedure described in the i2c communication interface manual
+     * a procedure described in the i2c communication interface manual.
      */
 
     case SNIOC_SET_MOVING_AVG:

@@ -67,7 +67,7 @@ FAR char *getenv(FAR const char *name)
 
   /* Verify that a string was passed */
 
-  if (name == NULL)
+  if (name == NULL || up_interrupt_context())
     {
       ret = -EINVAL;
       goto errout;
@@ -75,15 +75,22 @@ FAR char *getenv(FAR const char *name)
 
   /* Get a reference to the thread-private environ in the TCB. */
 
-  sched_lock();
   rtcb  = this_task();
   group = rtcb->group;
 
   /* Check if the variable exists */
 
-  if (group == NULL || (ret = env_findvar(group, name)) < 0)
+  if (group == NULL)
     {
-      goto errout_with_lock;
+      goto errout;
+    }
+
+  nxrmutex_lock(&group->tg_mutex);
+  ret = env_findvar(group, name);
+  if (ret < 0)
+    {
+      nxrmutex_unlock(&group->tg_mutex);
+      goto errout;
     }
 
   /* It does!  Get the value sub-string from the name=value string */
@@ -91,20 +98,20 @@ FAR char *getenv(FAR const char *name)
   pvalue = strchr(group->tg_envp[ret], '=');
   if (pvalue == NULL)
     {
+      nxrmutex_unlock(&group->tg_mutex);
+
       /* The name=value string has no '='  This is a bug! */
 
       ret = -EINVAL;
-      goto errout_with_lock;
+      goto errout;
     }
 
   /* Adjust the pointer so that it points to the value right after the '=' */
 
   pvalue++;
-  sched_unlock();
+  nxrmutex_unlock(&group->tg_mutex);
   return pvalue;
 
-errout_with_lock:
-  sched_unlock();
 errout:
   set_errno(-ret);
   return NULL;

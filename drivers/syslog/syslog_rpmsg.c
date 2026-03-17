@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/syslog/syslog_rpmsg.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -168,7 +170,11 @@ static bool syslog_rpmsg_transfer(FAR struct syslog_rpmsg_s *priv, bool wait)
       msg->count          = len;
       priv->tail         += len;
       msg->header.command = SYSLOG_RPMSG_TRANSFER;
-      rpmsg_send_nocopy(&priv->ept, msg, sizeof(*msg) + len);
+      if (rpmsg_send_nocopy(&priv->ept, msg, sizeof(*msg) + len) < 0)
+        {
+          rpmsg_release_tx_buffer(&priv->ept, msg);
+        }
+
       len                 = SYSLOG_RPMSG_COUNT(priv);
 
       leave_critical_section(flags);
@@ -239,7 +245,7 @@ static void syslog_rpmsg_addbuf(FAR struct syslog_rpmsg_s *priv,
 
   if (priv->flush)
     {
-#if defined(CONFIG_ARCH_LOWPUTC)
+#if defined(CONFIG_ARCH_LOWPUTC) && !defined(CONFIG_SYSLOG_DEFAULT)
       up_nputs(buffer, len);
 #endif
       priv->flush += len;
@@ -388,13 +394,15 @@ int syslog_rpmsg_flush(FAR syslog_channel_t *channel)
       priv->flush = priv->tail;
     }
 
+#if defined(CONFIG_ARCH_LOWPUTC) && !defined(CONFIG_SYSLOG_DEFAULT)
   while (priv->flush < priv->head)
     {
-#if defined(CONFIG_ARCH_LOWPUTC)
       up_putc(priv->buffer[SYSLOG_RPMSG_FLUSHOFF(priv)]);
-#endif
       priv->flush++;
     }
+#else
+  priv->flush = priv->head;
+#endif
 
   leave_critical_section(flags);
 

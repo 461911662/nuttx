@@ -27,6 +27,7 @@
 #include <nuttx/config.h>
 
 #include <assert.h>
+#include <debug.h>
 
 #include <nuttx/mm/mm.h>
 #include <nuttx/mm/kasan.h>
@@ -140,6 +141,8 @@ FAR void *mm_memalign(FAR struct mm_heap_s *heap, size_t alignment,
 
   kasan_poison((FAR void *)rawchunk,
                mm_malloc_size(heap, (FAR void *)rawchunk));
+
+  rawchunk = (uintptr_t)kasan_clear_tag((FAR void *)rawchunk);
 
   /* We need to hold the MM mutex while we muck with the chunks and
    * nodelist.
@@ -275,15 +278,17 @@ FAR void *mm_memalign(FAR struct mm_heap_s *heap, size_t alignment,
       heap->mm_maxused = heap->mm_curused;
     }
 
+  sched_note_heap(NOTE_HEAP_ALLOC, heap, (FAR void *)alignedchunk, size,
+                  heap->mm_curused);
+
   mm_unlock(heap);
 
   MM_ADD_BACKTRACE(heap, node);
 
   alignedchunk = (uintptr_t)kasan_unpoison((FAR const void *)alignedchunk,
                                            size - MM_ALLOCNODE_OVERHEAD);
-  sched_note_heap(NOTE_HEAP_ALLOC, heap, (FAR void *)alignedchunk, size,
-                  heap->mm_curused);
-
   DEBUGASSERT(alignedchunk % alignment == 0);
+  minfo("Aligned %"PRIxPTR" to %"PRIxPTR", size %zu\n",
+        rawchunk, alignedchunk, size);
   return (FAR void *)alignedchunk;
 }

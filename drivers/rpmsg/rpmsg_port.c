@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/rpmsg/rpmsg_port.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,20 +24,24 @@
  * Included Files
  ****************************************************************************/
 
+#include <debug.h>
+#include <execinfo.h>
 #include <stdio.h>
+#include <time.h>
 
 #include <nuttx/irq.h>
 #include <nuttx/kmalloc.h>
 
 #include <metal/mutex.h>
-
-#include <rpmsg/rpmsg_internal.h>
+#include <metal/sys.h>
 
 #include "rpmsg_port.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define RPMSG_PORT_TIMEOUT_MS       15000
 
 #define RPMSG_PORT_BUF_TO_NODE(q,b) ((q)->node + ((FAR void *)(b) - (q)->buf) / (q)->len)
 #define RPMSG_PORT_NODE_TO_BUF(q,n) ((q)->buf + (((n) - (q)->node)) * (q)->len)
@@ -44,11 +50,10 @@
  * Private Function Prototypes
  ****************************************************************************/
 
-static FAR const char *
-rpmsg_port_get_local_cpuname(FAR struct rpmsg_s *rpmsg);
-static FAR const char *rpmsg_port_get_cpuname(FAR struct rpmsg_s *rpmsg);
-static int rpmsg_port_get_tx_buffer_size(FAR struct rpmsg_s *rpmsg);
-static int rpmsg_port_get_rx_buffer_size(FAR struct rpmsg_s *rpmsg);
+static void rpmsg_port_dump(FAR struct rpmsg_s *rpmsg);
+static int rpmsg_port_get_timestamp(FAR struct rpmsg_s *rpmsg,
+                                    FAR const void *data,
+                                    FAR struct rpmsg_timestamp_s *ts);
 
 /****************************************************************************
  * Private Data
@@ -60,11 +65,8 @@ static const struct rpmsg_ops_s g_rpmsg_port_ops =
   NULL,
   NULL,
   NULL,
-  NULL,
-  rpmsg_port_get_local_cpuname,
-  rpmsg_port_get_cpuname,
-  rpmsg_port_get_tx_buffer_size,
-  rpmsg_port_get_rx_buffer_size,
+  rpmsg_port_dump,
+  rpmsg_port_get_timestamp,
 };
 
 /****************************************************************************
@@ -222,6 +224,8 @@ rpmsg_port_create_queues(FAR struct rpmsg_port_s *port,
       return ret;
     }
 
+  port->txq.port = port;
+  port->rxq.port = port;
   return 0;
 }
 
@@ -254,7 +258,7 @@ rpmsg_port_get_tx_payload_buffer(FAR struct rpmsg_device *rdev,
     }
 
   *len = hdr->len - sizeof(struct rpmsg_port_header_s) -
-         sizeof(struct rpmsg_hdr);
+         sizeof(struct rpmsg_hdr) - sizeof(struct rpmsg_timestamp_s);
 
   return RPMSG_LOCATE_DATA(hdr->buf);
 }
@@ -371,6 +375,59 @@ static int rpmsg_port_release_tx_buffer(FAR struct rpmsg_device *rdev,
 }
 
 /****************************************************************************
+ * Name: rpmsg_port_get_tx_buffer_size
+ ****************************************************************************/
+
+static int rpmsg_port_get_tx_buffer_size(FAR struct rpmsg_device *rdev)
+{
+  FAR struct rpmsg_port_s *port =
+    metal_container_of(rdev, struct rpmsg_port_s, rdev);
+
+  return port->txq.len - sizeof(struct rpmsg_port_header_s) -
+         sizeof(struct rpmsg_hdr) - sizeof(struct rpmsg_timestamp_s);
+}
+
+/****************************************************************************
+ * Name: rpmsg_port_get_rx_buffer_size
+ ****************************************************************************/
+
+static int rpmsg_port_get_rx_buffer_size(FAR struct rpmsg_device *rdev)
+{
+  FAR struct rpmsg_port_s *port =
+    metal_container_of(rdev, struct rpmsg_port_s, rdev);
+
+  return port->rxq.len - sizeof(struct rpmsg_port_header_s) -
+         sizeof(struct rpmsg_hdr) - sizeof(struct rpmsg_timestamp_s);
+}
+
+/****************************************************************************
+ * Name: rpmsg_port_get_timestamp
+ ****************************************************************************/
+
+static int rpmsg_port_get_timestamp(FAR struct rpmsg_s *rpmsg,
+                                    FAR const void *data,
+                                    FAR struct rpmsg_timestamp_s *ts)
+{
+  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
+  FAR const struct rpmsg_hdr *rphdr = RPMSG_LOCATE_HDR(data);
+  FAR const struct rpmsg_port_header_s *hdr =
+    metal_container_of(rphdr, struct rpmsg_port_header_s, buf);
+  FAR const struct rpmsg_timestamp_s *rpts =
+    (FAR const struct rpmsg_timestamp_s *)((uint8_t *)hdr + port->rxq.len -
+                                           sizeof(struct rpmsg_timestamp_s));
+
+  if (hdr->len > port->rxq.len - sizeof(struct rpmsg_timestamp_s))
+    {
+      return -EINVAL;
+    }
+
+  ts->tx_nsec = rpts->tx_nsec;
+  ts->rx_nsec = rpts->rx_nsec;
+
+  return RPMSG_SUCCESS;
+}
+
+/****************************************************************************
  * Name: rpmsg_port_rx_callback
  ****************************************************************************/
 
@@ -381,7 +438,7 @@ static void rpmsg_port_rx_callback(FAR struct rpmsg_port_s *port,
   FAR struct rpmsg_hdr *rphdr = (FAR struct rpmsg_hdr *)hdr->buf;
   FAR void *data = RPMSG_LOCATE_DATA(rphdr);
   FAR struct rpmsg_endpoint *ept;
-  int status;
+  int status = 0;
 
   metal_mutex_acquire(&rdev->lock);
   ept = rpmsg_get_ept_from_addr(rdev, rphdr->dst);
@@ -397,13 +454,17 @@ static void rpmsg_port_rx_callback(FAR struct rpmsg_port_s *port,
         }
 
       status = ept->cb(ept, data, rphdr->len, rphdr->src, ept->priv);
-      if (status < 0)
+      if (status < 0 && status != RPMSG_SUCCESS_BUFFER_RELEASED)
         {
           RPMSG_ASSERT(0, "unexpected callback status\n");
         }
     }
 
-  rpmsg_port_release_rx_buffer(rdev, data);
+  if (status != RPMSG_SUCCESS_BUFFER_RELEASED)
+    {
+      rpmsg_port_release_rx_buffer(rdev, data);
+    }
+
   metal_mutex_acquire(&rdev->lock);
   rpmsg_ept_decref(ept);
   metal_mutex_release(&rdev->lock);
@@ -516,53 +577,6 @@ static int rpmsg_port_ns_callback(FAR struct rpmsg_endpoint *ept,
 }
 
 /****************************************************************************
- * Name: rpmsg_port_get_local_cpuname
- ****************************************************************************/
-
-static FAR const char *
-rpmsg_port_get_local_cpuname(FAR struct rpmsg_s *rpmsg)
-{
-  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
-
-  return port->local_cpuname;
-}
-
-/****************************************************************************
- * Name: rpmsg_port_get_cpuname
- ****************************************************************************/
-
-static FAR const char *rpmsg_port_get_cpuname(FAR struct rpmsg_s *rpmsg)
-{
-  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
-
-  return port->cpuname;
-}
-
-/****************************************************************************
- * Name: rpmsg_port_get_tx_buffer_size
- ****************************************************************************/
-
-static int rpmsg_port_get_tx_buffer_size(FAR struct rpmsg_s *rpmsg)
-{
-  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
-
-  return port->txq.len - sizeof(struct rpmsg_port_header_s) -
-         sizeof(struct rpmsg_hdr);
-}
-
-/****************************************************************************
- * Name: rpmsg_port_get_rx_buffer_size
- ****************************************************************************/
-
-static int rpmsg_port_get_rx_buffer_size(FAR struct rpmsg_s *rpmsg)
-{
-  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
-
-  return port->rxq.len - sizeof(struct rpmsg_port_header_s) -
-         sizeof(struct rpmsg_hdr);
-}
-
-/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -589,7 +603,7 @@ int rpmsg_port_initialize(FAR struct rpmsg_port_s *port,
     }
 
   port->ops = ops;
-  strlcpy(port->cpuname, cfg->remotecpu, RPMSG_NAME_SIZE);
+  strlcpy(port->rpmsg.cpuname, cfg->remotecpu, RPMSG_NAME_SIZE);
 
   rdev = &port->rdev;
   memset(rdev, 0, sizeof(*rdev));
@@ -602,14 +616,14 @@ int rpmsg_port_initialize(FAR struct rpmsg_port_s *port,
   rdev->ops.get_tx_payload_buffer = rpmsg_port_get_tx_payload_buffer;
   rdev->ops.send_offchannel_nocopy = rpmsg_port_send_offchannel_nocopy;
   rdev->ops.release_tx_buffer = rpmsg_port_release_tx_buffer;
+  rdev->ops.get_rx_buffer_size = rpmsg_port_get_rx_buffer_size;
+  rdev->ops.get_tx_buffer_size = rpmsg_port_get_tx_buffer_size;
 
   metal_list_init(&rdev->endpoints);
 
   rdev->support_ack = true;
   rdev->support_ns = true;
 
-  rpmsg_register_endpoint(rdev, &rdev->ns_ept, "NS", RPMSG_NS_EPT_ADDR,
-                          RPMSG_NS_EPT_ADDR, rpmsg_port_ns_callback, NULL);
   port->ops->register_callback(port, rpmsg_port_rx_callback);
 
   return 0;
@@ -621,20 +635,8 @@ int rpmsg_port_initialize(FAR struct rpmsg_port_s *port,
 
 void rpmsg_port_uninitialize(FAR struct rpmsg_port_s *port)
 {
-  FAR struct rpmsg_device *rdev = &port->rdev;
-  FAR struct metal_list *node;
-  FAR struct rpmsg_endpoint *ept;
-
-  while (!metal_list_is_empty(&rdev->endpoints))
-    {
-      node = rdev->endpoints.next;
-      ept = metal_container_of(node, struct rpmsg_endpoint, node);
-      rpmsg_destroy_ept(ept);
-      if (ept->ns_unbind_cb)
-        {
-          ept->ns_unbind_cb(ept);
-        }
-    }
+  FAR struct rpmsg_s *rpmsg = &port->rpmsg;
+  FAR struct rpmsg_device *rdev = rpmsg_get_rdev_by_rpmsg(rpmsg);
 
   metal_mutex_deinit(&rdev->lock);
   rpmsg_port_destroy_queues(port);
@@ -648,8 +650,10 @@ FAR struct rpmsg_port_header_s *
 rpmsg_port_queue_get_available_buffer(FAR struct rpmsg_port_queue_s *queue,
                                       bool wait)
 {
-  FAR struct list_node *node;
+  FAR struct rpmsg_port_s *port = queue->port;
   FAR struct rpmsg_port_header_s *hdr;
+  FAR struct list_node *node;
+  int ret;
 
   for (; ; )
     {
@@ -665,7 +669,19 @@ rpmsg_port_queue_get_available_buffer(FAR struct rpmsg_port_queue_s *queue,
           return NULL;
         }
 
-      nxsem_wait_uninterruptible(&queue->free.sem);
+      ret = port->ops->notify_queue_noavail ?
+            port->ops->notify_queue_noavail(port, queue) : -ENOTSUP;
+      if (ret == -ENOTSUP)
+        {
+          ret = nxsem_tickwait_uninterruptible(
+            &queue->free.sem, MSEC2TICK(RPMSG_PORT_TIMEOUT_MS));
+          if (ret == -ETIMEDOUT)
+            {
+              rpmsgerr("Get buffer timeout, Dump debug information:\n");
+              dump_stack();
+              rpmsg_port_dump(&port->rpmsg);
+            }
+        }
     }
 }
 
@@ -721,6 +737,55 @@ void rpmsg_port_queue_add_buffer(FAR struct rpmsg_port_queue_s *queue,
 }
 
 /****************************************************************************
+ * Name: rpmsg_port_update_timestamp
+ ****************************************************************************/
+
+void rpmsg_port_update_timestamp(FAR struct rpmsg_port_queue_s *queue,
+                                 FAR struct rpmsg_port_header_s *hdr,
+                                 bool tx)
+{
+  FAR struct rpmsg_timestamp_s *rpts =
+    (FAR struct rpmsg_timestamp_s *)((uint8_t *)hdr + queue->len -
+                                     sizeof(struct rpmsg_timestamp_s));
+  struct timespec ts;
+
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  if (tx)
+    {
+      rpts->tx_nsec = 1000000000ull * ts.tv_sec + ts.tv_nsec;
+    }
+  else if (hdr->len <= queue->len - sizeof(struct rpmsg_timestamp_s))
+    {
+      rpts->rx_nsec = 1000000000ull * ts.tv_sec + ts.tv_nsec;
+    }
+}
+
+/****************************************************************************
+ * Name: rpmsg_port_drop_packets
+ ****************************************************************************/
+
+void rpmsg_port_drop_packets(FAR struct rpmsg_port_s *rport, uint8_t type)
+{
+  FAR struct rpmsg_port_header_s *hdr;
+
+  if (type & RPMSG_PORT_DROP_TXQ)
+    {
+      while (!!(hdr = rpmsg_port_queue_get_buffer(&rport->txq, false)))
+        {
+          rpmsg_port_queue_return_buffer(&rport->txq, hdr);
+        }
+    }
+
+  if (type & RPMSG_PORT_DROP_RXQ)
+    {
+      while (!!(hdr = rpmsg_port_queue_get_buffer(&rport->rxq, false)))
+        {
+          rpmsg_port_queue_return_buffer(&rport->rxq, hdr);
+        }
+    }
+}
+
+/****************************************************************************
  * Name: rpmsg_port_register
  ****************************************************************************/
 
@@ -732,16 +797,19 @@ int rpmsg_port_register(FAR struct rpmsg_port_s *port,
 
   if (local_cpuname)
     {
-      strlcpy(port->local_cpuname, local_cpuname, RPMSG_NAME_SIZE);
+      strlcpy(port->rpmsg.local_cpuname, local_cpuname, RPMSG_NAME_SIZE);
     }
 
-  snprintf(name, sizeof(name), "/dev/rpmsg/%s", port->cpuname);
+  snprintf(name, sizeof(name), "/dev/rpmsg/%s", port->rpmsg.cpuname);
   ret = rpmsg_register(name, &port->rpmsg, &g_rpmsg_port_ops);
   if (ret < 0)
     {
       return ret;
     }
 
+  rpmsg_register_endpoint(&port->rdev, &port->rdev.ns_ept, "NS",
+                          RPMSG_NS_EPT_ADDR, RPMSG_NS_EPT_ADDR,
+                          rpmsg_port_ns_callback, NULL, port);
   rpmsg_device_created(&port->rpmsg);
   return ret;
 }
@@ -754,8 +822,84 @@ void rpmsg_port_unregister(FAR struct rpmsg_port_s *port)
 {
   char name[64];
 
-  snprintf(name, sizeof(name), "/dev/rpmsg/%s", port->cpuname);
-  rpmsg_unregister(name, &port->rpmsg);
+  snprintf(name, sizeof(name), "/dev/rpmsg/%s", port->rpmsg.cpuname);
 
   rpmsg_device_destory(&port->rpmsg);
+  rpmsg_unregister(name, &port->rpmsg);
+}
+
+/****************************************************************************
+ * Name: rpmsg_port_dump_buffer
+ ****************************************************************************/
+
+static void rpmsg_port_dump_buffer(FAR struct rpmsg_device *rdev,
+                                   FAR struct rpmsg_port_queue_s *queue,
+                                   bool rx)
+{
+  FAR struct list_node *node;
+  irqstate_t flags = spin_lock_irqsave(&queue->ready.lock);
+
+  metal_log(METAL_LOG_EMERGENCY,
+            "rpmsg_port queue %s: {used: %u, avail: %u}\n",
+            rx ? "RX" : "TX",
+            rpmsg_port_queue_nused(queue),
+            rpmsg_port_queue_navail(queue));
+  metal_log(METAL_LOG_EMERGENCY, "rpmsg buffer list:\n");
+  list_for_every(&queue->ready.head, node)
+    {
+      FAR struct rpmsg_port_header_s *hdr =
+        RPMSG_PORT_NODE_TO_BUF(queue, node);
+      FAR struct rpmsg_hdr *rphdr = (FAR struct rpmsg_hdr *)hdr->buf;
+      FAR struct rpmsg_endpoint *ept;
+
+      ept = rpmsg_get_ept_from_addr(rdev, rx ? rphdr->dst : rphdr->src);
+      if (ept)
+        {
+          metal_log(METAL_LOG_EMERGENCY, " %s buffer %p hold by %s\n",
+                    rx ? "RX" : "TX", rphdr, ept->name);
+        }
+    }
+
+  spin_unlock_irqrestore(&queue->ready.lock, flags);
+}
+
+/****************************************************************************
+ * Name: rpmsg_port_dump
+ ****************************************************************************/
+
+static void rpmsg_port_dump(FAR struct rpmsg_s *rpmsg)
+{
+  FAR struct rpmsg_port_s *port = (FAR struct rpmsg_port_s *)rpmsg;
+  FAR struct rpmsg_device *rdev = rpmsg_get_rdev_by_rpmsg(rpmsg);
+  FAR struct rpmsg_endpoint *ept;
+  FAR struct metal_list *node;
+  bool needunlock = false;
+
+  if (!up_interrupt_context() && !sched_idletask())
+    {
+      metal_mutex_acquire(&rdev->lock);
+      needunlock = true;
+    }
+
+  metal_log(METAL_LOG_EMERGENCY, "Remote: %s state: %d\n",
+            port->rpmsg.cpuname, rpmsg_is_running(rdev));
+
+  metal_list_for_each(&rdev->endpoints, node)
+    {
+      ept = metal_container_of(node, struct rpmsg_endpoint, node);
+      metal_log(METAL_LOG_EMERGENCY, "ept %s\n", ept->name);
+    }
+
+  rpmsg_port_dump_buffer(rdev, &port->rxq, true);
+  rpmsg_port_dump_buffer(rdev, &port->txq, false);
+
+  if (needunlock)
+    {
+      metal_mutex_release(&rdev->lock);
+    }
+
+  if (port->ops->dump)
+    {
+      port->ops->dump(port);
+    }
 }

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/common/x86_64_switchcontext.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -59,23 +61,19 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
 {
   int cpu;
 
+#ifdef CONFIG_ARCH_KERNEL_STACK
+  /* Update kernel stack top pointer */
+
+  x86_64_set_ktopstk(tcb->xcp.ktopstk);
+#endif
+
   /* Are we in an interrupt handler? */
 
   if (up_interrupt_context())
     {
-      /* Yes, then we have to do things differently.
-       * Just copy the g_current_regs into the OLD rtcb.
-       */
-
-      x86_64_savestate(rtcb->xcp.regs);
+      /* Restore addition x86_64 state */
 
       x86_64_restore_auxstate(tcb);
-
-      /* Then switch contexts.  Any necessary address environment
-       * changes will be made when the interrupt returns.
-       */
-
-      x86_64_restorestate(tcb->xcp.regs);
     }
 
   /* We are not in an interrupt handler.  Copy the user C context
@@ -86,6 +84,7 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
 
   else if (!up_saveusercontext(rtcb->xcp.regs))
     {
+      struct tcb_s **running_task;
       cpu = this_cpu();
 
       x86_64_restore_auxstate(tcb);
@@ -98,6 +97,7 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
        */
 
       addrenv_switch(tcb);
+      tcb = this_task();
 #endif
 
       /* Restore the cpu lock */
@@ -106,14 +106,15 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
 
       /* Update scheduler parameters */
 
-      nxsched_suspend_scheduler(g_running_tasks[cpu]);
-      nxsched_resume_scheduler(current_task(cpu));
+      running_task = &g_running_tasks[cpu];
+      tcb = current_task(cpu);
+      nxsched_switch_context(*running_task, tcb);
 
       /* Record the new "running" task.  g_running_tasks[] is only used by
        * assertion logic for reporting crashes.
        */
 
-      g_running_tasks[cpu] = current_task(cpu);
+      *running_task = tcb;
 
       /* Then switch contexts */
 

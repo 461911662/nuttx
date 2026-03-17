@@ -24,7 +24,6 @@
 
 #include <nuttx/mm/kasan.h>
 #include <nuttx/compiler.h>
-#include <nuttx/irq.h>
 
 #include <assert.h>
 #include <debug.h>
@@ -42,6 +41,8 @@
 #  include "generic.c"
 #elif defined(CONFIG_MM_KASAN_SW_TAGS)
 #  include "sw_tags.c"
+#elif defined(CONFIG_MM_KASAN_HW_TAGS)
+#  include "hw_tags.c"
 #else
 #  define kasan_is_poisoned(addr, size) false
 #endif
@@ -96,6 +97,8 @@
 
 #define KASAN_INIT_VALUE 0xcafe
 
+#ifdef CONFIG_MM_KASAN_INSTRUMENT
+
 /****************************************************************************
  * Private Types
  ****************************************************************************/
@@ -115,7 +118,13 @@ struct kasan_watchpoint_s
 static struct kasan_watchpoint_s g_watchpoint[MM_KASAN_WATCHPOINT];
 #endif
 
+#ifdef CONFIG_MM_KASAN
+#  ifdef MM_KASAN_MARK_LOCATION
+static uint32_t g_region_init locate_data(MM_KASAN_MARK_LOCATION);
+#  else
 static uint32_t g_region_init;
+#  endif
+#endif
 
 /****************************************************************************
  * Private Functions
@@ -167,9 +176,16 @@ static void kasan_show_memory(FAR const uint8_t *addr, size_t size,
 static void kasan_report(FAR const void *addr, size_t size,
                          bool is_write, FAR void *return_address)
 {
-  irqstate_t flags;
+  bool dump_only = (is_write && MM_KASAN_DISABLE_WRITE_PANIC) ||
+                   (!is_write && MM_KASAN_DISABLE_READ_PANIC);
 
-  flags = enter_critical_section();
+#ifdef CONFIG_MM_KASAN
+  if (!dump_only)
+    {
+      kasan_stop();
+    }
+
+#endif
   _alert("kasan detected a %s access error, address at %p,"
          "size is %zu, return address: %p\n",
          is_write ? "write" : "read",
@@ -177,8 +193,7 @@ static void kasan_report(FAR const void *addr, size_t size,
 
   kasan_show_memory(addr, size, 80);
 
-  if ((is_write && MM_KASAN_DISABLE_WRITE_PANIC) ||
-      (!is_write && MM_KASAN_DISABLE_READ_PANIC))
+  if (dump_only)
     {
       dump_stack();
     }
@@ -186,8 +201,6 @@ static void kasan_report(FAR const void *addr, size_t size,
     {
       PANIC();
     }
-
-  leave_critical_section(flags);
 }
 
 #if MM_KASAN_WATCHPOINT > 0
@@ -207,7 +220,7 @@ static void kasan_check_watchpoint(FAR const void *addr, size_t size,
         }
 
       if (addr + size <= watchpoint->addr ||
-          addr > watchpoint->addr + watchpoint->size)
+          addr >= watchpoint->addr + watchpoint->size)
         {
           continue;
         }
@@ -225,27 +238,29 @@ static inline void kasan_check_report(FAR const void *addr, size_t size,
                                       bool is_write,
                                       FAR void *return_address)
 {
+#ifdef CONFIG_MM_KASAN
   if (predict_false(size == 0 || g_region_init != KASAN_INIT_VALUE))
     {
       return;
     }
 
-#ifndef CONFIG_MM_KASAN_DISABLE_NULL_POINTER_CHECK
+#  ifndef CONFIG_MM_KASAN_DISABLE_NULL_POINTER_CHECK
   if (predict_false(addr == NULL))
     {
       kasan_report(addr, size, is_write, return_address);
     }
-#endif
+#  endif
 
-#ifndef CONFIG_MM_KASAN_NONE
+#  ifndef CONFIG_MM_KASAN_NONE
   if (predict_false(kasan_is_poisoned(addr, size)))
     {
       kasan_report(addr, size, is_write, return_address);
     }
-#endif
+#  endif
 
-#if MM_KASAN_WATCHPOINT > 0
+#  if MM_KASAN_WATCHPOINT > 0
   kasan_check_watchpoint(addr, size, is_write, return_address);
+#  endif
 #endif
 }
 
@@ -253,6 +268,7 @@ static inline void kasan_check_report(FAR const void *addr, size_t size,
  * Public Functions
  ****************************************************************************/
 
+#ifdef CONFIG_MM_KASAN
 void kasan_start(void)
 {
   g_region_init = KASAN_INIT_VALUE;
@@ -262,6 +278,7 @@ void kasan_stop(void)
 {
   g_region_init = 0;
 }
+#endif
 
 /****************************************************************************
  * Name: kasan_debugpoint
@@ -399,3 +416,6 @@ DEFINE_ASAN_LOAD_STORE(2)
 DEFINE_ASAN_LOAD_STORE(4)
 DEFINE_ASAN_LOAD_STORE(8)
 DEFINE_ASAN_LOAD_STORE(16)
+
+#endif /* CONFIG_MM_KASAN_INSTRUMENT */
+

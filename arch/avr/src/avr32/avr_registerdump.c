@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/avr/src/avr32/avr_registerdump.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -37,16 +39,6 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: up_getusrsp
- ****************************************************************************/
-
-uintptr_t up_getusrsp(void *regs)
-{
-  uint8_t *ptr = regs;
-  return ptr[REG_R13];
-}
 
 /****************************************************************************
  * Name: up_dump_register

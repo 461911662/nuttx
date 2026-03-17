@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mqueue/mq_open.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -39,7 +41,7 @@
 
 #include "inode/inode.h"
 #include "mqueue/mqueue.h"
-#include "notify/notify.h"
+#include "vfs/vfs.h"
 
 /****************************************************************************
  * Private Functions Prototypes
@@ -74,7 +76,7 @@ static int nxmq_file_close(FAR struct file *filep)
 {
   FAR struct inode *inode = filep->f_inode;
 
-  if (atomic_load(&inode->i_crefs) <= 0)
+  if (atomic_read(&inode->i_crefs) <= 1)
     {
       FAR struct mqueue_inode_s *msgq = inode->i_private;
 
@@ -262,13 +264,12 @@ static int file_mq_vopen(FAR struct file *mq, FAR const char *mq_name,
 
       /* Associate the inode with a file structure */
 
-      memset(mq, 0, sizeof(*mq));
       mq->f_oflags = oflags;
       mq->f_inode  = inode;
 
       if (created)
         {
-          *created = 1;
+          *created = 0;
         }
     }
   else
@@ -306,7 +307,6 @@ static int file_mq_vopen(FAR struct file *mq, FAR const char *mq_name,
 
       /* Associate the inode with a file structure */
 
-      memset(mq, 0, sizeof(*mq));
       mq->f_oflags = oflags;
       mq->f_inode  = inode;
 
@@ -321,7 +321,7 @@ static int file_mq_vopen(FAR struct file *mq, FAR const char *mq_name,
 
       if (created)
         {
-          *created = 0;
+          *created = 1;
         }
     }
 
@@ -345,28 +345,32 @@ errout:
 
 static mqd_t nxmq_vopen(FAR const char *mq_name, int oflags, va_list ap)
 {
-  struct file mq;
+  FAR struct file *mq;
   int created;
   int ret;
+  int fd;
 
-  ret = file_mq_vopen(&mq, mq_name, oflags, getumask(), ap, &created);
+  mq = file_allocate();
+  if (mq == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  ret = file_mq_vopen(mq, mq_name, oflags, getumask(), ap, &created);
   if (ret < 0)
     {
+      file_deallocate(mq);
       return ret;
     }
 
-  ret = file_allocate(mq.f_inode, mq.f_oflags,
-                      mq.f_pos, mq.f_priv, 0, false);
-  if (ret < 0)
+  fd = file_dup(mq, 0, oflags);
+  if (fd < 0)
     {
-      file_mq_close(&mq);
-      if (created)
-        {
-          file_mq_unlink(mq_name);
-        }
+      file_close(mq);
+      file_deallocate(mq);
     }
 
-  return ret;
+  return fd;
 }
 
 /****************************************************************************
@@ -413,6 +417,8 @@ int file_mq_open(FAR struct file *mq,
 {
   va_list ap;
   int ret;
+
+  memset(mq, 0, sizeof(*mq));
 
   va_start(ap, oflags);
   ret = file_mq_vopen(mq, mq_name, oflags, 0, ap, NULL);

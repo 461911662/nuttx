@@ -1,6 +1,8 @@
 ############################################################################
 # drivers/input/Make.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -116,8 +118,20 @@ ifeq ($(CONFIG_INPUT_NUNCHUCK),y)
   CSRCS += nunchuck.c
 endif
 
+ifeq ($(CONFIG_INPUT_SBUTTON),y)
+  CSRCS += sbutton.c
+endif
+
 ifeq ($(CONFIG_INPUT_SPQ10KBD),y)
   CSRCS += spq10kbd.c
+endif
+
+ifeq ($(CONFIG_INPUT_KMATRIX),y)
+  CSRCS += kmatrix.c
+endif
+
+ifeq ($(CONFIG_INPUT_KMATRIX_I2C),y)
+  CSRCS += kmatrix_i2c.c
 endif
 
 ifeq ($(CONFIG_INPUT_GOLDFISH_EVENTS),y)

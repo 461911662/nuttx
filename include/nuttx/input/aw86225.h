@@ -43,6 +43,18 @@
  * Public Types
  ****************************************************************************/
 
+/* struct aw86225_pattern_s - effect pattern configuration parameters
+ */
+
+struct aw86225_pattern_s
+{
+  uint8_t patternid[8];
+  uint8_t waveloop[8];
+  uint8_t mainloop;
+  float strength;
+  uint32_t duration; /* in millisecond */
+};
+
 /* struct aw86225_hap_effect - effect configuration parameters
  */
 
@@ -97,7 +109,7 @@ struct aw86225_config
 
   unsigned int sine_array[4];
 
-  /* The boundry between ram mode and rtp mode */
+  /* The boundary between ram mode and rtp mode */
 
   unsigned int effect_id_boundary;
 
@@ -129,6 +141,7 @@ struct aw86225_board_config
   uint8_t addr;            /* I2C address */
   int freq;                /* I2C frequency */
   FAR struct aw86225_hap_effect *predefined;
+  FAR struct aw86225_pattern_s *pattern;
 
   /* Motor driver registration path */
 

@@ -66,7 +66,7 @@ static int terminat_handler(FAR void *cookie)
       return -ESRCH;
     }
 
-  nxsched_remove_readytorun(tcb, false);
+  nxsched_remove_readytorun(tcb);
 
   leave_critical_section(flags);
   return OK;
@@ -137,18 +137,14 @@ int nxtask_terminate(pid_t pid)
   if (task_state == TSTATE_TASK_RUNNING &&
       dtcb->cpu != this_cpu())
     {
-      cpu_set_t affinity;
       uint16_t tcb_flags;
       int ret;
 
       tcb_flags = dtcb->flags;
       dtcb->flags |= TCB_FLAG_CPU_LOCKED;
-      affinity = dtcb->affinity;
-      CPU_SET(dtcb->cpu, &dtcb->affinity);
 
       ret = nxsched_smp_call_single(dtcb->cpu, terminat_handler,
-                                    (FAR void *)(uintptr_t)pid,
-                                    true);
+                                    (FAR void *)(uintptr_t)pid);
 
       if (ret < 0)
         {
@@ -159,12 +155,11 @@ int nxtask_terminate(pid_t pid)
         }
 
       dtcb->flags = tcb_flags;
-      dtcb->affinity = affinity;
     }
   else
 #endif
     {
-      nxsched_remove_readytorun(dtcb, false);
+      nxsched_remove_readytorun(dtcb);
     }
 
   dtcb->task_state = task_state;

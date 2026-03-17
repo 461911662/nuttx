@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sim/src/sim/posix/sim_x11framebuffer.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -164,6 +166,11 @@ static inline Display *sim_x11createframe(void)
   gcval.graphics_exposures = 0;
   g_gc = XCreateGC(display, g_window, GCGraphicsExposures, &gcval);
 
+  /* Map the window to make it visible on the display after it has been
+   * created and configured
+   */
+
+  XMapWindow(display, g_window);
   return display;
 }
 

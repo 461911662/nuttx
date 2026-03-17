@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/stm32/stm32f4discovery/scripts/user-space.ld
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,11 +24,24 @@
  * this script.
  */
 
+/* Make sure that the critical memory management functions are in user-space.
+ * the user heap memory manager will reside in user-space but be usable both
+ * by kernel- and user-space code
+ */
+
+EXTERN(umm_initialize)
+EXTERN(umm_addregion)
+
+EXTERN(malloc)
+EXTERN(realloc)
+EXTERN(zalloc)
+EXTERN(free)
+
 OUTPUT_ARCH(arm)
 SECTIONS
 {
     .userspace : {
-        *(.userspace)
+        KEEP(*(.userspace))
     } > uflash
 
     .text : {

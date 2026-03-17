@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/mpu60x0.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * TODO: Theory of Operation
@@ -785,19 +800,19 @@ static int mpu_reset(FAR struct mpu_dev_s *dev)
 
   do
     {
-      nxsig_usleep(50000);            /* usecs (arbitrary) */
+      nxsched_usleep(50000);            /* usecs (arbitrary) */
     }
   while (__mpu_read_pwr_mgmt_1(dev) & PWR_MGMT_1__DEVICE_RESET);
 
   /* Reset signal paths */
 
   __mpu_write_signal_path_reset(dev, SIGNAL_PATH_RESET__ALL_RESET);
-  nxsig_usleep(2000);
+  nxsched_usleep(2000);
 
   /* Disable SLEEP, use PLL with z-axis clock source */
 
   __mpu_write_pwr_mgmt_1(dev, 3);
-  nxsig_usleep(2000);
+  nxsched_usleep(2000);
 
   /* Disable i2c if we're on spi. */
 

@@ -123,15 +123,29 @@
 /* This structure defines one serial I/O buffer.
  * The serial infrastructure will initialize the 'sem' field but all other
  * fields must be initialized by the caller of uart_register().
+ *
+ * Maximum buffer size is reduced to 8 bits on architectures where 16bit
+ * load takes two instructions and is therefore not atomic. This prevents
+ * corrupted read if the value is changed in an interrupt handler while
+ * being loaded in non-interrupt code.
  */
+
+#ifndef CONFIG_ARCH_LDST_16BIT_NOT_ATOMIC
+typedef int16_t sbuf_size_t;
+#else
+typedef uint8_t sbuf_size_t;
+#endif
 
 struct uart_buffer_s
 {
-  mutex_t          lock;   /* Used to control exclusive access to the buffer */
-  volatile int16_t head;   /* Index to the head [IN] index in the buffer */
-  volatile int16_t tail;   /* Index to the tail [OUT] index in the buffer */
-  int16_t          size;   /* The allocated size of the buffer */
-  FAR char        *buffer; /* Pointer to the allocated buffer memory */
+  mutex_t              lock;   /* Used to control exclusive access
+                                * to the buffer */
+  volatile sbuf_size_t head;   /* Index to the head [IN] index
+                                * in the buffer */
+  volatile sbuf_size_t tail;   /* Index to the tail [OUT] index
+                                * in the buffer */
+  sbuf_size_t          size;   /* The allocated size of the buffer */
+  FAR char            *buffer; /* Pointer to the allocated buffer memory */
 };
 
 #if defined(CONFIG_SERIAL_RXDMA) || defined(CONFIG_SERIAL_TXDMA)
@@ -283,6 +297,20 @@ struct uart_ops_s
                           FAR const void *buf, size_t len);
 };
 
+/* This structure is used for U(S)ART frame, overrun, parity and brk error
+ * counters. This way applications will know if the UART communition is
+ * having some trouble.
+ */
+
+struct serial_icounter_s
+{
+  uint32_t frame;
+  uint32_t overrun;
+  uint32_t parity;
+  uint32_t brk;
+  uint32_t buf_overrun;
+};
+
 /* This is the device structure used by the driver.  The caller of
  * uart_register() must allocate and initialize this structure.  The
  * calling logic need only set all fields to zero except:
@@ -310,6 +338,10 @@ struct uart_dev_s
   pid_t                pid;          /* Thread PID to receive signals (-1 if none) */
 #endif
 
+#ifdef CONFIG_TTY_FORCE_PANIC
+  int                  panic_count;
+#endif
+
   /* Terminal control flags */
 
   tcflag_t             tc_iflag;     /* Input modes */
@@ -321,7 +353,6 @@ struct uart_dev_s
   sem_t                xmitsem;      /* Wakeup user waiting for space in xmit.buffer */
   sem_t                recvsem;      /* Wakeup user waiting for data in recv.buffer */
   mutex_t              closelock;    /* Locks out new open while close is in progress */
-  mutex_t              polllock;     /* Manages exclusive access to fds[] */
 
   /* I/O buffers */
 
@@ -561,7 +592,7 @@ int uart_check_special(FAR uart_dev_t *dev, FAR const char *buf,
  ****************************************************************************/
 
 #ifdef CONFIG_SERIAL_GDBSTUB
-int uart_gdbstub_register(FAR uart_dev_t *dev);
+int uart_gdbstub_register(FAR uart_dev_t *dev, FAR const char *path);
 #endif
 
 #undef EXTERN

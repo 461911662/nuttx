@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/xtensa/src/common/xtensa_saveusercontext.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,7 +26,7 @@
 
 #include <nuttx/config.h>
 #include <nuttx/irq.h>
-#include <nuttx/nuttx.h>
+#include <nuttx/macro.h>
 
 #include <string.h>
 
@@ -76,6 +78,10 @@ int up_saveusercontext(void *saveregs)
           "   s32i a13, %0, (4 * " STRINGIFY(REG_A13) ")\n"
           "   s32i a14, %0, (4 * " STRINGIFY(REG_A14) ")\n"
           "   s32i a15, %0, (4 * " STRINGIFY(REG_A15) ")\n"
+#endif
+#ifdef CONFIG_SCHED_THREAD_LOCAL
+          "   rur  a2, THREADPTR\n"
+          "   s32i a2, %0, (4 * " STRINGIFY(THREADPTR) ")\n"
 #endif
           "   rsr  a2, SAR\n"
           "   s32i a2, %0, (4 * " STRINGIFY(REG_SAR) ")\n"

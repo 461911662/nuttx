@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/net/ftmac100.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -807,7 +809,7 @@ static void ftmac100_interrupt_work(FAR void *arg)
 
   /* Process pending Ethernet interrupts */
 
-  net_lock();
+  netdev_lock(&priv->ft_dev);
   status = priv->status;
 
   ninfo("status=%08x(%08x) BASE=%p ISR=%p PHYCR=%p\n",
@@ -881,7 +883,7 @@ out:
   putreg32 (INT_MASK_ALL_ENABLED, &iobase->imr);
 
   ninfo("ISR-done\n");
-  net_unlock();
+  netdev_unlock(&priv->ft_dev);
 
   /* Re-enable Ethernet interrupts */
 
@@ -970,12 +972,12 @@ static void ftmac100_txtimeout_work(FAR void *arg)
 
   /* Process pending Ethernet interrupts */
 
-  net_lock();
+  netdev_lock(&priv->ft_dev);
 
   /* Then poll the network for new XMIT data */
 
   devif_poll(&priv->ft_dev, ftmac100_txpoll);
-  net_unlock();
+  netdev_unlock(&priv->ft_dev);
 }
 
 /****************************************************************************
@@ -1062,6 +1064,9 @@ static int ftmac100_ifup(struct net_driver_s *dev)
 
   priv->ft_bifup = true;
   up_enable_irq(CONFIG_FTMAC100_IRQ);
+
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1109,6 +1114,9 @@ static int ftmac100_ifdown(struct net_driver_s *dev)
 
   priv->ft_bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -1135,7 +1143,7 @@ static void ftmac100_txavail_work(FAR void *arg)
 
   /* Perform the poll */
 
-  net_lock();
+  netdev_lock(&priv->ft_dev);
 
   /* Ignore the notification if the interface is not yet up */
 
@@ -1150,7 +1158,7 @@ static void ftmac100_txavail_work(FAR void *arg)
       devif_poll(&priv->ft_dev, ftmac100_txpoll);
     }
 
-  net_unlock();
+  netdev_unlock(&priv->ft_dev);
 }
 
 /****************************************************************************

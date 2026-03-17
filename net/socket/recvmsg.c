@@ -88,11 +88,6 @@ ssize_t psock_recvmsg(FAR struct socket *psock, FAR struct msghdr *msg,
       return -EINVAL;
     }
 
-  if (msg->msg_iovlen != 1)
-    {
-      return -ENOTSUP;
-    }
-
   /* Verify that the sockfd corresponds to valid, allocated socket */
 
   if (psock == NULL || psock->s_conn == NULL)
@@ -184,7 +179,7 @@ ssize_t recvmsg(int sockfd, FAR struct msghdr *msg, int flags)
   if (ret == OK)
     {
       ret = psock_recvmsg(psock, msg, flags);
-      fs_putfilep(filep);
+      file_put(filep);
     }
 
   if (ret < 0)

@@ -184,7 +184,7 @@ void devzero_register(void);
  ****************************************************************************/
 
 int bchdev_register(FAR const char *blkdev, FAR const char *chardev,
-                    bool readonly);
+                    int oflags);
 
 /****************************************************************************
  * Name: bchdev_unregister
@@ -211,7 +211,7 @@ int bchdev_unregister(FAR const char *chardev);
  *
  ****************************************************************************/
 
-int bchlib_setup(FAR const char *blkdev, bool readonly, FAR void **handle);
+int bchlib_setup(FAR const char *blkdev, int oflags, FAR void **handle);
 
 /****************************************************************************
  * Name: bchlib_teardown
@@ -273,6 +273,16 @@ void lwlconsole_init(void);
  ****************************************************************************/
 
 void rpmsg_serialinit(void);
+
+/****************************************************************************
+ * Name: rpmsg_serialrawinit
+ *
+ * Description:
+ *   Register rpmsg serial driver
+ *
+ ****************************************************************************/
+
+void rpmsg_serialrawinit(void);
 
 #undef EXTERN
 #if defined(__cplusplus)

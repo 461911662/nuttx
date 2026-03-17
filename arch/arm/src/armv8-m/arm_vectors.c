@@ -1,7 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv8-m/arm_vectors.c
  *
- *   Copyright (C) 2012 Michael Smith. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2012 Michael Smith. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +41,8 @@
 
 #include "chip.h"
 #include "arm_internal.h"
+#include "ram_vectors.h"
+#include "nvic.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -74,12 +77,13 @@ static void start(void)
 /* Common exception entrypoint */
 
 extern void exception_common(void);
+extern void exception_direct(void);
 
 /****************************************************************************
  * Public data
  ****************************************************************************/
 
-/* The v7m vector table consists of an array of function pointers, with the
+/* The v8m vector table consists of an array of function pointers, with the
  * first slot (vector zero) used to hold the initial stack pointer.
  *
  * As all exceptions (interrupts) are routed via exception_common, we just
@@ -88,7 +92,8 @@ extern void exception_common(void);
  * Note that the [ ... ] designated initializer is a GCC extension.
  */
 
-const void * const _vectors[] locate_data(".vectors") =
+const void * const _vectors[] locate_data(".vectors")
+                              aligned_data(VECTAB_ALIGN) =
 {
   /* Initial stack */
 
@@ -100,5 +105,7 @@ const void * const _vectors[] locate_data(".vectors") =
 
   /* Vectors 2 - n point directly at the generic handler */
 
-  [2 ... (15 + ARMV8M_PERIPHERAL_INTERRUPTS)] = &exception_common
+  [2 ... NVIC_IRQ_PENDSV] = &exception_common,
+  [(NVIC_IRQ_PENDSV + 1) ... (15 + ARMV8M_PERIPHERAL_INTERRUPTS)]
+                          = &exception_direct
 };

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/include/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,19 +37,24 @@
 #ifndef __ASSEMBLY__
 #  include <stdint.h>
 #  include <arch/syscall.h>
+#  include <nuttx/macro.h>
 #endif
-
-/* Include NuttX-specific IRQ definitions */
-
-#include <nuttx/irq.h>
 
 /* Include chip-specific IRQ definitions (including IRQ numbers) */
 
 #include <arch/chip/irq.h>
 
+/* Include NuttX-specific IRQ definitions */
+
+#include <nuttx/irq.h>
+
 /****************************************************************************
  * Pre-processor Prototypes
  ****************************************************************************/
+
+#ifdef __ghs__
+#  define __ARM_ARCH 8
+#endif
 
 #define up_getsp()          (uintptr_t)__builtin_frame_address(0)
 
@@ -146,11 +153,13 @@
 #define REG_SPSR            (33)
 #define REG_SP_EL0          (34)
 #define REG_EXE_DEPTH       (35)
+#define REG_SCTLR_EL1       (36)
+#define REG_RESERVED        (37)
 
 /* In Armv8-A Architecture, the stack must align with 16 byte */
 
-#define XCPTCONTEXT_GP_REGS (36)
-#define XCPTCONTEXT_GP_SIZE (8 * XCPTCONTEXT_GP_REGS)
+#define ARM64_CONTEXT_REGS  (38)
+#define ARM64_CONTEXT_SIZE  (8 * ARM64_CONTEXT_REGS)
 
 #ifdef CONFIG_ARCH_FPU
 
@@ -166,66 +175,77 @@
 
 /* 128bit registers */
 
-#define FPU_REG_Q0          (0)
-#define FPU_REG_Q1          (1)
-#define FPU_REG_Q2          (2)
-#define FPU_REG_Q3          (3)
-#define FPU_REG_Q4          (4)
-#define FPU_REG_Q5          (5)
-#define FPU_REG_Q6          (6)
-#define FPU_REG_Q7          (7)
-#define FPU_REG_Q8          (8)
-#define FPU_REG_Q9          (9)
-#define FPU_REG_Q10         (10)
-#define FPU_REG_Q11         (11)
-#define FPU_REG_Q12         (12)
-#define FPU_REG_Q13         (13)
-#define FPU_REG_Q14         (14)
-#define FPU_REG_Q15         (15)
-#define FPU_REG_Q16         (16)
-#define FPU_REG_Q17         (17)
-#define FPU_REG_Q18         (18)
-#define FPU_REG_Q19         (19)
-#define FPU_REG_Q20         (20)
-#define FPU_REG_Q21         (21)
-#define FPU_REG_Q22         (22)
-#define FPU_REG_Q23         (23)
-#define FPU_REG_Q24         (24)
-#define FPU_REG_Q25         (25)
-#define FPU_REG_Q26         (26)
-#define FPU_REG_Q27         (27)
-#define FPU_REG_Q28         (28)
-#define FPU_REG_Q29         (29)
-#define FPU_REG_Q30         (30)
-#define FPU_REG_Q31         (31)
+#define REG_Q0              (0)
+#define REG_Q1              (1)
+#define REG_Q2              (2)
+#define REG_Q3              (3)
+#define REG_Q4              (4)
+#define REG_Q5              (5)
+#define REG_Q6              (6)
+#define REG_Q7              (7)
+#define REG_Q8              (8)
+#define REG_Q9              (9)
+#define REG_Q10             (10)
+#define REG_Q11             (11)
+#define REG_Q12             (12)
+#define REG_Q13             (13)
+#define REG_Q14             (14)
+#define REG_Q15             (15)
+#define REG_Q16             (16)
+#define REG_Q17             (17)
+#define REG_Q18             (18)
+#define REG_Q19             (19)
+#define REG_Q20             (20)
+#define REG_Q21             (21)
+#define REG_Q22             (22)
+#define REG_Q23             (23)
+#define REG_Q24             (24)
+#define REG_Q25             (25)
+#define REG_Q26             (26)
+#define REG_Q27             (27)
+#define REG_Q28             (28)
+#define REG_Q29             (29)
+#define REG_Q30             (30)
+#define REG_Q31             (31)
 
 /* 32 bit registers
  */
-#define FPU_REG_FPSR        (0)
-#define FPU_REG_FPCR        (1)
+#define REG_FPSR            (0)
+#define REG_FPCR            (1)
 
 /* FPU registers(Q0~Q31, 128bit): 32x2 = 64
  * FPU FPSR/SPSR(32 bit) : 1
  * FPU TRAP: 1
  * 64 + 1 + 1 = 66
  */
-#define XCPTCONTEXT_FPU_REGS      (66)
+#define FPU_CONTEXT_REGS    (66)
 #else
-#define XCPTCONTEXT_FPU_REGS      (0)
+#define FPU_CONTEXT_REGS    (0)
 #endif
 
-#define FPUCONTEXT_SIZE     (8 * XCPTCONTEXT_FPU_REGS)
+#define FPU_CONTEXT_SIZE    (8 * FPU_CONTEXT_REGS)
 
-#define XCPTCONTEXT_REGS    (XCPTCONTEXT_GP_REGS + XCPTCONTEXT_FPU_REGS)
+#define XCPTCONTEXT_REGS    (ARM64_CONTEXT_REGS + FPU_CONTEXT_REGS)
 #define XCPTCONTEXT_SIZE    (8 * XCPTCONTEXT_REGS)
 
-#ifdef CONFIG_ARM64_DECODEFIQ
-#  define IRQ_DAIF_MASK (3)
-#else
-#  define IRQ_DAIF_MASK (2)
+#if XCPTCONTEXT_SIZE % 16 != 0
+#  error "ARM64_CONTEXT_REGS and FPU_CONTEXT_REGS must be an even number to ensure the stack is aligned to 16 bytes"
 #endif
 
-#define IRQ_SPSR_MASK (IRQ_DAIF_MASK << 6)
+/* Friendly register names */
+
+#define REG_FP              REG_X29
+#define REG_LR              REG_X30
+
+#define FIQ_DAIF_MASK       (1)
+#define IRQ_DAIF_MASK       (2)
+#define IRQ_FIQ_DAIF_MASK   (FIQ_DAIF_MASK | IRQ_DAIF_MASK)
+
+#define IRQ_SPSR_MASK       (IRQ_DAIF_MASK << 6)
+
+/* AArch64 the stack-pointer must be 128-bit aligned */
+
+#define STACKFRAME_ALIGN    16
 
 #ifndef __ASSEMBLY__
 
@@ -243,7 +263,12 @@ extern "C"
 
 struct xcptcontext
 {
-#ifdef CONFIG_BUILD_KERNEL
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+  /* task context, for signal process */
+
+  uint64_t *saved_regs;
+
+#if defined(CONFIG_BUILD_KERNEL) || defined(CONFIG_BUILD_PROTECTED)
   /* This is the saved address to use when returning from a user-space
    * signal handler.
    */
@@ -251,6 +276,7 @@ struct xcptcontext
   uintptr_t sigreturn;
 
 #endif
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
   /* task stack reg context */
 
   uint64_t *regs;
@@ -258,9 +284,10 @@ struct xcptcontext
   uint64_t *initregs;
 #endif
 
-  /* task context, for signal process */
-
-  uint64_t *saved_reg;
+#ifdef CONFIG_ARCH_FPU
+  uint64_t *fpu_regs;
+  uint64_t *saved_fpu_regs;
+#endif
 
   /* Extra fault address register saved for common paging logic.  In the
    * case of the pre-fetch abort, this value is the same as regs[REG_ELR];
@@ -309,7 +336,7 @@ struct xcptcontext
 
 /* Return the current IRQ state */
 
-static inline irqstate_t irqstate(void)
+static inline_function irqstate_t irqstate(void)
 {
   irqstate_t flags;
 
@@ -320,7 +347,7 @@ static inline irqstate_t irqstate(void)
 
 /* Disable IRQs and return the previous IRQ state */
 
-static inline irqstate_t up_irq_save(void)
+static inline_function irqstate_t up_irq_save(void)
 {
   irqstate_t flags;
 
@@ -329,7 +356,11 @@ static inline irqstate_t up_irq_save(void)
       "mrs %0, daif\n"
       "msr daifset, %1\n"
       : "=r" (flags)
+#if defined(CONFIG_ARCH_TRUSTZONE_SECURE)
+      : "i" (FIQ_DAIF_MASK)
+#else
       : "i" (IRQ_DAIF_MASK)
+#endif
       : "memory"
     );
 
@@ -338,7 +369,7 @@ static inline irqstate_t up_irq_save(void)
 
 /* Enable IRQs and return the previous IRQ state */
 
-static inline irqstate_t up_irq_enable(void)
+static inline_function irqstate_t up_irq_enable(void)
 {
   irqstate_t flags;
 
@@ -347,7 +378,13 @@ static inline irqstate_t up_irq_enable(void)
       "mrs %0, daif\n"
       "msr daifclr, %1\n"
       : "=r" (flags)
+#if defined(CONFIG_ARCH_HIPRI_INTERRUPT)
+      : "i" (IRQ_FIQ_DAIF_MASK)
+#elif defined(CONFIG_ARCH_TRUSTZONE_SECURE)
+      : "i" (FIQ_DAIF_MASK)
+#else
       : "i" (IRQ_DAIF_MASK)
+#endif
       : "memory"
     );
   return flags;
@@ -355,7 +392,7 @@ static inline irqstate_t up_irq_enable(void)
 
 /* Restore saved IRQ & FIQ state */
 
-static inline void up_irq_restore(irqstate_t flags)
+static inline_function void up_irq_restore(irqstate_t flags)
 {
   __asm__ __volatile__("msr daif, %0" :: "r" (flags): "memory");
 }
@@ -368,72 +405,90 @@ static inline void up_irq_restore(irqstate_t flags)
  * Name: up_cpu_index
  *
  * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
+ *   Return the real core number regardless CONFIG_SMP setting
  *
  ****************************************************************************/
 
-#ifdef CONFIG_SMP
+#ifdef CONFIG_ARCH_HAVE_MULTICPU
+#  ifndef MPID_TO_CORE
+#    define MPID_TO_CORE(mpid) \
+            (((mpid) >> MPIDR_AFF0_SHIFT) & MPIDR_AFFLVL_MASK)
+#  endif
 #  define up_cpu_index() ((int)MPID_TO_CORE(GET_MPIDR()))
-#else
-#  define up_cpu_index() (0)
-#endif
+#endif /* CONFIG_ARCH_HAVE_MULTICPU */
 
 /****************************************************************************
  * Name:
- *   up_current_regs/up_set_current_regs
+ *   read_/write_/zero_/modify_ sysreg
  *
  * Description:
- *   We use the following code to manipulate the tpidr_el1 register,
- *   which exists uniquely for each CPU and is primarily designed to store
- *   current thread information. Currently, we leverage it to store interrupt
- *   information, with plans to further optimize its use for storing both
- *   thread and interrupt information in the future.
+ *
+ *   ARMv8 Architecture Registers access method
+ *   All the macros need a memory clobber
  *
  ****************************************************************************/
 
-noinstrument_function
-static inline_function uint64_t *up_current_regs(void)
-{
-  uint64_t *regs;
-  __asm__ volatile ("mrs %0, " "tpidr_el1" : "=r" (regs));
-  return regs;
-}
+#define read_sysreg(reg)                            \
+  ({                                                \
+    uint64_t __val;                                 \
+    __asm__ volatile ("mrs %0, " STRINGIFY(reg)     \
+                    : "=r" (__val) :: "memory");    \
+    __val;                                          \
+  })
 
-noinstrument_function
-static inline_function void up_set_current_regs(uint64_t *regs)
-{
-  __asm__ volatile ("msr " "tpidr_el1" ", %0" : : "r" (regs));
-}
+#define write_sysreg(__val, reg)                    \
+  ({                                                \
+    __asm__ volatile ("msr " STRINGIFY(reg) ", %x0"  \
+                      : : "r" (__val) : "memory");  \
+  })
 
-#define up_switch_context(tcb, rtcb)                              \
-  do {                                                            \
-    if (!up_interrupt_context())                                  \
-      {                                                           \
-        sys_call2(SYS_switch_context, (uintptr_t)&rtcb->xcp.regs, \
-                  (uintptr_t)tcb->xcp.regs);                      \
-      }                                                           \
-  } while (0)
+#define zero_sysreg(reg)                            \
+  ({                                                \
+    __asm__ volatile ("msr " STRINGIFY(reg) ", xzr" \
+                      ::: "memory");                \
+  })
+
+#define modify_sysreg(v,m,a)                        \
+  write_sysreg((read_sysreg(a) & ~(m)) |            \
+               ((uintptr_t)(v) & (m)), a)
 
 /****************************************************************************
- * Name: up_interrupt_context
+ * Schedule acceleration macros
  *
- * Description: Return true is we are currently executing in
- * the interrupt handler context.
- *
+ * The lsbit of tpidr_el1 stores information about whether the current
+ * execution is in an interrupt context, where 1 indicates being in an
+ * interrupt context and 0 indicates being in a thread context.
  ****************************************************************************/
 
-static inline bool up_interrupt_context(void)
-{
-  return up_current_regs() != NULL;
-}
+#define up_this_task()         ((struct tcb_s *)(read_sysreg(tpidr_el1) & ~1ul))
+#define up_update_task(t)      modify_sysreg(t, ~1ul, tpidr_el1)
+#define up_interrupt_context() (read_sysreg(tpidr_el1) & 1)
+
+#define up_switch_context(tcb, rtcb)                                      \
+  do                                                                      \
+    {                                                                     \
+      if (!up_interrupt_context())                                        \
+        {                                                                 \
+          sys_call0(SYS_switch_context);                                  \
+        }                                                                 \
+      UNUSED(rtcb);                                                       \
+    }                                                                     \
+  while (0)
+
+/****************************************************************************
+ * Name: up_getusrpc
+ ****************************************************************************/
+
+#define up_getusrpc(regs) \
+    (((uintptr_t *)((regs) ? (regs) : (uint64_t *)running_regs()))[REG_ELR])
+
+#ifndef CONFIG_BUILD_KERNEL
+#  define up_getusrsp(regs) \
+    ((uintptr_t)((uint64_t *)(regs))[REG_SP_ELX])
+#else
+#  define up_getusrsp(regs) \
+    ((uintptr_t)((uint64_t *)(regs))[REG_SP_EL0])
+#endif
 
 #undef EXTERN
 #ifdef __cplusplus

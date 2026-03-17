@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/serial/serial_io.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -164,7 +166,7 @@ void uart_recvchars(FAR uart_dev_t *dev)
     {
       int nexthead = rxbuf->head + 1 < rxbuf->size ? rxbuf->head + 1 : 0;
       bool is_full = (nexthead == rxbuf->tail);
-      FAR char *pbuf;
+      FAR char *pbuf = NULL;
       char ch;
 
 #ifdef CONFIG_SERIAL_IFLOWCONTROL_WATERMARKS
@@ -215,38 +217,52 @@ void uart_recvchars(FAR uart_dev_t *dev)
 
       /* Get this next character from the hardware */
 
-      if (!is_full && dev->ops->recvbuf)
+      if (dev->ops->recvbuf)
         {
           ssize_t ret;
 
-          if (rxbuf->tail > rxbuf->head)
+          if (!is_full)
             {
-              nbytes = rxbuf->tail - rxbuf->head - 1;
-            }
-          else if (rxbuf->tail)
-            {
-              nbytes = rxbuf->size - rxbuf->head;
+              if (rxbuf->tail > rxbuf->head)
+                {
+                  nbytes = rxbuf->tail - rxbuf->head - 1;
+                }
+              else if (rxbuf->tail)
+                {
+                  nbytes = rxbuf->size - rxbuf->head;
+                }
+              else
+                {
+                  nbytes = rxbuf->size - rxbuf->head - 1;
+                }
+
+              pbuf = &rxbuf->buffer[rxbuf->head];
+              ret = uart_recvbuf(dev, pbuf, nbytes);
+              if (ret <= 0)
+                {
+                  continue;
+                }
+
+              nbytes = ret;
+              rxbuf->head += nbytes;
+              if (rxbuf->head >= rxbuf->size)
+                {
+                  rxbuf->head = 0;
+                }
             }
           else
             {
-              nbytes = rxbuf->size - rxbuf->head - 1;
-            }
+              pbuf = &ch;
+              nbytes = 1;
 
-          pbuf = &rxbuf->buffer[rxbuf->head];
-          ret = uart_recvbuf(dev, pbuf, nbytes);
-          if (ret <= 0)
-            {
-              continue;
-            }
-
-          nbytes = ret;
-          rxbuf->head += nbytes;
-          if (rxbuf->head >= rxbuf->size)
-            {
-              rxbuf->head = 0;
+              ret = uart_recvbuf(dev, pbuf, nbytes);
+              if (ret <= 0)
+                {
+                  continue;
+                }
             }
         }
-      else
+      else if(dev->ops->receive)
         {
           unsigned int status;
 
@@ -310,7 +326,6 @@ void uart_recvchars(FAR uart_dev_t *dev)
   if (signo != 0)
     {
       nxsig_kill(dev->pid, signo);
-      uart_reset_sem(dev);
     }
 #endif
 }

@@ -41,6 +41,10 @@
 
 #define NXSTYLE_VERSION "0.01"
 
+#ifdef WIN32
+#  define realpath(n,r) _fullpath((r),(n),_MAX_PATH)
+#endif
+
 #define LINE_SIZE      512
 #define RANGE_NUMBER   4096
 #define DEFAULT_WIDTH  78
@@ -188,6 +192,7 @@ static const char *g_white_prefix[] =
   "ASCII_",  /* Ref:  include/nuttx/ascii.h */
   "Dl_info", /* Ref:  include/dlfcn.h */
   "Elf",     /* Ref:  include/elf.h, include/elf32.h, include/elf64.h */
+  "Ifx",     /* Ref:  arch/tricore/src */
   "PRId",    /* Ref:  inttypes.h */
   "PRIi",    /* Ref:  inttypes.h */
   "PRIo",    /* Ref:  inttypes.h */
@@ -200,17 +205,28 @@ static const char *g_white_prefix[] =
   "SCNx",    /* Ref:  inttypes.h */
   "SYS_",    /* Ref:  include/sys/syscall.h */
   "STUB_",   /* Ref:  syscall/syscall_lookup.h, syscall/sycall_stublookup.c */
+  "TEEC_",   /* Ref:  apps/tee/libteec/optee_client/libteec/include/tee_client_api.h */
+  "V4L2_",   /* Ref:  include/sys/video_controls.h */
   "XK_",     /* Ref:  include/input/X11_keysymdef.h */
   "b8",      /* Ref:  include/fixedmath.h */
   "b16",     /* Ref:  include/fixedmath.h */
   "b32",     /* Ref:  include/fixedmath.h */
+  "cJSON",   /* Ref:  apps/wireless/wapi/src */
   "ub8",     /* Ref:  include/fixedmath.h */
   "ub16",    /* Ref:  include/fixedmath.h */
   "ub32",    /* Ref:  include/fixedmath.h */
   "lua_",    /* Ref:  apps/interpreters/lua/lua-5.x.x/src/lua.h */
   "luaL_",   /* Ref:  apps/interpreters/lua/lua-5.x.x/src/lauxlib.h */
-  "V4L2_",   /* Ref:  include/sys/video_controls.h */
-  "Ifx",     /* Ref:  arch/tricore/src */
+  "Ba",      /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "Thread",  /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "LThread", /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "Http",    /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "Disk",    /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "Xedge",   /* Ref:  apps/netutils/xedge/BAS/examples/xedge/src/xedge.h */
+  "tAddr",   /* Ref:  arch/tricore/src */
+  "tClass",  /* Ref:  arch/tricore/src */
+  "tCpu",    /* Ref:  arch/tricore/src */
+  "tId",     /* Ref:  arch/tricore/src */
   NULL
 };
 
@@ -222,6 +238,14 @@ static const char *g_white_suffix[] =
   "kHz",
   "kbps",
   "us",
+
+  /* Ref:  arch/avr/src/avrdx/avrdx_serial.c (and others
+   * in arch/avr/src/avrdx.) I/O register constants
+   * for AVR DA/DB chips.
+   */
+
+  "bm",
+  "bp",
   NULL
 };
 
@@ -616,6 +640,40 @@ static const char *g_white_content_list[] =
   "unzGetCurrentFileInfo64",
   "unzGoToNextFile",
   "unzGoToFirstFile",
+
+  /* Ref:
+   * apps/netutils/telnetc/telnetc.c
+   */
+
+  "deflateInit",
+  "deflateEnd",
+  "inflateInit",
+  "inflateEnd",
+  "zError",
+
+  /* Ref:
+   * apps/tee/libteec/optee_client/libteec/include/tee_client_api.h
+   */
+
+  "clockSeqAndNode",
+  "paramTypes",
+  "timeLow",
+  "timeMid",
+  "timeHiAndVersion",
+
+  /* Ref:
+   * apps/netutils/xedge/BAS/examples/xedge/src/xedge.h
+   */
+
+  "ltMgr",
+  "Lt",
+  "setDispExit",
+  "baGetUnixTime",
+  "platformInitDiskIo",
+  "xedgeInitDiskIo",
+  "xedgeOpenAUX",
+  "baParseDate",
+
   NULL
 };
 
@@ -641,6 +699,40 @@ static const char *g_white_files[] =
 
   "arm-acle-compat.h",
   "arm_asm.h",
+
+  /* Skip Mixed case
+   * Ref:
+   * libs/libbuiltin/
+   */
+
+  "InstrProfilingPlatform.c",
+
+  /* Skip Mixed case
+   * arch/arm/src/phy62xx/uart.c:1229:13: error: Mixed case identifier found
+   */
+
+  "phy62xx/uart.c",
+
+  /* Skip Mixed case
+   * arch/arm/src/phy62xx/irq.c:194:5: error: Mixed case identifier found
+   */
+
+  "phy62xx/irq.c",
+
+  /* Skip Mixed case
+   * arch/arm/src/phy62xx/phyplus_wdt.c:61:28: error: Mixed case identifier found
+   */
+
+  "phy62xx/phyplus_wdt.c",
+
+  /* Skip infineon illd files
+   * Ref:
+   * arch/tricore/src/illd
+   */
+
+  "Ifx_Cfg_Ssw.c",
+  "Ifx_Cfg_Ssw.h",
+  "Ifx_Cfg.h",
   NULL
 };
 
@@ -674,6 +766,67 @@ static void show_usage(char *progname, int exitcode, char *what)
   fprintf(stderr, "                   2 - output each line (default)\n");
   exit(exitcode);
 }
+
+#ifndef HAVE_STRNDUP
+/********************************************************************************
+ * Name: my_strndup
+ *
+ * Description:
+ *   Duplicate a specific number of bytes from a string.
+ *   Implementation of strndup() for Windows Native
+ *   MinGW does not seem to provide strndup
+ *
+ ********************************************************************************/
+
+char *my_strndup(const char *s, size_t size)
+{
+  char *dest = NULL;
+  size_t len;
+
+  len = strnlen(s, size);
+  len = len < size ? len : size;
+  dest = malloc(len + 1);
+
+  if (dest == NULL)
+    {
+      return NULL;
+    }
+
+  memcpy(dest, s, len);
+  dest[len] = '\0';
+  return dest;
+}
+#undef strndup
+#  define strndup my_strndup
+#endif
+
+#ifdef CONFIG_WINDOWS_NATIVE
+/********************************************************************************
+ * Name: backslash_to_slash
+ *
+ * Description:
+ *   Replace backslashes \ to forward slashes /.
+ *
+ ********************************************************************************/
+
+static void backslash_to_slash(char *str)
+{
+  char *p;
+
+  if (str == NULL)
+    {
+      return;
+    }
+
+  for (p = str; *p; ++p)
+    {
+      if (*p == '\\')
+        {
+           *p = '/';
+        }
+    }
+}
+#endif
 
 /********************************************************************************
  * Name: skip
@@ -1098,7 +1251,7 @@ int main(int argc, char **argv, char **envp)
 {
   FILE *instream;       /* File input stream */
   char line[LINE_SIZE]; /* The current line being examined */
-  char buffer[100];     /* Localy format error strings */
+  char buffer[100];     /* Locally format error strings */
   char *lptr;           /* Temporary pointer into line[] */
   char *ext;            /* Temporary file extension */
   bool btabs;           /* True: TAB characters found on the line */
@@ -1108,6 +1261,7 @@ int main(int argc, char **argv, char **envp)
   bool bfor;            /* True: This line is beginning of a 'for' statement */
   bool bif;             /* True: This line is beginning of a 'if' statement */
   bool bswitch;         /* True: Within a switch statement */
+  bool bcase;           /* True: Within a case statement of a switch */
   bool bstring;         /* True: Within a string */
   bool bquote;          /* True: Backslash quoted character next */
   bool bblank;          /* Used to verify block comment terminator */
@@ -1201,6 +1355,9 @@ int main(int argc, char **argv, char **envp)
       return 1;
     }
 
+#ifdef CONFIG_WINDOWS_NATIVE
+  backslash_to_slash(g_file_name);
+#endif
   /* Are we parsing a header file? */
 
   ext = strrchr(g_file_name, '.');
@@ -1244,6 +1401,7 @@ int main(int argc, char **argv, char **envp)
   bcrs           = false;       /* True: Carriage return found on the line */
   bfunctions     = false;       /* True: In private or public functions */
   bswitch        = false;       /* True: Within a switch statement */
+  bcase          = false;       /* True: Within a case statement of a switch */
   bstring        = false;       /* True: Within a string */
   bexternc       = false;       /* True: Within 'extern "C"' */
   bif            = false;       /* True: This line is beginning of a 'if' statement */
@@ -1979,22 +2137,11 @@ int main(int argc, char **argv, char **envp)
            */
 
           else if (strncmp(&line[indent], "break ", 6) == 0 ||
-                   strncmp(&line[indent], "case ", 5) == 0 ||
-    #if 0 /* Part of switch */
-                   strncmp(&line[indent], "case ", 5) == 0 ||
-    #endif
                    strncmp(&line[indent], "continue ", 9) == 0 ||
-
-    #if 0 /* Part of switch */
-                   strncmp(&line[indent], "default ", 8) == 0 ||
-    #endif
                    strncmp(&line[indent], "do ", 3) == 0 ||
                    strncmp(&line[indent], "else ", 5) == 0 ||
                    strncmp(&line[indent], "goto ", 5) == 0 ||
                    strncmp(&line[indent], "return ", 7) == 0 ||
-    #if 0 /* Doesn't follow pattern */
-                   strncmp(&line[indent], "switch ", 7) == 0 ||
-    #endif
                    strncmp(&line[indent], "while ", 6) == 0)
             {
               bstatm = true;
@@ -2017,6 +2164,29 @@ int main(int argc, char **argv, char **envp)
             {
               bswitch = true;
             }
+          else if (strncmp(&line[indent], "switch(", 7) == 0)
+            {
+              ERROR("Missing whitespace after keyword", lineno, n);
+              bswitch = true;
+            }
+          else if (strncmp(&line[indent], "case ", 5) == 0)
+            {
+              bcase = true;
+            }
+          else if (strncmp(&line[indent], "case(", 5) == 0)
+            {
+              ERROR("Missing whitespace after keyword", lineno, n);
+              bcase = true;
+            }
+          else if (strncmp(&line[indent], "default ", 8) == 0)
+            {
+              ERROR("Missing whitespace after keyword", lineno, n);
+              bcase = true;
+            }
+          else if (strncmp(&line[indent], "default:", 8) == 0)
+            {
+              bcase = true;
+            }
 
           /* Also check for C keywords with missing white space */
 
@@ -2037,11 +2207,6 @@ int main(int argc, char **argv, char **envp)
               ERROR("Missing whitespace after keyword", lineno, n);
               bfor   = true;
               bstatm = true;
-            }
-          else if (strncmp(&line[indent], "switch(", 7) == 0)
-            {
-              ERROR("Missing whitespace after keyword", lineno, n);
-              bswitch = true;
             }
         }
 
@@ -2706,9 +2871,26 @@ int main(int argc, char **argv, char **envp)
                       }
                   }
                   break;
+                case ':':
+                  {
+                    if (bcase == true)
+                      {
+                        char *ndx = &line[n + 1];
+                        while ((int)isspace(*ndx))
+                          {
+                            ndx++;
+                          }
 
-                /* Semi-colon may terminate a declaration */
+                        if (*ndx != '\0' && *ndx != '/')
+                          {
+                            ERROR("Case statement should be on a new line",
+                                  lineno, n);
+                          }
 
+                        bcase = false;
+                      }
+                  }
+                  break;
                 case ',':
                   {
                     if (!isspace((int)line[n + 1]))
@@ -3047,7 +3229,6 @@ int main(int argc, char **argv, char **envp)
                     }
 
                   break;
-
                 case '^':
 
                   /* ^= */

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-pci-legacy.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -106,10 +108,6 @@ virtio_pci_legacy_get_queue_len(FAR struct virtio_pci_device_s *vpdev,
 static int
 virtio_pci_legacy_create_virtqueue(FAR struct virtio_pci_device_s *vpdev,
                                    FAR struct virtqueue *vq);
-static int
-virtio_pci_legacy_config_vector(FAR struct virtio_pci_device_s *vpdev,
-                                bool enable);
-
 static void
 virtio_pci_legacy_delete_virtqueue(FAR struct virtio_device *vdev,
                                    int index);
@@ -122,10 +120,10 @@ static void virtio_pci_legacy_write_config(FAR struct virtio_device *vdev,
 static void virtio_pci_legacy_read_config(FAR struct virtio_device *vdev,
                                           uint32_t offset, FAR void *dst,
                                           int length);
-static uint32_t
+static uint64_t
 virtio_pci_legacy_get_features(FAR struct virtio_device *vdev);
 static void virtio_pci_legacy_set_features(FAR struct virtio_device *vdev,
-                                           uint32_t features);
+                                           uint64_t features);
 static void virtio_pci_legacy_notify(FAR struct virtqueue *vq);
 
 /****************************************************************************
@@ -150,7 +148,6 @@ static const struct virtio_dispatch g_virtio_pci_dispatch =
 static const struct virtio_pci_ops_s g_virtio_pci_legacy_ops =
 {
   virtio_pci_legacy_get_queue_len,       /* get_queue_len */
-  virtio_pci_legacy_config_vector,       /* config_vector */
   virtio_pci_legacy_create_virtqueue,    /* create_virtqueue */
   virtio_pci_legacy_delete_virtqueue,    /* delete_virtqueue */
 };
@@ -175,7 +172,7 @@ virtio_pci_legacy_get_queue_len(FAR struct virtio_pci_device_s *vpdev,
                    (uintptr_t)(vpdev->ioaddr + VIRTIO_PCI_QUEUE_NUM), &num);
   if (num == 0)
     {
-      pcierr("Queue is not available num=%d\n", num);
+      vrterr("Queue is not available num=%d\n", num);
     }
 
   return num;
@@ -207,9 +204,14 @@ virtio_pci_legacy_create_virtqueue(FAR struct virtio_pci_device_s *vpdev,
                      VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 
 #if CONFIG_DRIVERS_VIRTIO_PCI_POLLING_PERIOD <= 0
+  if (vpdev->intx)
+    {
+      return OK;
+    }
+
   pci_write_io_word(vpdev->dev,
                     (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_QUEUE_VECTOR),
-                    VIRTIO_PCI_INT_VQ);
+                    0);
   pci_read_io_word(vpdev->dev,
                    (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_QUEUE_VECTOR),
                    &msix_vector);
@@ -222,32 +224,6 @@ virtio_pci_legacy_create_virtqueue(FAR struct virtio_pci_device_s *vpdev,
       return -EBUSY;
     }
 #endif
-
-  return OK;
-}
-
-/****************************************************************************
- * Name: virtio_pci_legacy_config_vector
- ****************************************************************************/
-
-static int
-virtio_pci_legacy_config_vector(FAR struct virtio_pci_device_s *vpdev,
-                                bool enable)
-{
-  uint16_t vector = enable ? 0 : VIRTIO_PCI_MSI_NO_VECTOR;
-  uint16_t rvector;
-
-  pci_write_io_word(vpdev->dev,
-                    (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_CONFIG_VECTOR),
-                    vector);
-  pci_read_io_word(vpdev->dev,
-                   (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_CONFIG_VECTOR),
-                   &rvector);
-
-  if (rvector != vector)
-    {
-      return -EINVAL;
-    }
 
   return OK;
 }
@@ -270,14 +246,17 @@ void virtio_pci_legacy_delete_virtqueue(FAR struct virtio_device *vdev,
                     index);
 
 #if CONFIG_DRIVERS_VIRTIO_PCI_POLLING_PERIOD <= 0
-  pci_write_io_word(vpdev->dev,
-                    (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_QUEUE_VECTOR),
-                    VIRTIO_PCI_MSI_NO_VECTOR);
+  if (!vpdev->intx)
+    {
+      pci_write_io_word(vpdev->dev,
+                        (uintptr_t)(vpdev->ioaddr + VIRTIO_MSI_QUEUE_VECTOR),
+                        VIRTIO_PCI_MSI_NO_VECTOR);
 
-  /* Flush the write out to device */
+      /* Flush the write out to device */
 
-  pci_read_io_byte(vpdev->dev,
-                   (uintptr_t)(vpdev->ioaddr + VIRTIO_PCI_ISR), &isr);
+      pci_read_io_byte(vpdev->dev,
+                       (uintptr_t)(vpdev->ioaddr + VIRTIO_PCI_ISR), &isr);
+    }
 #endif
 
   /* Select and deactivate the queue */
@@ -367,7 +346,7 @@ static void virtio_pci_legacy_read_config(FAR struct virtio_device *vdev,
  * Name: virtio_pci_legacy_get_features
  ****************************************************************************/
 
-static uint32_t
+static uint64_t
 virtio_pci_legacy_get_features(FAR struct virtio_device *vdev)
 {
   FAR struct virtio_pci_device_s *vpdev =
@@ -385,14 +364,20 @@ virtio_pci_legacy_get_features(FAR struct virtio_device *vdev)
  ****************************************************************************/
 
 static void virtio_pci_legacy_set_features(FAR struct virtio_device *vdev,
-                                           uint32_t features)
+                                           uint64_t features)
 {
   FAR struct virtio_pci_device_s *vpdev =
     (FAR struct virtio_pci_device_s *)vdev;
 
+  if ((features >> 32) != 0)
+    {
+      features = (uint64_t)((uint32_t)features);
+      vrtwarn("Virtio pci legacy not support feature bits larger than 32\n");
+    }
+
   pci_write_io_dword(vpdev->dev,
                      (uintptr_t)(vpdev->ioaddr + VIRTIO_PCI_GUEST_FEATURES),
-                     vdev->features);
+                     features);
   vdev->features = features;
 }
 
@@ -422,7 +407,7 @@ virtio_pci_legacy_init_device(FAR struct virtio_pci_device_s *vpdev)
 
   if (dev->revision != VIRTIO_PCI_ABI_VERSION)
     {
-      pcierr("Virtio_pci: expected ABI version %d, got %u\n",
+      vrterr("Virtio_pci: expected ABI version %d, got %u\n",
               VIRTIO_PCI_ABI_VERSION, dev->revision);
       return -ENODEV;
     }
@@ -434,6 +419,7 @@ virtio_pci_legacy_init_device(FAR struct virtio_pci_device_s *vpdev)
       return -EINVAL;
     }
 
+  vpdev->isr = vpdev->ioaddr + VIRTIO_PCI_ISR;
   vdev->id.vendor = dev->subsystem_vendor;
   vdev->id.device = dev->subsystem_device;
 
@@ -450,10 +436,11 @@ int virtio_pci_legacy_probe(FAR struct pci_device_s *dev)
   FAR struct virtio_device *vdev = &vpdev->vdev;
   int ret;
 
-  /* We only own devices >= 0x1000 and <= 0x107f: leave the rest. */
+  /* We only own devices >= 0x1000 and <= 0x103f: leave the rest. */
 
   if (dev->device < 0x1000 || dev->device > 0x103f)
     {
+      vrtwarn("Device id 0x%04x not supported\n", dev->device);
       return -ENODEV;
     }
 
@@ -464,7 +451,7 @@ int virtio_pci_legacy_probe(FAR struct pci_device_s *dev)
   ret = virtio_pci_legacy_init_device(vpdev);
   if (ret < 0)
     {
-      pcierr("Virtio pci legacy device init failed, ret=%d\n", ret);
+      vrterr("Virtio pci legacy device init failed, ret=%d\n", ret);
     }
 
   return ret;

@@ -36,7 +36,9 @@
  * Private Data
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_MINIMAL_VECTORTABLE_DYNAMIC
+static spinlock_t g_irqlock = SP_UNLOCKED;
+#if defined(CONFIG_ARCH_MINIMAL_VECTORTABLE_DYNAMIC) && \
+    !defined(CONFIG_ARCH_IRQ_TO_NDX)
 static int g_irqmap_count = 1;
 #endif
 
@@ -55,26 +57,48 @@ static int g_irqmap_count = 1;
  * declaration is here for the time being.
  */
 
+#  if !defined(CONFIG_ARCH_IRQ_TO_NDX)
 irq_mapped_t g_irqmap[NR_IRQS];
+#  endif
+int g_irqrevmap[CONFIG_ARCH_NUSER_INTERRUPTS];
 #endif
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
-#ifdef CONFIG_ARCH_MINIMAL_VECTORTABLE_DYNAMIC
+#if defined(CONFIG_ARCH_MINIMAL_VECTORTABLE_DYNAMIC) && \
+    !defined(CONFIG_ARCH_IRQ_TO_NDX)
 int irq_to_ndx(int irq)
 {
   DEBUGASSERT(g_irqmap_count < CONFIG_ARCH_NUSER_INTERRUPTS);
 
-  irqstate_t flags = spin_lock_irqsave(NULL);
+  irqstate_t flags = spin_lock_irqsave(&g_irqlock);
   if (g_irqmap[irq] == 0)
     {
-      g_irqmap[irq] = g_irqmap_count++;
+      int ndx = g_irqmap_count++;
+      g_irqmap[irq] = ndx;
+      g_irqrevmap[ndx] = irq;
     }
 
-  spin_unlock_irqrestore(NULL, flags);
+  spin_unlock_irqrestore(&g_irqlock, flags);
   return g_irqmap[irq];
+}
+#elif defined(CONFIG_ARCH_MINIMAL_VECTORTABLE) && \
+      !defined(CONFIG_ARCH_IRQ_TO_NDX)
+int ndx_to_irq(int ndx)
+{
+  int i;
+
+  for (i = 0; i < NR_IRQS; i++)
+    {
+      if (g_irqmap[i] == ndx)
+        {
+          return i;
+        }
+    }
+
+  return -EINVAL;
 }
 #endif
 
@@ -89,25 +113,21 @@ int irq_to_ndx(int irq)
 
 int irq_attach(int irq, xcpt_t isr, FAR void *arg)
 {
+  int ret = OK;
 #if NR_IRQS > 0
-  int ret = -EINVAL;
-
-  if ((unsigned)irq < NR_IRQS)
+  int ndx = IRQ_TO_NDX(irq);
+  if (ndx < 0)
     {
-      int ndx = IRQ_TO_NDX(irq);
-      irqstate_t flags;
-
-      if (ndx < 0)
-        {
-          return ndx;
-        }
-
+      ret = ndx;
+    }
+  else
+    {
       /* If the new ISR is NULL, then the ISR is being detached.
        * In this case, disable the ISR and direct any interrupts
        * to the unexpected interrupt handler.
        */
 
-      flags = spin_lock_irqsave(NULL);
+      irqstate_t flags = spin_lock_irqsave(&g_irqlock);
       if (isr == NULL)
         {
           /* Disable the interrupt if we can before detaching it.  We might
@@ -141,27 +161,25 @@ int irq_attach(int irq, xcpt_t isr, FAR void *arg)
       if (is_irqchain(ndx, isr))
         {
           ret = irqchain_attach(ndx, isr, arg);
-          spin_unlock_irqrestore(NULL, flags);
-          return ret;
+          spin_unlock_irqrestore(&g_irqlock, flags);
         }
+      else
 #endif
+        {
+          /* Save the new ISR and its argument in the table. */
 
-      /* Save the new ISR and its argument in the table. */
+          g_irqvector[ndx].handler = isr;
+          g_irqvector[ndx].arg     = arg;
+    #ifdef CONFIG_SCHED_IRQMONITOR
+          g_irqvector[ndx].start   = clock_systime_ticks();
+          g_irqvector[ndx].time    = 0;
+          g_irqvector[ndx].count   = 0;
+    #endif
 
-      g_irqvector[ndx].handler = isr;
-      g_irqvector[ndx].arg     = arg;
-#ifdef CONFIG_SCHED_IRQMONITOR
-      g_irqvector[ndx].start   = clock_systime_ticks();
-      g_irqvector[ndx].time    = 0;
-      g_irqvector[ndx].count   = 0;
-#endif
-
-      spin_unlock_irqrestore(NULL, flags);
-      ret = OK;
+          spin_unlock_irqrestore(&g_irqlock, flags);
+        }
     }
+#endif  /* NR_IRQS */
 
   return ret;
-#else
-  return OK;
-#endif
 }

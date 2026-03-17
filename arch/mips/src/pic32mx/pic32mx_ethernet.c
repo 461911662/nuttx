@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/mips/src/pic32mx/pic32mx_ethernet.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -115,7 +117,7 @@
 #  define CONFIG_PIC32MX_MULTICAST 1
 #endif
 
-/* Use defaults if the number of discriptors is not provided */
+/* Use defaults if the number of descriptors is not provided */
 
 #ifndef CONFIG_PIC32MX_ETH_NTXDESC
 #  define CONFIG_PIC32MX_ETH_NTXDESC 2
@@ -709,7 +711,7 @@ static inline void pic32mx_txdescinit(struct pic32mx_driver_s *priv)
   int i;
 
   /* Assign a buffer to each TX descriptor.  For now, just mark each TX
-   * descriptor as owned by softare andnot linked.
+   * descriptor as owned by software and not linked.
    */
 
   for (i = 0; i < CONFIG_PIC32MX_ETH_NTXDESC; i++)
@@ -833,7 +835,7 @@ static inline void pic32mx_rxdescinit(struct pic32mx_driver_s *priv)
  *
  * Returned Value:
  *   A pointer to the next available Tx descriptor on success; NULL if the
- *   next Tx dscriptor is not available.
+ *   next Tx descriptor is not available.
  *
  ****************************************************************************/
 
@@ -2118,7 +2120,7 @@ static int pic32mx_ifup(struct net_driver_s *dev)
 
   pic32mx_putreg(ETH_CON2_RXBUFSZ(CONFIG_NET_ETH_PKTSIZE), PIC32MX_ETH_CON2);
 
-  /* Reset state varialbes */
+  /* Reset state variables */
 
   priv->pd_polling   = false;
   priv->pd_txpending = false;
@@ -2189,6 +2191,9 @@ static int pic32mx_ifup(struct net_driver_s *dev)
 #else
   up_enable_irq(PIC32MX_IRQSRC_ETH);
 #endif
+
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -2231,6 +2236,9 @@ static int pic32mx_ifdown(struct net_driver_s *dev)
   pic32mx_ethreset(priv);
   priv->pd_ifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 

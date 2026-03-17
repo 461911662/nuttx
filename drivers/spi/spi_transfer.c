@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/spi/spi_transfer.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -132,7 +134,7 @@ int spi_transfer(FAR struct spi_dev_s *spi, FAR struct spi_sequence_s *seq)
 
       if (trans->delay > 0)
         {
-          nxsig_usleep(trans->delay);
+          nxsched_usleep(trans->delay);
         }
     }
 

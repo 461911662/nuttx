@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/pipes/pipe_common.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,6 +40,7 @@
 #include <assert.h>
 #include <debug.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/semaphore.h>
 #include <nuttx/fs/fs.h>
@@ -73,9 +76,12 @@ static void pipecommon_wakeup(FAR sem_t *sem)
 {
   int sval;
 
-  while (nxsem_get_value(sem, &sval) == OK && sval <= 0)
+  if (nxsem_get_value(sem, &sval) >= 0)
     {
-      nxsem_post(sem);
+      while (sval++ <= 0)
+        {
+          nxsem_post(sem);
+        }
     }
 }
 
@@ -725,9 +731,13 @@ int pipecommon_poll(FAR struct file *filep, FAR struct pollfd *fds,
           eventset |= POLLIN;
         }
 
-      /* Notify the POLLHUP event if the pipe is empty and no writers */
+      /* Notify the POLLHUP event if the pipe is empty,
+       * while no writers and policy 0.
+       */
 
-      if (nbytes == 0 && dev->d_nwriters <= 0)
+      if (nbytes == 0 &&
+          dev->d_nwriters <= 0 &&
+          PIPE_IS_POLICY_0(dev->d_flags))
         {
           eventset |= POLLHUP;
         }

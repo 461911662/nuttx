@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/bch/bchdev_driver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -80,7 +82,9 @@ const struct file_operations g_bch_fops =
   bch_ioctl,   /* ioctl */
   NULL,        /* mmap */
   NULL,        /* truncate */
-  bch_poll     /* poll */
+  bch_poll,    /* poll */
+  NULL,        /* readv */
+  NULL         /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , bch_unlink /* unlink */
 #endif
@@ -431,6 +435,14 @@ static int bch_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         break;
 #endif
 
+      case BIOC_DISCARD:
+        {
+          /* Invalidate the sector so next read is from the device- */
+
+          bch->sector = (size_t)-1;
+          goto ioctl_default;
+        }
+
       case BIOC_FLUSH:
         {
           /* Flush any dirty pages remaining in the cache */
@@ -446,6 +458,7 @@ static int bch_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 
       /* Pass the IOCTL command on to the contained block driver. */
 
+ioctl_default:
       default:
         {
           FAR struct inode *bchinode = bch->inode;
@@ -455,6 +468,14 @@ static int bch_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
           if (bchinode->u.i_bops->ioctl != NULL)
             {
               ret = bchinode->u.i_bops->ioctl(bchinode, cmd, arg);
+
+              /* Drivers may not support command BIOC_FLUSH */
+
+              if (ret == -ENOTTY && (cmd == BIOC_FLUSH ||
+                  cmd == BIOC_DISCARD))
+                {
+                  ret = 0;
+                }
             }
         }
         break;

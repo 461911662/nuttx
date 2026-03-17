@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/mpfs/mpfs_ihc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -79,7 +81,7 @@
 
 /* rptun initialization names */
 
-#define MPFS_RPTUN_CPU_NAME      "mpfs-ihc"
+#define MPFS_RPTUN_CPU_NAME      "mpfsihc"
 
 /* Vring configuration parameters */
 
@@ -145,7 +147,8 @@ struct mpfs_ihc_work_arg_s
  ****************************************************************************/
 
 static const char *mpfs_rptun_get_cpuname(struct rptun_dev_s *dev);
-static struct rptun_rsc_s *mpfs_rptun_get_resource(struct rptun_dev_s *dev);
+static struct resource_table *
+mpfs_rptun_get_resource(struct rptun_dev_s *dev);
 static bool mpfs_rptun_is_autostart(struct rptun_dev_s *dev);
 static bool mpfs_rptun_is_master(struct rptun_dev_s *dev);
 static int mpfs_rptun_start(struct rptun_dev_s *dev);
@@ -374,7 +377,7 @@ static uint32_t mpfs_ihc_context_to_local_hart_id(ihc_channel_t channel)
   uint32_t hart             = UNDEFINED_HART_ID;
   uint32_t hart_idx         = 0;
   uint32_t harts_in_context = LIBERO_SETTING_CONTEXT_B_HART_EN;
-  uint64_t mhartid          = riscv_mhartid();
+  uint64_t mhartid          = up_cpu_index();
 
   /* If we are sending to a Context, assume we are a Context.
    * i.e. HSS bootloader will not send directly to a context.
@@ -575,7 +578,7 @@ static void mpfs_ihc_rx_message(ihc_channel_t channel, uint32_t mhartid,
  *
  * Description:
  *   This is called from the interrupt handler. This figures out the actions
- *   based on the information retieved from the subsequent functions.
+ *   based on the information retrieved from the subsequent functions.
  *
  * Input Parameters:
  *   None
@@ -587,7 +590,7 @@ static void mpfs_ihc_rx_message(ihc_channel_t channel, uint32_t mhartid,
 
 static void mpfs_ihc_message_present_isr(void)
 {
-  uint64_t mhartid = riscv_mhartid();
+  uint64_t mhartid = up_cpu_index();
   bool is_ack = false;
   bool is_msg = false;
 
@@ -843,7 +846,7 @@ static const char *mpfs_rptun_get_cpuname(struct rptun_dev_s *dev)
  *
  ****************************************************************************/
 
-static struct rptun_rsc_s *
+static struct resource_table *
 mpfs_rptun_get_resource(struct rptun_dev_s *dev)
 {
   struct mpfs_rptun_dev_s *priv = container_of(dev,
@@ -855,7 +858,7 @@ mpfs_rptun_get_resource(struct rptun_dev_s *dev)
 
   if (priv->shmem != NULL)
     {
-      return &priv->shmem->rsc;
+      return &priv->shmem->rsc.rsc_tbl_hdr;
     }
   else
     {
@@ -874,10 +877,12 @@ mpfs_rptun_get_resource(struct rptun_dev_s *dev)
       rsc->rpmsg_vdev.id            = VIRTIO_ID_RPMSG;
       rsc->rpmsg_vdev.notifyid      = VDEV_NOTIFYID;
       rsc->rpmsg_vdev.dfeatures     = 1 << VIRTIO_RPMSG_F_NS  |
-                                      1 << VIRTIO_RPMSG_F_ACK;
+                                      1 << VIRTIO_RPMSG_F_ACK |
+                                      1 << VIRTIO_RPMSG_F_CPUNAME;
 
       rsc->rpmsg_vdev.gfeatures     = 1 << VIRTIO_RPMSG_F_NS  |
-                                      1 << VIRTIO_RPMSG_F_ACK;
+                                      1 << VIRTIO_RPMSG_F_ACK |
+                                      1 << VIRTIO_RPMSG_F_CPUNAME;
 
       /* If the master is up already, don't clear the status here */
 
@@ -886,6 +891,8 @@ mpfs_rptun_get_resource(struct rptun_dev_s *dev)
           rsc->rpmsg_vdev.status    = 0;
         }
 
+      rsc->rpmsg_vdev.reserved[0]   = VIRTIO_DEV_DRIVER;
+      rsc->rpmsg_vdev.reserved[1]   = 0;
       rsc->rpmsg_vdev.config_len    = sizeof(struct fw_rsc_config);
       rsc->rpmsg_vdev.num_of_vrings = VRINGS;
       rsc->rpmsg_vring0.align       = VRING_ALIGN;
@@ -898,6 +905,10 @@ mpfs_rptun_get_resource(struct rptun_dev_s *dev)
       rsc->rpmsg_vring1.notifyid    = VRING1_NOTIFYID;
       rsc->config.r2h_buf_size      = VRING_SIZE;
       rsc->config.h2r_buf_size      = VRING_SIZE;
+      strlcpy((char *)rsc->config.host_cpuname, MPFS_RPTUN_CPU_NAME,
+              VIRTIO_RPMSG_CPUNAME_SIZE);
+      strlcpy((char *)rsc->config.remote_cpuname, "nuttx",
+              VIRTIO_RPMSG_CPUNAME_SIZE);
     }
 
   /* It might be tempting to set this at mpfs_rptun_start(), but it's only
@@ -912,7 +923,7 @@ mpfs_rptun_get_resource(struct rptun_dev_s *dev)
 
   up_enable_irq(g_plic_irq);
 
-  return &priv->shmem->rsc;
+  return &priv->shmem->rsc.rsc_tbl_hdr;
 }
 
 /****************************************************************************
@@ -1173,7 +1184,7 @@ static int mpfs_echo_ping_init(struct rpmsg_device *rdev,
  *
  * Description:
  *   Callback that is called when the underlying rpmsg device has been
- *   created. This is used to initialize the ping enpoint at the proper
+ *   created. This is used to initialize the ping endpoint at the proper
  *   time.
  *
  * Input Parameters:
@@ -1306,7 +1317,7 @@ static int mpfs_rptun_thread(int argc, char *argv[])
 
 int mpfs_ihc_init(void)
 {
-  uint32_t  mhartid = (uint32_t)riscv_mhartid();
+  uint32_t  mhartid = (uint32_t)up_cpu_index();
 #ifdef MPFS_RPTUN_USE_THREAD
   char     *argv[3];
   char      arg1[19];

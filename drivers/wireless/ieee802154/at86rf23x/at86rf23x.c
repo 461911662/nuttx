@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/wireless/ieee802154/at86rf23x/at86rf23x.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -615,7 +617,7 @@ static int at86rf23x_set_trxstate(FAR struct at86rf23x_dev_s *dev,
       break;
 
     default:
-      wlerr("ERRPR: %s\n", EINVAL_STR);
+      wlerr("ERROR: %s\n", EINVAL_STR);
       init_status = 0;  /* Placed this here to keep compiler if no debug */
       return -EINVAL;
     }

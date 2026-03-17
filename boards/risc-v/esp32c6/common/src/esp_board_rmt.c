@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/risc-v/esp32c6/common/src/esp_board_rmt.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -75,7 +77,6 @@
  *   Initialize the RMT peripheral and register an RX device.
  *
  * Input Parameters:
- *   ch  - The RMT's channel that will be used
  *   pin - The pin used for the RX channel
  *
  * Returned Value:
@@ -83,11 +84,11 @@
  *
  ****************************************************************************/
 
-int board_rmt_rxinitialize(int ch, int pin)
+int board_rmt_rxinitialize(int pin)
 {
   int ret;
 
-  struct rmt_dev_s *rmt = esp_rmt_rx_init(ch, pin);
+  struct rmt_dev_s *rmt = esp_rmt_rx_init(pin);
 
   ret = rmtchar_register(rmt);
   if (ret < 0)
@@ -106,7 +107,6 @@ int board_rmt_rxinitialize(int ch, int pin)
  *   Initialize the RMT peripheral and register an TX device.
  *
  * Input Parameters:
- *   ch  - The RMT's channel that will be used
  *   pin - The pin used for the TX channel
  *
  * Returned Value:
@@ -114,7 +114,7 @@ int board_rmt_rxinitialize(int ch, int pin)
  *
  ****************************************************************************/
 
-int board_rmt_txinitialize(int ch, int pin)
+int board_rmt_txinitialize(int pin)
 {
   int ret;
   struct rmt_dev_s *rmt;
@@ -122,7 +122,7 @@ int board_rmt_txinitialize(int ch, int pin)
   struct ws2812_dev_s *led;
 #endif
 
-  rmt = esp_rmt_tx_init(ch, pin);
+  rmt = esp_rmt_tx_init(pin);
   if (rmt == NULL)
     {
       rmterr("ERROR: esp_rmt_tx_init failed\n");

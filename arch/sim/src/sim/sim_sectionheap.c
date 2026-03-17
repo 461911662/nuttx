@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sim/src/sim/sim_sectionheap.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -108,7 +110,7 @@ void *up_dataheap_memalign(size_t align, size_t size)
   if (g_dataheap == NULL)
     {
       g_dataheap = mm_initialize("dataheap",
-                                 host_allocheap(SIM_HEAP_SIZE, true),
+                                 host_allocheap(SIM_HEAP_SIZE, false),
                                  SIM_HEAP_SIZE);
     }
 

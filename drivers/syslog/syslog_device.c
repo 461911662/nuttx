@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/syslog/syslog_device.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -564,7 +566,7 @@ static int syslog_dev_putc(FAR syslog_channel_t *channel, int ch)
       return ret;
     }
 
-  /* Pre-pend a newline with a carriage return. */
+  /* Prepend a newline with a carriage return. */
 
   if (ch == '\n')
     {

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/ff_dummy.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -55,6 +57,21 @@ static int ff_dummy_haptics_upload_effect(FAR struct ff_lowerhalf_s *lower,
                                           FAR struct ff_effect *old)
 {
   iinfo("called: effect_id = %d \n", effect->id);
+
+  if (effect->type == FF_PERIODIC)
+    {
+      if (effect->u.periodic.custom_data != NULL &&
+          effect->u.periodic.custom_len >=
+          3 * sizeof(effect->u.periodic.custom_data[0]))
+        {
+          iinfo("custom effect id = %d\n",
+          effect->u.periodic.custom_data[0]);
+
+          effect->u.periodic.custom_data[1] = 5; /* effect id playlength s */
+          effect->u.periodic.custom_data[2] = 0; /* effect id playlength ms */
+        }
+    }
+
   return OK;
 }
 
@@ -91,7 +108,7 @@ static void ff_dummy_haptics_set_gain(FAR struct ff_lowerhalf_s *lower,
  *
  * Input Parameters:
  *   devno - The user specifies device number, from 0. If the
- *           devno alerady exists, -EEXIST will be returned.
+ *           devno already exists, -EEXIST will be returned.
  *
  * Returned Value:
  *   Zero (OK) on success; a negated errno value on failure.

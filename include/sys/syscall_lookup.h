@@ -28,14 +28,13 @@
 
 SYSCALL_LOOKUP1(_exit,                     1)
 SYSCALL_LOOKUP(_assert,                    4)
-SYSCALL_LOOKUP(getpid,                     0)
-SYSCALL_LOOKUP(gettid,                     0)
 SYSCALL_LOOKUP(prctl,                      2)
 
 #ifdef CONFIG_SCHED_HAVE_PARENT
   SYSCALL_LOOKUP(getppid,                  0)
 #endif
 
+SYSCALL_LOOKUP(sched_getcpu,               0)
 SYSCALL_LOOKUP(sched_getparam,             2)
 SYSCALL_LOOKUP(sched_getscheduler,         1)
 SYSCALL_LOOKUP(sched_lock,                 0)
@@ -53,7 +52,6 @@ SYSCALL_LOOKUP(nxsched_get_stackinfo,      2)
 
 #ifdef CONFIG_SMP
   SYSCALL_LOOKUP(sched_getaffinity,        3)
-  SYSCALL_LOOKUP(sched_getcpu,             0)
   SYSCALL_LOOKUP(sched_setaffinity,        3)
 #endif
 
@@ -78,14 +76,21 @@ SYSCALL_LOOKUP(sethostname,                2)
 /* Semaphores */
 
 SYSCALL_LOOKUP(nxsem_destroy,              1)
-SYSCALL_LOOKUP(nxsem_post,                 1)
+SYSCALL_LOOKUP(nxsem_post_slow,            1)
+SYSCALL_LOOKUP(nxsem_reset,                2)
+SYSCALL_LOOKUP(nxsem_tickwait,             2)
 SYSCALL_LOOKUP(nxsem_clockwait,            3)
 SYSCALL_LOOKUP(nxsem_timedwait,            2)
-SYSCALL_LOOKUP(nxsem_trywait,              1)
-SYSCALL_LOOKUP(nxsem_wait,                 1)
+SYSCALL_LOOKUP(nxsem_trywait_slow,         1)
+SYSCALL_LOOKUP(nxsem_wait_slow,            1)
 
 #ifdef CONFIG_PRIORITY_INHERITANCE
   SYSCALL_LOOKUP(nxsem_set_protocol,       2)
+#endif
+
+#ifdef CONFIG_PRIORITY_PROTECT
+  SYSCALL_LOOKUP(nxsem_setprioceiling,     3)
+  SYSCALL_LOOKUP(nxsem_getprioceiling,     2)
 #endif
 
 /* Named semaphores */
@@ -149,13 +154,17 @@ SYSCALL_LOOKUP(nxsem_wait,                 1)
 
 SYSCALL_LOOKUP(kill,                       2)
 SYSCALL_LOOKUP(tgkill,                     3)
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
 SYSCALL_LOOKUP(sigaction,                  3)
 SYSCALL_LOOKUP(sigpending,                 1)
+#endif
+#ifndef CONFIG_DISABLE_ALL_SIGNALS
 SYSCALL_LOOKUP(sigprocmask,                3)
 SYSCALL_LOOKUP(sigqueue,                   3)
 SYSCALL_LOOKUP(sigsuspend,                 1)
 SYSCALL_LOOKUP(sigtimedwait,               3)
 SYSCALL_LOOKUP(sigwaitinfo,                2)
+#endif
 SYSCALL_LOOKUP(clock_nanosleep,            4)
 
 /* The following are only defined if the system clock is enabled in the
@@ -165,7 +174,8 @@ SYSCALL_LOOKUP(clock_nanosleep,            4)
 SYSCALL_LOOKUP(clock,                      0)
 SYSCALL_LOOKUP(clock_gettime,              2)
 SYSCALL_LOOKUP(clock_settime,              2)
-#ifdef CONFIG_CLOCK_TIMEKEEPING
+#ifdef CONFIG_CLOCK_ADJTIME
+  SYSCALL_LOOKUP(clock_adjtime,            2)
   SYSCALL_LOOKUP(adjtime,                  2)
 #endif
 
@@ -183,7 +193,9 @@ SYSCALL_LOOKUP(clock_settime,              2)
 
 /* System logging */
 
+#ifdef CONFIG_SYSLOG
 SYSCALL_LOOKUP(nx_vsyslog,                 3)
+#endif
 
 /* The following are defined if either file or socket descriptor are
  * enabled.
@@ -193,6 +205,8 @@ SYSCALL_LOOKUP(close,                      1)
 SYSCALL_LOOKUP(ioctl,                      3)
 SYSCALL_LOOKUP(read,                       3)
 SYSCALL_LOOKUP(write,                      3)
+SYSCALL_LOOKUP(readv,                      3)
+SYSCALL_LOOKUP(writev,                     3)
 SYSCALL_LOOKUP(pread,                      4)
 SYSCALL_LOOKUP(pwrite,                     4)
 #ifdef CONFIG_FS_AIO
@@ -301,31 +315,18 @@ SYSCALL_LOOKUP(munmap,                     2)
 /* The following are defined if pthreads are enabled */
 
 #ifndef CONFIG_DISABLE_PTHREAD
-  SYSCALL_LOOKUP(pthread_barrier_wait,     1)
   SYSCALL_LOOKUP(pthread_cancel,           1)
-  SYSCALL_LOOKUP(pthread_cond_broadcast,   1)
-  SYSCALL_LOOKUP(pthread_cond_signal,      1)
-  SYSCALL_LOOKUP(pthread_cond_wait,        2)
   SYSCALL_LOOKUP(nx_pthread_create,        5)
   SYSCALL_LOOKUP(pthread_detach,           1)
   SYSCALL_LOOKUP(nx_pthread_exit,          1)
   SYSCALL_LOOKUP(pthread_getschedparam,    3)
   SYSCALL_LOOKUP(pthread_join,             2)
-  SYSCALL_LOOKUP(pthread_mutex_destroy,    1)
-  SYSCALL_LOOKUP(pthread_mutex_init,       2)
-  SYSCALL_LOOKUP(pthread_mutex_timedlock,  2)
-  SYSCALL_LOOKUP(pthread_mutex_trylock,    1)
-  SYSCALL_LOOKUP(pthread_mutex_unlock,     1)
-#ifndef CONFIG_PTHREAD_MUTEX_UNSAFE
-  SYSCALL_LOOKUP(pthread_mutex_consistent, 1)
-#endif
   SYSCALL_LOOKUP(pthread_setschedparam,    3)
   SYSCALL_LOOKUP(pthread_setschedprio,     2)
 #ifdef CONFIG_SMP
   SYSCALL_LOOKUP(pthread_setaffinity_np,   3)
   SYSCALL_LOOKUP(pthread_getaffinity_np,   3)
 #endif
-  SYSCALL_LOOKUP(pthread_cond_clockwait,   4)
   SYSCALL_LOOKUP(pthread_sigmask,          3)
 #endif
 
@@ -377,20 +378,15 @@ SYSCALL_LOOKUP(munmap,                     2)
   SYSCALL_LOOKUP(socketpair,               4)
 #endif
 
-/* The following is defined only if entropy pool random number generator
- * is enabled.
- */
-
-#ifdef CONFIG_CRYPTO_RANDOM_POOL
-  SYSCALL_LOOKUP(arc4random_buf,           2)
-#endif
-
 SYSCALL_LOOKUP(nanosleep,                  2)
 
 /* I/O event notification facility */
 
+SYSCALL_LOOKUP(epoll_close,                1)
+SYSCALL_LOOKUP(epoll_create,               1)
 SYSCALL_LOOKUP(epoll_create1,              1)
 SYSCALL_LOOKUP(epoll_ctl,                  4)
+SYSCALL_LOOKUP(epoll_pwait,                5)
 SYSCALL_LOOKUP(epoll_wait,                 4)
 
 /* POSIX timers */
@@ -402,3 +398,8 @@ SYSCALL_LOOKUP(settimeofday,               2)
 /* ANSI C signal handling */
 
 SYSCALL_LOOKUP(signal,                     2)
+
+#ifdef CONFIG_SCHED_INSTRUMENTATION_DUMP
+  SYSCALL_LOOKUP(sched_note_vprintf_ip,    5)
+  SYSCALL_LOOKUP(sched_note_event_ip,      5)
+#endif

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/tiva/lm/lm3s_ethernet.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1258,6 +1260,9 @@ static int tiva_ifup(struct net_driver_s *dev)
 
   priv->ld_bifup = true;
   leave_critical_section(flags);
+
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -1340,6 +1345,9 @@ static int tiva_ifdown(struct net_driver_s *dev)
 
   priv->ld_bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 

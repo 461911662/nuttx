@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/ina3221.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -65,10 +80,6 @@
 #define INA3221_REG_DIE_ID              0xFF  /* Always 0x3220 */
 
 #define INA3221_CONFIG_RST (1 << 15)
-
-#ifndef CONFIG_INA3221_I2C_FREQUENCY
-#  define CONFIG_INA3221_I2C_FREQUENCY  400000
-#endif
 
 #define I2C_NOSTARTSTOP_MSGS              2
 #define I2C_NOSTARTSTOP_ADDRESS_MSG_INDEX 0

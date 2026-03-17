@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/fakesensor_uorb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/param.h>
 
 #include <nuttx/fs/fs.h>
 #include <nuttx/kmalloc.h>
@@ -36,9 +39,12 @@
 #include <nuttx/semaphore.h>
 #include <nuttx/sensors/fakesensor.h>
 #include <nuttx/sensors/sensor.h>
-#include <nuttx/sensors/gnss.h>
 #include <nuttx/signal.h>
 #include <debug.h>
+
+#ifdef CONFIG_SENSORS_GNSS
+#include <nuttx/sensors/gnss.h>
+#endif
 
 /****************************************************************************
  * Private Types
@@ -49,7 +55,9 @@ struct fakesensor_s
   union
     {
       struct sensor_lowerhalf_s lower;
+#ifdef CONFIG_SENSORS_GNSS
       struct gnss_lowerhalf_s gnss;
+#endif
     };
 
   int type;
@@ -74,14 +82,17 @@ static int fakesensor_set_interval(FAR struct sensor_lowerhalf_s *lower,
 static int fakesensor_batch(FAR struct sensor_lowerhalf_s *lower,
                             FAR struct file *filep,
                             FAR uint32_t *latency_us);
+static void fakesensor_push_event(FAR struct fakesensor_s *sensor,
+                                  uint64_t event_timestamp);
+static int fakesensor_thread(int argc, char** argv);
+
+#ifdef CONFIG_SENSORS_GNSS
 static int fakegnss_activate(FAR struct gnss_lowerhalf_s *lower,
                              FAR struct file *filep, bool sw);
 static int fakegnss_set_interval(FAR struct gnss_lowerhalf_s *lower,
                                  FAR struct file *filep,
                                  FAR uint32_t *period_us);
-static void fakesensor_push_event(FAR struct fakesensor_s *sensor,
-                                  uint64_t event_timestamp);
-static int fakesensor_thread(int argc, char** argv);
+#endif
 
 /****************************************************************************
  * Private Data
@@ -94,11 +105,13 @@ static struct sensor_ops_s g_fakesensor_ops =
   .batch = fakesensor_batch,
 };
 
+#ifdef CONFIG_SENSORS_GNSS
 static struct gnss_ops_s g_fakegnss_ops =
 {
   .activate = fakegnss_activate,
   .set_interval = fakegnss_set_interval,
 };
+#endif
 
 /****************************************************************************
  * Private Functions
@@ -194,6 +207,21 @@ static inline void fakesensor_read_gyro(FAR struct fakesensor_s *sensor,
                     sizeof(struct sensor_gyro));
 }
 
+static inline void fakesensor_read_baro(FAR struct fakesensor_s *sensor,
+                                        uint64_t event_timestamp)
+{
+  struct sensor_baro baro;
+  char raw[50];
+
+  fakesensor_read_csv_line(&sensor->data, raw, sizeof(raw),
+                           sensor->raw_start);
+  sscanf(raw, "%f,%f\n", &baro.pressure, &baro.temperature);
+  baro.timestamp = event_timestamp;
+  sensor->lower.push_event(sensor->lower.priv, &baro,
+                           sizeof(struct sensor_baro));
+}
+
+#ifdef CONFIG_SENSORS_GNSS
 static inline void fakesensor_read_gnss(FAR struct fakesensor_s *sensor)
 {
   char raw[150];
@@ -210,6 +238,7 @@ static inline void fakesensor_read_gnss(FAR struct fakesensor_s *sensor)
         }
     }
 }
+#endif
 
 static int fakesensor_activate(FAR struct sensor_lowerhalf_s *lower,
                                FAR struct file *filep, bool enable)
@@ -232,11 +261,13 @@ static int fakesensor_activate(FAR struct sensor_lowerhalf_s *lower,
   return OK;
 }
 
+#ifdef CONFIG_SENSORS_GNSS
 static int fakegnss_activate(FAR struct gnss_lowerhalf_s *lower,
                              FAR struct file *filep, bool enable)
 {
   return fakesensor_activate((FAR void *)lower, filep, enable);
 }
+#endif
 
 static int fakesensor_set_interval(FAR struct sensor_lowerhalf_s *lower,
                                    FAR struct file *filep,
@@ -248,12 +279,14 @@ static int fakesensor_set_interval(FAR struct sensor_lowerhalf_s *lower,
   return OK;
 }
 
+#ifdef CONFIG_SENSORS_GNSS
 static int fakegnss_set_interval(FAR struct gnss_lowerhalf_s *lower,
                                  FAR struct file *filep,
                                  FAR uint32_t *period_us)
 {
   return fakesensor_set_interval((FAR void *)lower, filep, period_us);
 }
+#endif
 
 static int fakesensor_batch(FAR struct sensor_lowerhalf_s *lower,
                             FAR struct file *filep,
@@ -292,10 +325,16 @@ void fakesensor_push_event(FAR struct fakesensor_s *sensor,
       fakesensor_read_gyro(sensor, event_timestamp);
       break;
 
+    case SENSOR_TYPE_BAROMETER:
+      fakesensor_read_baro(sensor, event_timestamp);
+      break;
+
+#ifdef CONFIG_SENSORS_GNSS
     case SENSOR_TYPE_GNSS:
     case SENSOR_TYPE_GNSS_SATELLITE:
       fakesensor_read_gnss(sensor);
       break;
+#endif
 
     default:
       snerr("fakesensor: unsupported type sensor type\n");
@@ -331,7 +370,7 @@ static int fakesensor_thread(int argc, char** argv)
         {
           /* Sleeping thread for interval */
 
-          nxsig_usleep(sensor->batch ? sensor->batch : sensor->interval);
+          nxsched_usleep(sensor->batch ? sensor->batch : sensor->interval);
 
           /* Notify upper */
 
@@ -390,6 +429,7 @@ static int fakesensor_thread(int argc, char** argv)
  *                    ...
  *   devno       - The user specifies which device of this type, from 0.
  *   batch_number- The maximum number of batch
+ *
  ****************************************************************************/
 
 int fakesensor_init(int type, FAR const char *file_name,
@@ -398,6 +438,16 @@ int fakesensor_init(int type, FAR const char *file_name,
   FAR struct fakesensor_s *sensor;
   FAR char *argv[2];
   char arg1[32];
+#ifdef CONFIG_SENSORS_GNSS
+  uint32_t nbuffer[] = {
+    [SENSOR_GNSS_IDX_GNSS] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_SATELLITE] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_MEASUREMENT] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_CLOCK] = batch_number,
+    [SENSOR_GNSS_IDX_GNSS_GEOFENCE] = batch_number,
+  };
+#endif
+
   int ret;
 
   /* Alloc memory for sensor */
@@ -430,12 +480,14 @@ int fakesensor_init(int type, FAR const char *file_name,
 
   /*  Register sensor */
 
+#ifdef CONFIG_SENSORS_GNSS
   if (type == SENSOR_TYPE_GNSS || type == SENSOR_TYPE_GNSS_SATELLITE)
     {
       sensor->gnss.ops = &g_fakegnss_ops;
-      gnss_register(&sensor->gnss, devno, batch_number);
+      gnss_register(&sensor->gnss, devno, nbuffer, nitems(nbuffer));
     }
   else
+#endif
     {
       sensor->lower.type = type;
       sensor->lower.ops = &g_fakesensor_ops;

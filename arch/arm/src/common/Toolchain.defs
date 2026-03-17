@@ -1,6 +1,8 @@
 ############################################################################
 # arch/arm/src/common/Toolchain.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -61,7 +63,7 @@ else
 endif
 
 ifeq ($(CONFIG_STACK_CANARIES),y)
-  ARCHOPTIMIZATION += -fstack-protector-all
+  ARCHOPTIMIZATION += $(patsubst "%",%,$(CONFIG_STACK_CANARIES_LEVEL))
 endif
 
 ifeq ($(CONFIG_STACK_USAGE),y)
@@ -72,8 +74,16 @@ ifneq ($(CONFIG_STACK_USAGE_WARNING),0)
   ARCHOPTIMIZATION += -Wstack-usage=$(CONFIG_STACK_USAGE_WARNING)
 endif
 
-ifeq ($(CONFIG_ARCH_COVERAGE_ALL),y)
-  ARCHOPTIMIZATION += -fprofile-generate -ftest-coverage
+ifeq ($(CONFIG_COVERAGE_ALL),y)
+  ifeq ($(CONFIG_ARCH_TOOLCHAIN_GCC),y)
+    ARCHOPTIMIZATION += -fprofile-arcs -ftest-coverage -fno-inline
+  else ifeq ($(CONFIG_ARCH_TOOLCHAIN_CLANG),y)
+    ARCHOPTIMIZATION += -fprofile-instr-generate -fcoverage-mapping
+  endif
+endif
+
+ifeq ($(CONFIG_PROFILE_ALL),y)
+  ARCHOPTIMIZATION += -pg
 endif
 
 ifeq ($(CONFIG_MM_UBSAN_ALL),y)
@@ -84,20 +94,30 @@ ifeq ($(CONFIG_MM_UBSAN_TRAP_ON_ERROR),y)
   ARCHOPTIMIZATION += -fsanitize-undefined-trap-on-error
 endif
 
-ifeq ($(CONFIG_MM_KASAN_ALL),y)
+ifeq ($(CONFIG_MM_KASAN_INSTRUMENT_ALL),y)
   ARCHOPTIMIZATION += -fsanitize=kernel-address
-endif
+  KASAN_PARAM += asan-stack=0
+  KASAN_PARAM += asan-instrumentation-with-call-threshold=0
 
-ifeq ($(CONFIG_MM_KASAN_GLOBAL),y)
-  ARCHOPTIMIZATION += --param asan-globals=1
-endif
+  ifeq ($(CONFIG_MM_KASAN_GLOBAL),y)
+    KASAN_PARAM += asan-globals=1
+  else
+    KASAN_PARAM += asan-globals=0
+  endif
 
-ifeq ($(CONFIG_MM_KASAN_DISABLE_READS_CHECK),y)
-  ARCHOPTIMIZATION += --param asan-instrument-reads=0
-endif
+  ifeq ($(CONFIG_MM_KASAN_DISABLE_READS_CHECK),y)
+    KASAN_PARAM += asan-instrument-reads=0
+  endif
 
-ifeq ($(CONFIG_MM_KASAN_DISABLE_WRITES_CHECK),y)
-  ARCHOPTIMIZATION += --param asan-instrument-writes=0
+  ifeq ($(CONFIG_MM_KASAN_DISABLE_WRITES_CHECK),y)
+    KASAN_PARAM += asan-instrument-writes=0
+  endif
+
+  ifeq ($(CONFIG_ARM_TOOLCHAIN_CLANG),y)
+    ARCHOPTIMIZATION += $(addprefix -mllvm ,$(KASAN_PARAM))
+  else
+    ARCHOPTIMIZATION += $(addprefix --param ,$(KASAN_PARAM))
+  endif
 endif
 
 # Instrumentation options
@@ -194,6 +214,7 @@ ifeq ($(CONFIG_ARM_TOOLCHAIN_CLANG),y)
   LD      = ld.lld -m armelf
   STRIP   = llvm-strip --strip-unneeded
   AR      = llvm-ar rcs
+  UNAR    = llvm-ar x
   NM      = llvm-nm
   OBJCOPY = llvm-objcopy
   OBJDUMP = llvm-objdump
@@ -204,23 +225,13 @@ ifeq ($(CONFIG_ARM_TOOLCHAIN_CLANG),y)
 
   ARCHOPTIMIZATION += -fno-builtin
 
-  ifneq ($(TOOLCHAIN_CLANG_CONFIG),)
-    ifeq ($(CLANGVER),)
-      export CLANGVER := $(shell $(CC) --version | grep "clang version" | sed -E "s/.* ([0-9]+\.[0-9]+).*/\1/")
-    endif
+  ifeq ($(CLANGVER),)
+    export CLANGVER := $(shell $(CC) --version | grep "clang version" | sed -E "s/.* ([0-9]+\.[0-9]+\.[0-9]+).*/\1/")
+  endif
 
-    ifeq ($(CLANGVER),14.0)
-      TOOLCHAIN_CLANG_CONFIG := $(TOOLCHAIN_CLANG_CONFIG)_nosys
-    endif
-
-    ifeq ($(CLANGVER),17.0)
-      TOOLCHAIN_CLANG_OPTION = -target
-      ARCHCPUFLAGS += --target=arm-none-eabi
-    else
-      TOOLCHAIN_CLANG_OPTION = --config
-    endif
-
-    ARCHCPUFLAGS := $(TOOLCHAIN_CLANG_OPTION) $(TOOLCHAIN_CLANG_CONFIG).cfg $(ARCHCPUFLAGS)
+  ifeq "17.0" "$(word 1, $(sort 17.0 $(CLANGVER)))"
+    ARCHCPUFLAGS += --target=arm-none-eabi
+    LDFLAGS += --print-memory-usage
   endif
 
   LDFLAGS += --entry=__start
@@ -235,6 +246,7 @@ else ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),y)
   LD      = armlink
   STRIP   = llvm-strip --strip-unneeded
   AR      = armar -rcs
+  UNAR    = armar -x
   NM      = llvm-nm
   OBJCOPY = llvm-objcopy
   OBJDUMP = llvm-objdump
@@ -292,36 +304,43 @@ else
   LD      = $(CROSSDEV)ld
   STRIP   = $(CROSSDEV)strip --strip-unneeded
   AR      = $(CROSSDEV)ar rcs
+  UNAR    = $(CROSSDEV)ar x
   NM      = $(CROSSDEV)nm
   OBJCOPY = $(CROSSDEV)objcopy
   OBJDUMP = $(CROSSDEV)objdump
 
   ifeq ($(CONFIG_LTO_FULL),y)
     ifeq ($(CONFIG_ARM_TOOLCHAIN_GNU_EABI),y)
-      LD := $(CROSSDEV)gcc
-      AR := $(CROSSDEV)gcc-ar rcs
-      NM := $(CROSSDEV)gcc-nm
+      LD   := $(CROSSDEV)gcc
+      AR   := $(CROSSDEV)gcc-ar rcs
+      UNAR := $(CROSSDEV)gcc-ar x
+      NM   := $(CROSSDEV)gcc-nm
       ARCHOPTIMIZATION += -fno-builtin
     endif
   endif
 
   # Workaround to skip -Warray-bounds check due to bug of GCC-12:
-   # Wrong warning array subscript [0] is outside array bounds:
-   # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
+  # Wrong warning array subscript [0] is outside array bounds:
+  # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 
-   ifeq ($(GCCVER),)
-     export GCCVER := $(shell $(CC) --version | grep gcc | sed -E "s/.* ([0-9]+\.[0-9]+).*/\1/" | cut -d'.' -f1)
-   endif
-
-   ifeq ($(GCCVER),12)
-     ARCHOPTIMIZATION += --param=min-pagesize=0
-     ifeq ($(CONFIG_ARCH_RAMFUNCS),y)
-       LDFLAGS += --no-warn-rwx-segments
-     endif
-   endif
+  ifeq ($(CONFIG_ARCH_TOOLCHAIN_GNU),y)
+    ifeq ($(CONFIG_ARCH_TOOLCHAIN_CLANG),)
+      ifeq ($(GCCVER),)
+        export GCCVER := $(shell $(CC) --version | grep gcc | sed -E "s/.* ([0-9]+\.[0-9]+).*/\1/" | cut -d'.' -f1)
+      endif
+      ifeq ($(shell expr "$(GCCVER)" \>= 12), 1)
+        ARCHOPTIMIZATION += --param=min-pagesize=0
+        LDFLAGS += --print-memory-usage
+        ifeq ($(CONFIG_ARCH_RAMFUNCS),y)
+          LDFLAGS += --no-warn-rwx-segments
+        else ifeq ($(CONFIG_BOOT_RUNFROMFLASH),)
+          LDFLAGS += --no-warn-rwx-segments
+        endif
+      endif
+    endif
+  endif
 
   LDFLAGS += --entry=__start
-
 endif
 
 ifeq ($(CONFIG_ARCH_TOOLCHAIN_CLANG),y)
@@ -379,7 +398,14 @@ ARCHOPTIMIZATION += --no_commons
 else
 ARCHOPTIMIZATION += -fno-common
 endif
-ARCHOPTIMIZATION += -Wall -Wshadow -Wundef
+
+ifeq ($(CONFIG_ARM_TOOLCHAIN_GHS),y)
+  ARCHOPTIMIZATION += --ghstd=last
+else
+  ARCHOPTIMIZATION += -Wall
+endif
+
+ARCHOPTIMIZATION += -Wshadow -Wundef
 
 ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),y)
   ARCHOPTIMIZATION += -nostdlib
@@ -405,10 +431,13 @@ ZIGFLAGS = -target $(ZARCH)-freestanding-$(ZEABI) $(ZARCHCPUFLAGS)
 
 ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),)
   ifeq ($(CONFIG_DEBUG_OPT_UNUSED_SECTIONS),y)
-    ifeq ($(CONFIG_ARCH_TOOLCHAIN_GHS),)
+    ifeq ($(CONFIG_ARCH_TOOLCHAIN_GHS),y)
+      # instruct the exlr deletet the unused functions during link procedure
+      LDFLAGS += -delete
+    else
       LDFLAGS          += --gc-sections
-      ARCHOPTIMIZATION += -ffunction-sections -fdata-sections
     endif
+    ARCHOPTIMIZATION += -ffunction-sections -fdata-sections
   endif
 endif
 
@@ -423,6 +452,15 @@ endif
 ifeq ($(CONFIG_DEBUG_LINK_MAP),y)
   ifeq ($(CONFIG_ARM_TOOLCHAIN_GHS),y)
     LDFLAGS += -map=$(call CONVERT_PATH,$(TOPDIR)$(DELIM)nuttx.map)
+    # instruct the compiler to keep the temp files generated at
+    # compile time after they are used
+    ARCHOPTIMIZATION += -keeptempfiles
+
+    # instruct the compiler to generate a source listing of the asm file
+    ARCHOPTIMIZATION += -list
+
+    # instruct the exlr the contents that needs to be contained in the generated map file
+    LDFLAGS += -map_eofn_symbols -Mn -Mx -Ms -Mu -Ml
   else ifeq ($(CONFIG_ARM_TOOLCHAIN_ARMCLANG),)
     LDFLAGS += --cref -Map=$(call CONVERT_PATH,$(TOPDIR)$(DELIM)nuttx.map)
   else
@@ -438,20 +476,48 @@ ifeq ($(CONFIG_DEBUG_SYMBOLS),y)
       LDFLAGS += --debug
     endif
   else
-    ARCHOPTIMIZATION += -G -gdwarf-2
+    # instruct the exlr to ignore relocations from DWARF debug sections when using -delete
+    LDFLAGS += -ignore_debug_references
+
+    # instruct the exlr to dump verbose information during link procedure
+    LDFLAGS += -v
+
+    # instruct the gsize to generate a "*.siz" file that contains the detailed section size
+    LDFLAGS += -gsize
+
+    ARCHOPTIMIZATION += -G -dual_debug
   endif
+endif
+
+ifeq ($(CONFIG_ARCH_TOOLCHAIN_GHS),y)
+
+  # instruct the compiler to treat the functions referenced or called when no prototype has
+  # been provided as error
+  ARCHCFLAGS += --prototype_errors
+  ARCHCXXFLAGS += --prototype_errors
+
+  # instruct the compiler to treat #pragma directives that using wrong syntax as warnings
+  ARCHCFLAGS += --incorrect_pragma_warnings
+  ARCHCXXFLAGS += --incorrect_pragma_warnings
+
+  # instruct the exlr do not link the start files into executable
+  LDFLAGS += -nostartfiles
 endif
 
 # Add the builtin library
 
-COMPILER_RT_LIB = $(shell $(CC) $(ARCHCPUFLAGS) --print-libgcc-file-name)
-ifeq ($(CONFIG_ARCH_TOOLCHAIN_CLANG),y)
-  ifeq ($(wildcard $(COMPILER_RT_LIB)),)
-    # if "--print-libgcc-file-name" unable to find the correct libgcc PATH
-    # then go ahead and try "--print-file-name"
-    COMPILER_RT_LIB := $(wildcard $(shell $(CC) $(ARCHCPUFLAGS) --print-file-name $(notdir $(COMPILER_RT_LIB))))
+ifeq ($(CONFIG_BUILTIN_TOOLCHAIN),y)
+  COMPILER_RT_LIB = $(shell $(CC) $(ARCHCPUFLAGS) --print-libgcc-file-name)
+  ifeq ($(CONFIG_ARCH_TOOLCHAIN_CLANG),y)
+    ifeq ($(wildcard $(COMPILER_RT_LIB)),)
+      # if "--print-libgcc-file-name" unable to find the correct libgcc PATH
+      # then go ahead and try "--print-file-name"
+      COMPILER_RT_LIB := $(wildcard $(shell $(CC) $(ARCHCPUFLAGS) --print-file-name $(notdir $(COMPILER_RT_LIB))))
+    endif
   endif
-else ifeq ($(CONFIG_ARCH_TOOLCHAIN_GHS),y)
+endif
+
+ifeq ($(CONFIG_ARCH_TOOLCHAIN_GHS),y)
   GHS_ROOT_PATH = $(shell which $(CC) | awk -F '/[^/]*$$' '{print $$1}')
   COMPILER_RT_LIB := -l$(GHS_ROOT_PATH)/lib/thumb2/libarch
   ifeq ($(CONFIG_ARCH_FPU),y)
@@ -487,17 +553,57 @@ ifeq ($(CONFIG_LIBM_TOOLCHAIN),y)
   endif
 endif
 
-ifeq ($(CONFIG_LIBSUPCXX),y)
+ifeq ($(CONFIG_LIBSUPCXX_TOOLCHAIN),y)
   EXTRA_LIBS += $(wildcard $(shell $(CC) $(ARCHCPUFLAGS) --print-file-name=libsupc++.a))
 endif
 
-ifeq ($(CONFIG_ARCH_COVERAGE),y)
+ifeq ($(CONFIG_COVERAGE_TOOLCHAIN),y)
   EXTRA_LIBS += $(wildcard $(shell $(CC) $(ARCHCPUFLAGS) --print-file-name=libgcov.a))
 endif
 
 ifeq ($(CONFIG_LIBCXXTOOLCHAIN),y)
   EXTRA_LIBS += $(wildcard $(shell $(CC) $(ARCHCPUFLAGS) --print-file-name=libstdc++.a))
 endif
+
+PICFLAGS = -fpic -fPIE -mno-pic-data-is-text-relative -msingle-pic-base
+
+ifneq ($(CONFIG_BUILD_PIC),)
+  ARCHCFLAGS += $(PICFLAGS) -mpic-register=r9
+  ARCHCXXFLAGS += $(PICFLAGS) -mpic-register=r9
+  LDFLAGS += --emit-relocs
+endif
+
+# Loadable module definitions
+
+CMODULEFLAGS = $(CFLAGS) -fvisibility=hidden -mlong-calls # --target1-abs
+LDMODULEFLAGS = -r -T $(call CONVERT_PATH,$(TOPDIR)/libs/libc/elf/gnu-elf.ld)
+
+# ELF module definitions
+
+CELFFLAGS = $(CFLAGS) -fvisibility=hidden -mlong-calls # --target1-abs
+CXXELFFLAGS = $(CXXFLAGS)-fvisibility=hidden -mlong-calls
+
+ifeq ($(CONFIG_PIC),y)
+  CFLAGS += --fixed-r10
+  CELFFLAGS += $(PICFLAGS) -mpic-register=r10
+  CXXELFFLAGS += $(PICFLAGS) -mpic-register=r10
+
+  # Generate an executable elf, need to ignore undefined symbols
+  LDELFFLAGS += --unresolved-symbols=ignore-in-object-files --emit-relocs
+else
+  ifneq ($(CONFIG_BINFMT_ELF_EXECUTABLE),y)
+    LDELFFLAGS += -r
+  endif
+endif
+
+ifneq ($(CONFIG_BUILD_KERNEL),y)
+  # Flat build and protected elf entry point use crt0,
+  # Kernel build will use apps/import/scripts/crt0
+
+  LDELFFLAGS += $(TOPDIR)$(DELIM)arch$(DELIM)arm$(DELIM)src$(DELIM)crt0.o
+endif
+
+LDELFFLAGS += -e _start -T $(call CONVERT_PATH,$(TOPDIR)$(DELIM)libs$(DELIM)libc$(DELIM)elf$(DELIM)gnu-elf.ld)
 
 # Zig toolchain
 

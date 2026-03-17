@@ -67,7 +67,7 @@ static int group_continue_handler(pid_t pid, FAR void *arg)
   rtcb = nxsched_get_tcb(pid);
   if (rtcb != NULL)
     {
-      /* Remove the task from waitting list */
+      /* Remove the task from waiting list */
 
       nxsched_remove_blocked(rtcb);
 
@@ -77,7 +77,7 @@ static int group_continue_handler(pid_t pid, FAR void *arg)
 
       if (nxsched_add_readytorun(rtcb))
         {
-          up_switch_context(rtcb, tcb);
+          up_switch_context(this_task(), tcb);
         }
     }
 
@@ -108,15 +108,12 @@ static int group_continue_handler(pid_t pid, FAR void *arg)
 
 int group_continue(FAR struct tcb_s *tcb)
 {
+  irqstate_t flags;
   int ret;
 
-  /* Lock the scheduler so that there this thread will not lose priority
-   * until all of its children are suspended.
-   */
-
-  sched_lock();
+  flags = enter_critical_section();
   ret = group_foreachchild(tcb->group, group_continue_handler, NULL);
-  sched_unlock();
+  leave_critical_section(flags);
   return ret;
 }
 

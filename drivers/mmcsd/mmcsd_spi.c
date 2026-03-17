@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/mmcsd/mmcsd_spi.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -466,7 +468,7 @@ static int mmcsd_waitready(FAR struct mmcsd_slot_s *slot)
         {
           /* Give other threads time to run */
 
-          nxsig_usleep(10000);
+          nxsched_usleep(10000);
         }
     }
   while (elapsed < MMCSD_DELAY_500MS);

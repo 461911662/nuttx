@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/avr/src/avr/avr_sigdeliver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -100,6 +102,10 @@ void avr_sigdeliver(void)
   regs[REG_PC1]    = rtcb->xcp.saved_pc1;
 #if defined(REG_PC2)
   regs[REG_PC2]    = rtcb->xcp.saved_pc2;
+#endif
+
+#if defined(REG_RAMPZ)
+  regs[REG_RAMPZ] = rtcb->xcp.saved_rampz;
 #endif
   regs[REG_SREG]   = rtcb->xcp.saved_sreg;
   rtcb->sigdeliver = NULL;  /* Allows next handler to be scheduled */

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mmap/fs_munmap.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,6 +35,7 @@
 #include <assert.h>
 #include <debug.h>
 
+#include <nuttx/sched.h>
 #include <nuttx/kmalloc.h>
 
 #include "inode/inode.h"
@@ -51,6 +54,11 @@ static int file_munmap_(FAR void *start, size_t length,
   FAR struct mm_map_entry_s *entry = NULL;
   FAR struct mm_map_s *mm = get_current_mm();
   int ret = OK;
+
+  if (length == 0)
+    {
+      return -EINVAL;
+    }
 
   /* Iterate through all the mappings and call the underlying
    * unmap for every mapping where "start" lies

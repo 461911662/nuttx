@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/moxart/moxart_16550.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -69,7 +71,7 @@ void uart_decodeirq(int irq, void *context)
 }
 
 #ifdef CONFIG_SERIAL_UART_ARCH_IOCTL
-int uart_ioctl(FAR struct u16550_s *priv, int cmd, unsigned long arg)
+int uart_ioctl(struct u16550_s *priv, int cmd, unsigned long arg)
 {
   int          ret = -ENOTTY;
   uint32_t     vmode;

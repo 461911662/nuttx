@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/max44009.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -46,10 +61,6 @@
 #  define max44009_dbg(x, ...)      _info(x, ##__VA_ARGS__)
 #else
 #  define max44009_dbg(x, ...)      sninfo(x, ##__VA_ARGS__)
-#endif
-
-#ifndef CONFIG_MAX44009_I2C_FREQUENCY
-#  define CONFIG_MAX44009_I2C_FREQUENCY 400000
 #endif
 
 /* Registers */

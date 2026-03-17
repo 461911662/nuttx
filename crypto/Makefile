@@ -1,6 +1,8 @@
 ############################################################################
 # crypto/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -30,7 +32,7 @@ CRYPTO_CSRCS += crypto.c testmngr.c
 
 ifeq ($(CONFIG_CRYPTO_CRYPTODEV),y)
   CRYPTO_CSRCS += cryptodev.c
-ifeq ($(CONFIG_CRYPTO_CRYPTODEV_SOFTWARE),y)
+ifneq ($(CONFIG_CRYPTO_CRYPTODEV_SOFTWARE_CRYPTO)$(CONFIG_CRYPTO_CRYPTODEV_SOFTWARE_KEYMGMT),)
   CRYPTO_CSRCS += cryptosoft.c
   CRYPTO_CSRCS += xform.c
 endif
@@ -47,6 +49,7 @@ CRYPTO_CSRCS += cast.c
 CRYPTO_CSRCS += chachapoly.c
 CRYPTO_CSRCS += ecb_enc.c
 CRYPTO_CSRCS += ecb3_enc.c
+CRYPTO_CSRCS += ecc.c
 CRYPTO_CSRCS += set_key.c
 CRYPTO_CSRCS += md5.c
 CRYPTO_CSRCS += poly1305.c
@@ -114,6 +117,7 @@ clean:
 	$(call CLEAN)
 
 distclean: clean
+	$(call DELFILE, $(CSRCS:.c=.ddc) $(ASRCS:.S=.dds))
 	$(call DELFILE, Make.dep)
 	$(call DELFILE, .depend)
 

@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/risc-v/src/common/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -20,31 +22,42 @@
 
 set(SRCS)
 
-list(APPEND SRCS riscv_exception_common.S riscv_mhartid.S riscv_vectors.S)
+list(APPEND SRCS riscv_exception_common.S riscv_vectors.S)
 list(APPEND SRCS riscv_saveusercontext.S)
 list(APPEND SRCS riscv_allocateheap.c riscv_cpuidlestack.c)
 list(APPEND SRCS riscv_cpuinfo.c riscv_createstack.c riscv_doirq.c
      riscv_exception.c)
 list(APPEND SRCS riscv_exit.c riscv_getintstack.c riscv_getnewintctx.c)
 list(APPEND SRCS riscv_initialize.c riscv_initialstate.c riscv_modifyreg32.c)
-list(APPEND SRCS riscv_mtimer.c riscv_nputs.c riscv_registerdump.c)
-list(APPEND SRCS riscv_releasestack.c riscv_schedulesigaction.c
-     riscv_sigdeliver.c)
+list(APPEND SRCS riscv_nputs.c riscv_registerdump.c)
+list(APPEND SRCS riscv_releasestack.c)
 list(APPEND SRCS riscv_stackframe.c riscv_tcbinfo.c riscv_swint.c)
 list(APPEND SRCS riscv_switchcontext.c riscv_usestack.c)
+
+if(CONFIG_ENABLE_ALL_SIGNALS)
+  list(APPEND SRCS riscv_schedulesigaction.c riscv_sigdeliver.c)
+endif()
+
+if(CONFIG_ONESHOT)
+  list(APPEND SRCS riscv_mtimer.c)
+endif()
 
 if(NOT CONFIG_ARCH_IDLE_CUSTOM)
   list(APPEND SRCS riscv_idle.c)
 endif()
 
-if(NOT CONFIG_ALARM_ARCH)
-  if(NOT CONFIG_TIMER_ARCH)
-    list(APPEND SRCS riscv_mdelay.c riscv_udelay.c)
+if(CONFIG_SMP)
+  list(APPEND SRCS riscv_smpcall.c riscv_cpustart.c)
+endif()
+
+if(CONFIG_ARCH_HAVE_MULTICPU)
+  if(CONFIG_ARCH_USE_S_MODE)
+    list(APPEND SRCS riscv_cpuindex.c)
   endif()
 endif()
 
-if(CONFIG_SMP)
-  list(APPEND SRCS riscv_cpuindex.c riscv_smpcall.c riscv_cpustart.c)
+if(CONFIG_ARCH_RV_CPUID_MAP)
+  list(APPEND SRCS riscv_cpuidmap.c)
 endif()
 
 if(CONFIG_RISCV_MISALIGNED_HANDLER)
@@ -56,8 +69,10 @@ if(CONFIG_ARCH_HAVE_DEBUG)
 endif()
 
 if(NOT CONFIG_BUILD_FLAT)
-  list(APPEND SRCS riscv_task_start.c riscv_pthread_start.c
-       riscv_signal_dispatch.c)
+  list(APPEND SRCS riscv_task_start.c riscv_pthread_start.c)
+  if(CONFIG_ENABLE_ALL_SIGNALS)
+    list(APPEND SRCS riscv_signal_dispatch.c)
+  endif()
   if(CONFIG_BUILD_PROTECTED)
     target_sources(arch_interface PRIVATE riscv_signal_handler.S)
   endif()

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sparc/src/sparc_v8/sparc_v8_sigdeliver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -186,7 +188,7 @@ retry:
 
   /* Then restore the correct state for this thread of execution. This is an
    * unusual case that must be handled by up_fullcontextresore. This case is
-   * unusal in two ways:
+   * unusual in two ways:
    *
    *   1. It is not a context switch between threads.  Rather,
    *      sparc_fullcontextrestore must behave more it more like a longjmp
@@ -207,9 +209,7 @@ retry:
 #ifdef CONFIG_SMP
   /* We need to keep the IRQ lock until task switching */
 
-  rtcb->irqcount++;
-  leave_critical_section((regs[REG_PSR]));
-  rtcb->irqcount--;
+  leave_critical_section(up_irq_save());
 #endif
   sparc_fullcontextrestore(regs);
 }

@@ -1,14 +1,10 @@
 /****************************************************************************
  * arch/arm/src/armv8-r/cp15_cacheops.h
  *
- *   Copyright (C) 2015 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Portions of this file derive from Atmel sample code for the SAMA5D3
- * Cortex-A5 which also has a modified BSD-style license:
- *
- *   Copyright (c) 2012, Atmel Corporation
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2015 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2012, Atmel Corporation. All rights reserved.
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -228,12 +224,21 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_enable_dcache tmp
+  mrc p15, 0, tmp, c1, c0, 0 /* Read SCTLR */
+  orr tmp, tmp, #(0x1 << 2)  /* Enable D cache */
+  mcr p15, 0, tmp, c1, c0, 0 /* Update the SCTLR */
+  isb
+.endm
+#else
 .macro cp15_enable_dcache, tmp
   mrc p15, 0, \tmp, c1, c0, 0 /* Read SCTLR */
   orr \tmp, \tmp, #(0x1 << 2) /* Enable D cache */
   mcr p15, 0, \tmp, c1, c0, 0 /* Update the SCTLR */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_disable_dcache
@@ -249,12 +254,21 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_disable_dcache tmp
+  mrc p15, 0, tmp, c1, c0, 0 /* Read SCTLR */
+  bic tmp, tmp, #(0x1 << 2)  /* Disable D cache */
+  mcr p15, 0, tmp, c1, c0, 0 /* Update the SCTLR */
+  isb
+.endm
+#else
 .macro cp15_disable_dcache, tmp
   mrc p15, 0, \tmp, c1, c0, 0 /* Read SCTLR */
   bic \tmp, \tmp, #(0x1 << 2) /* Disable D cache */
   mcr p15, 0, \tmp, c1, c0, 0 /* Update the SCTLR */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_enable_icache
@@ -270,12 +284,21 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_enable_icache tmp
+  mrc p15, 0, tmp, c1, c0, 0  /* Read SCTLR */
+  orr tmp, tmp, #(0x1 << 12)  /* Enable I cache */
+  mcr p15, 0, tmp, c1, c0, 0  /* Update the SCTLR */
+  isb
+.endm
+#else
 .macro cp15_enable_icache, tmp
   mrc p15, 0, \tmp, c1, c0, 0  /* Read SCTLR */
   orr \tmp, \tmp, #(0x1 << 12) /* Enable I cache */
   mcr p15, 0, \tmp, c1, c0, 0  /* Update the SCTLR */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_disable_icache
@@ -291,12 +314,21 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_disable_icache tmp
+  mrc p15, 0, tmp, c1, c0, 0  /* Read SCTLR */
+  bic tmp, tmp, #(0x1 << 12)  /* Disable I cache */
+  mcr p15, 0, tmp, c1, c0, 0  /* Update the SCTLR */
+  isb
+.endm
+#else
 .macro cp15_disable_icache, tmp
   mrc p15, 0, \tmp, c1, c0, 0  /* Read SCTLR */
   bic \tmp, \tmp, #(0x1 << 12) /* Disable I cache */
   mcr p15, 0, \tmp, c1, c0, 0  /* Update the SCTLR */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_icache_inner_sharable
@@ -312,11 +344,19 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_icache_inner_sharable tmp
+  mov tmp, #0
+  mrc p15, 0, tmp, c7, c1, 0 /* ICIALLUIS */
+  isb
+.endm
+#else
 .macro cp15_invalidate_icache_inner_sharable, tmp
   mov \tmp, #0
   mrc p15, 0, \tmp, c7, c1, 0 /* ICIALLUIS */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_btb_inner_sharable
@@ -332,11 +372,19 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_btb_inner_sharable tmp
+  mov tmp, #0
+  mrc p15, 0, tmp, c7, c1, 6 /* BPIALLIS */
+  isb
+.endm
+#else
 .macro cp15_invalidate_btb_inner_sharable, tmp
   mov \tmp, #0
   mrc p15, 0, \tmp, c7, c1, 6 /* BPIALLIS */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_icache_all
@@ -353,11 +401,19 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_icache_all tmp
+  mov tmp, #0
+  mrc p15, 0, tmp, c7, c5, 0 /* ICIALLU */
+  isb
+.endm
+#else
 .macro cp15_invalidate_icache_all, tmp
   mov \tmp, #0
   mrc p15, 0, \tmp, c7, c5, 0 /* ICIALLU */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_icache_bymva
@@ -373,10 +429,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_icache_bymva va
+  mrc p15, 0, va, c7, c5, 1 /* ICIMVAU */
+  isb
+.endm
+#else
 .macro cp15_invalidate_icache_bymva, va
   mrc p15, 0, \va, c7, c5, 1 /* ICIMVAU */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_flush_btb
@@ -392,11 +455,19 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_flush_btb tmp
+  mov tmp, #0
+  mrc p15, 0, tmp, c7, c5, 6 /* BPIALL */
+  isb
+.endm
+#else
 .macro cp15_flush_btb, tmp
   mov \tmp, #0
   mrc p15, 0, \tmp, c7, c5, 6 /* BPIALL */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_flush_btb_bymva
@@ -412,10 +483,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_flush_btb_bymva va
+  mrc p15, 0, va, c7, c5, 7 /* BPIMVA */
+  isb
+.endm
+#else
 .macro cp15_flush_btb_bymva, va
   mrc p15, 0, \va, c7, c5, 7 /* BPIMVA */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_dcacheline_bymva
@@ -431,10 +509,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_dcacheline_bymva va
+  mrc p15, 0, va, c7, c6, 1 /* DCIMVAC */
+  isb
+.endm
+#else
 .macro cp15_invalidate_dcacheline_bymva, va
   mrc p15, 0, \va, c7, c6, 1 /* DCIMVAC */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_invalidate_dcacheline_bysetway
@@ -450,10 +535,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_invalidate_dcacheline_bysetway setway
+  mrc p15, 0, setway, c7, c6, 2 /* DCISW */
+  isb
+.endm
+#else
 .macro cp15_invalidate_dcacheline_bysetway, setway
   mrc p15, 0, \setway, c7, c6, 2 /* DCISW */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_clean_dcache_bymva
@@ -469,10 +561,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_clean_dcache_bymva va
+  mrc p15, 0, va, c7, c10, 1 /* DCCMVAC */
+  isb
+.endm
+#else
 .macro cp15_clean_dcache_bymva, va
   mrc p15, 0, \va, c7, c10, 1 /* DCCMVAC */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_clean_dcache_bysetway
@@ -488,10 +587,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_clean_dcache_bysetway setway
+  mrc p15, 0, setway, c7, c10, 2 /* DCCSW */
+  isb
+.endm
+#else
 .macro cp15_clean_dcache_bysetway, setway
   mrc p15, 0, \setway, c7, c10, 2 /* DCCSW */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_clean_ucache_bymva
@@ -507,10 +613,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_clean_ucache_bymva va
+  mrc p15, 0, va, c7, c11, 1 /* DCCMVAU */
+  isb
+.endm
+#else
 .macro cp15_clean_ucache_bymva, va
   mrc p15, 0, \va, c7, c11, 1 /* DCCMVAU */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_cleaninvalidate_dcacheline_bymva
@@ -526,10 +639,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_cleaninvalidate_dcacheline_bymva va
+  mrc p15, 0, va, c7, c14, 1 /* DCCIMVAC */
+  isb
+.endm
+#else
 .macro cp15_cleaninvalidate_dcacheline_bymva, va
   mrc p15, 0, \va, c7, c14, 1 /* DCCIMVAC */
   isb
 .endm
+#endif
 
 /****************************************************************************
  * Name: cp15_cleaninvalidate_dcacheline
@@ -545,10 +665,17 @@
  *
  ****************************************************************************/
 
+#ifdef __ghs__
+.macro cp15_cleaninvalidate_dcacheline setway
+  mrc p15, 0, setway, c7, c14, 2 /* DCCISW */
+  isb
+.endm
+#else
 .macro cp15_cleaninvalidate_dcacheline, setway
   mrc p15, 0, \setway, c7, c14, 2 /* DCCISW */
   isb
 .endm
+#endif
 
 #endif /* __ASSEMBLY__ */
 
@@ -598,7 +725,7 @@ static inline void cp15_enable_dcache(void)
   sctlr = CP15_GET(SCTLR);
   sctlr |= SCTLR_C;
   CP15_SET(SCTLR, sctlr);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -622,7 +749,7 @@ static inline void cp15_disable_dcache(void)
   sctlr = CP15_GET(SCTLR);
   sctlr &= ~SCTLR_C;
   CP15_SET(SCTLR, sctlr);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -646,7 +773,7 @@ static inline void cp15_enable_icache(void)
   sctlr = CP15_GET(SCTLR);
   sctlr |= SCTLR_I;
   CP15_SET(SCTLR, sctlr);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -670,7 +797,7 @@ static inline void cp15_disable_icache(void)
   sctlr = CP15_GET(SCTLR);
   sctlr &= ~SCTLR_I;
   CP15_SET(SCTLR, sctlr);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -690,7 +817,7 @@ static inline void cp15_disable_icache(void)
 static inline void cp15_invalidate_icache_inner_sharable(void)
 {
   CP15_SET(ICIALLUIS, 0);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -710,7 +837,7 @@ static inline void cp15_invalidate_icache_inner_sharable(void)
 static inline void cp15_invalidate_btb_inner_sharable(void)
 {
   CP15_SET(BPIALLIS, 0);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -731,7 +858,7 @@ static inline void cp15_invalidate_btb_inner_sharable(void)
 static inline void cp15_invalidate_icache_all(void)
 {
   CP15_SET(ICIALLU, 0);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -751,7 +878,7 @@ static inline void cp15_invalidate_icache_all(void)
 static inline void cp15_invalidate_icache_bymva(unsigned int va)
 {
   CP15_SET(ICIMVAU, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -771,7 +898,7 @@ static inline void cp15_invalidate_icache_bymva(unsigned int va)
 static inline void cp15_flush_btb(void)
 {
   CP15_SET(BPIALL, 0);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -791,7 +918,7 @@ static inline void cp15_flush_btb(void)
 static inline void cp15_flush_btb_bymva(unsigned int va)
 {
   CP15_SET(BPIMVA, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -813,7 +940,7 @@ static inline void cp15_flush_btb_bymva(unsigned int va)
 static inline void cp15_invalidate_dcacheline_bymva(unsigned int va)
 {
   CP15_SET(DCIMVAC, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -835,7 +962,7 @@ static inline void cp15_invalidate_dcacheline_bymva(unsigned int va)
 static inline void cp15_invalidate_dcacheline_bysetway(unsigned int setway)
 {
   CP15_SET(DCISW, setway);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -857,7 +984,7 @@ static inline void cp15_invalidate_dcacheline_bysetway(unsigned int setway)
 static inline void cp15_clean_dcache_bymva(unsigned int va)
 {
   CP15_SET(DCCMVAC, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -877,7 +1004,7 @@ static inline void cp15_clean_dcache_bymva(unsigned int va)
 static inline void cp15_clean_dcache_bysetway(unsigned int setway)
 {
   CP15_SET(DCCSW, setway);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -897,7 +1024,7 @@ static inline void cp15_clean_dcache_bysetway(unsigned int setway)
 static inline void cp15_clean_ucache_bymva(unsigned int va)
 {
   CP15_SET(DCCMVAU, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -917,7 +1044,7 @@ static inline void cp15_clean_ucache_bymva(unsigned int va)
 static inline void cp15_cleaninvalidate_dcacheline_bymva(unsigned int va)
 {
   CP15_SET(DCCIMVAC, va);
-  ARM_ISB();
+  UP_ISB();
 }
 
 /****************************************************************************
@@ -937,7 +1064,7 @@ static inline void cp15_cleaninvalidate_dcacheline_bymva(unsigned int va)
 static inline void cp15_cleaninvalidate_dcacheline(unsigned int setway)
 {
   CP15_SET(DCCISW, setway);
-  ARM_ISB();
+  UP_ISB();
 }
 
 #endif /* __ASSEMBLY__ */

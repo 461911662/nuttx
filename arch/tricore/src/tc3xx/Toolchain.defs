@@ -1,6 +1,8 @@
 ############################################################################
 # arch/tricore/src/tc3xx/Toolchain.defs
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -27,9 +29,9 @@ ifeq ($(CONFIG_ARCH_CHIP_TC397),y)
     ARCHCPUFLAGS += -mtc162
   endif
 
-  ARCHINCLUDES += ${INCDIR_PREFIX}$(CHIP_DIR)/tc397/Libraries/iLLD/TC39B/Tricore/Cpu/Std
-  ARCHINCLUDES += ${INCDIR_PREFIX}$(CHIP_DIR)/tc397/Libraries/Infra/Platform
-  ARCHINCLUDES += ${INCDIR_PREFIX}$(CHIP_DIR)/tc397/Configurations
+  ARCHINCLUDES += ${INCDIR_PREFIX}$(TOPDIR)/arch/tricore/src/illd/tc3xx/Libraries/src/Libraries/iLLD/TC3xx/Tricore/Cpu/Std
+  ARCHINCLUDES += ${INCDIR_PREFIX}$(TOPDIR)/arch/tricore/src/illd/tc3xx/Libraries/src/Libraries/Infra/Platform
+  ARCHINCLUDES += ${INCDIR_PREFIX}$(TOPDIR)/arch/tricore/src/illd/tc3xx/Configurations
 endif
 
 include $(TOPDIR)/arch/tricore/src/common/Toolchain.defs

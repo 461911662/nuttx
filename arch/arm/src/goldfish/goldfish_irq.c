@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/goldfish/goldfish_irq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -116,12 +118,17 @@ void up_irqinitialize(void)
 
   /* Initialize the Generic Interrupt Controller (GIC) for CPU0 */
 
-  arm_gic0_initialize();  /* Initialization unique to CPU0 */
+  if (sched_getcpu() == 0)
+    {
+      arm_gic0_initialize();  /* Initialization unique to CPU0 */
+    }
+
   arm_gic_initialize();   /* Initialization common to all CPUs */
 
 #ifndef CONFIG_SUPPRESS_INTERRUPTS
   /* And finally, enable interrupts */
 
+  arm_color_intstack();
   up_irq_enable();
 #endif
 }

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/stm32h7/stm32h7x3xx_rcc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -22,6 +24,8 @@
  * Included Files
  ****************************************************************************/
 
+#include <assert.h>
+
 #include "stm32_pwr.h"
 #include "hardware/stm32_axi.h"
 #include "hardware/stm32_syscfg.h"
@@ -29,6 +33,9 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+static_assert(CONFIG_BOARD_LOOPSPERMSEC != -1,
+              "Configure BOARD_LOOPSPERMSEC to non-default value.");
 
 /* Allow up to 100 milliseconds for the high speed clock to become ready.
  * that is a very long delay, but if the clock does not become ready we are
@@ -593,6 +600,30 @@ static inline void rcc_enableapb3(void)
   regval |= RCC_APB3ENR_LTDCEN;
 #endif
 
+#ifdef CONFIG_STM32H7_WWDG
+
+  /* RM0433 Rev 8
+   * Reference manual - STM32H742, STM32H743/753 and STM32H750 Value line
+   * advanced Arm-based 32-bit MCUs
+   * https://www.st.com/resource/en/reference_manual/rm0433-stm32h742-
+   * stm32h743753-and-stm32h750-value-line-advanced-armbased-32bit-mcus-
+   * stmicroelectronics.pdf
+   * (Access date: 10-09-2025)
+   * Reset and Clock Control (RCC) -> RCC clock block functional
+   * description --> Kernel clock selection -> Watchdog clocks (page 365)
+   * "before enabling the WWDG1, the application must set the WW1RSC
+   * bit to 1.
+   * If the WW1RSC remains 0, when the WWDG1 is enabled, the behavior is
+   * not guaranteed"
+   */
+
+  uint32_t rcc_gcr = getreg32(STM32_RCC_GCR);
+  rcc_gcr |= RCC_GCR_WW1RSC;
+  putreg32(rcc_gcr, STM32_RCC_GCR);
+  regval |= RCC_APB3ENR_WWDG1EN;
+
+#endif
+
   putreg32(regval, STM32_RCC_APB3ENR);   /* Enable peripherals */
 }
 
@@ -804,7 +835,7 @@ void stm32_stdclockconfig(void)
       putreg32(regval, STM32_RCC_CFGR);
 #endif
 
-      /* Configure PLL123 clock source and multipiers */
+      /* Configure PLL123 clock source and multipliers */
 
 #ifdef STM32_BOARD_USEHSI
       regval = (RCC_PLLCKSELR_PLLSRC_HSI |
@@ -926,11 +957,13 @@ void stm32_stdclockconfig(void)
         {
         }
 
+#ifndef CONFIG_STM32H7_PWR_IGNORE_ACTVOSRDY
       /* See Reference manual Section 5.4.1, System supply startup */
 
       while ((getreg32(STM32_PWR_CSR1) & PWR_CSR1_ACTVOSRDY) == 0)
         {
         }
+#endif
 
 #if STM32_VOS_OVERDRIVE && (STM32_PWR_VOS_SCALE == PWR_D3CR_VOS_SCALE_1)
       /* Over-drive support for VOS1 */

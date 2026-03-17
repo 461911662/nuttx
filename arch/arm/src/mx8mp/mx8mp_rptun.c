@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/mx8mp/mx8mp_rptun.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -82,7 +84,7 @@ static const char *mx8mp_rptun_get_cpuname(struct rptun_dev_s *dev);
 static const char *mx8mp_rptun_get_firmware(struct rptun_dev_s *dev);
 static const struct rptun_addrenv_s *
 mx8mp_rptun_get_addrenv(struct rptun_dev_s *dev);
-static struct rptun_rsc_s *
+static struct resource_table *
 mx8mp_rptun_get_resource(struct rptun_dev_s *dev);
 static bool mx8mp_rptun_is_autostart(struct rptun_dev_s *dev);
 static bool mx8mp_rptun_is_master(struct rptun_dev_s *dev);
@@ -152,14 +154,15 @@ mx8mp_rptun_get_addrenv(struct rptun_dev_s *dev)
  * Name: mx8mp_rptun_get_resource
  ****************************************************************************/
 
-static struct rptun_rsc_s *mx8mp_rptun_get_resource(struct rptun_dev_s *dev)
+static struct resource_table *
+mx8mp_rptun_get_resource(struct rptun_dev_s *dev)
 {
   struct mx8mp_rptun_dev_s *priv
       = container_of(dev, struct mx8mp_rptun_dev_s, rptun);
 
   if (priv->shmem != NULL)
     {
-      return &priv->shmem->rsc;
+      return &priv->shmem->rsc.rsc_tbl_hdr;
     }
 
   priv->shmem = (struct mx8mp_rptun_shmem_s *)VRING_SHMEM;
@@ -169,7 +172,7 @@ static struct rptun_rsc_s *mx8mp_rptun_get_resource(struct rptun_dev_s *dev)
       mx8mp_copy_rsc_table();
     }
 
-  return &priv->shmem->rsc;
+  return &priv->shmem->rsc.rsc_tbl_hdr;
 }
 
 /****************************************************************************

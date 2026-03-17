@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86/src/i486/i486_regdump.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,16 +34,6 @@
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
-
-/****************************************************************************
- * Name: up_getusrsp
- ****************************************************************************/
-
-uintptr_t up_getusrsp(void *regs)
-{
-  uint32_t *ptr = regs;
-  return ptr[REG_ESP];
-}
 
 /****************************************************************************
  * Name: up_dump_register

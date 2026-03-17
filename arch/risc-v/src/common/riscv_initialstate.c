@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/riscv_initialstate.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -113,6 +115,12 @@ void up_initial_state(struct tcb_s *tcb)
       /* Set idle process' initial interrupt context */
 
       riscv_set_idleintctx();
+
+#ifdef CONFIG_LIB_SYSCALL
+      /* Update current thread pointer */
+
+      __asm__ __volatile__("mv tp, %0" : : "r"(tcb));
+#endif
       return;
     }
 

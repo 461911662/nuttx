@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/sim/src/sim/sim_switchcontext.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -58,10 +60,6 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
 
   sinfo("Unblocking TCB=%p\n", tcb);
 
-  /* Update scheduler parameters */
-
-  nxsched_suspend_scheduler(rtcb);
-
   /* Are we in an interrupt handler? */
 
   if (up_interrupt_context())
@@ -71,14 +69,6 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
        */
 
       sim_savestate(rtcb->xcp.regs);
-
-      /* Update scheduler parameters */
-
-      nxsched_resume_scheduler(tcb);
-
-      /* Restore the cpu lock */
-
-      restore_critical_section(tcb, this_cpu());
 
       /* Then switch contexts */
 
@@ -99,11 +89,15 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
 
       /* Update scheduler parameters */
 
-      nxsched_resume_scheduler(tcb);
+      nxsched_switch_context(rtcb, tcb);
 
       /* Restore the cpu lock */
 
       restore_critical_section(tcb, this_cpu());
+
+      /* Record the new "running" task */
+
+      g_running_tasks[this_cpu()] = tcb;
 
       /* Then switch contexts */
 
@@ -111,11 +105,13 @@ void up_switch_context(struct tcb_s *tcb, struct tcb_s *rtcb)
     }
   else
     {
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
       /* The way that we handle signals in the simulation is kind of
        * a kludge.  This would be unsafe in a truly multi-threaded,
        * interrupt driven environment.
        */
 
       sim_sigdeliver();
+#endif
     }
 }

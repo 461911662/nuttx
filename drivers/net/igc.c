@@ -1,6 +1,8 @@
 /*****************************************************************************
  * drivers/net/igc.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,6 +30,7 @@
 #include <debug.h>
 #include <errno.h>
 
+#include <nuttx/arch.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/wqueue.h>
 #include <nuttx/addrenv.h>
@@ -37,11 +40,21 @@
 #include <nuttx/pci/pci.h>
 #include <nuttx/net/igc.h>
 
+#include <arch/barriers.h>
+
 #include "igc.h"
 
 /*****************************************************************************
  * Pre-processor Definitions
  *****************************************************************************/
+
+#if CONFIG_NET_IGC_TXDESC % 8 != 0
+#  error CONFIG_NET_IGC_TXDESC must be multiple of 8
+#endif
+
+#if CONFIG_NET_IGC_RXDESC % 8 != 0
+#  error CONFIG_NET_IGC_RXDESC must be multiple of 8
+#endif
 
 /* Packet buffer size */
 
@@ -50,13 +63,13 @@
 
 /* TX and RX descriptors */
 
-#define IGC_TX_DESC            256
-#define IGC_RX_DESC            256
+#define IGC_TX_DESC            CONFIG_NET_IGC_TXDESC
+#define IGC_RX_DESC            CONFIG_NET_IGC_RXDESC
 
 /* After RX packet is done, we provide free netpkt to the RX descriptor ring.
  * The upper-half network logic is responsible for freeing the RX packets
  * so we need some additional spare netpkt buffers to assure that it's
- * allways possible to allocate the new RX packet in the recevier logic.
+ * always possible to allocate the new RX packet in the receiver logic.
  * It's hard to tell how many spare buffers is needed, for now it's set to 8.
  */
 
@@ -79,10 +92,6 @@
 #define IGC_FLASH_BAR          1
 #define IGC_IO_BAR             2
 #define IGC_MSIX_BAR           3
-
-/* Minimum Inter-interrupt Interval in 1 us increments */
-
-#define IGC_INTERRUPT_INTERVAL 100
 
 /* For MSI-X we allocate all interrupts to MSI-X vector 0 */
 
@@ -114,10 +123,7 @@ struct igc_driver_s
   /* This holds the information visible to the NuttX network */
 
   struct netdev_lowerhalf_s dev;
-
-  /* Driver state */
-
-  bool bifup;
+  struct work_s work;
 
   /* Packets list */
 
@@ -145,6 +151,10 @@ struct igc_driver_s
 
   FAR uint32_t *mta;
 #endif
+
+  /* A spinlock for protecting the driving state */
+
+  spinlock_t lock;
 };
 
 /*****************************************************************************
@@ -163,6 +173,11 @@ static void igc_dump_reg(FAR struct igc_driver_s *priv,
                          FAR const char *msg, unsigned int offset);
 static void igc_dump_mem(FAR struct igc_driver_s *priv, FAR const char *msg);
 #endif
+
+/* Rings management */
+
+static void igc_txclean(FAR struct igc_driver_s *priv);
+static void igc_rxclean(FAR struct igc_driver_s *priv);
 
 /* Common TX logic */
 
@@ -202,7 +217,6 @@ static int igc_probe(FAR struct pci_device_s *dev);
  * Private Data
  *****************************************************************************/
 
-#ifdef CONFIG_NET_IGC_I225LM
 /* Intel I225LM */
 
 static const struct igc_type_s g_igc_i225lm =
@@ -210,16 +224,27 @@ static const struct igc_type_s g_igc_i225lm =
   .desc_align = 128,
   .mta_regs   = 128
 };
-#endif
+
+static const struct igc_type_s g_igc_i226v =
+{
+  .desc_align = 128,
+  .mta_regs   = 128
+};
 
 static const struct pci_device_id_s g_igc_id_table[] =
 {
-#ifdef CONFIG_NET_IGC_I225LM
   {
     PCI_DEVICE(0x8086, 0x15f2),
     .driver_data = (uintptr_t)&g_igc_i225lm
   },
-#endif
+  {
+    PCI_DEVICE(0x8086, 0x15f3),
+    .driver_data = (uintptr_t)&g_igc_i225lm
+  },
+  {
+    PCI_DEVICE(0x8086, 0x125c),
+    .driver_data = (uintptr_t)&g_igc_i226v
+  },
   { }
 };
 
@@ -410,6 +435,74 @@ static void igc_dump_mem(FAR struct igc_driver_s *priv, FAR const char *msg)
 #endif
 
 /*****************************************************************************
+ * Name: igc_txclean
+ *
+ * Description:
+ *   Clean transmission ring
+ *
+ * Input Parameters:
+ *   priv - Reference to the driver state structure
+ *
+ * Returned Value:
+ *   None
+ *
+ * Assumption:
+ *   This function can be called only after card reset and when TX is disabled
+ *
+ *****************************************************************************/
+
+static void igc_txclean(FAR struct igc_driver_s *priv)
+{
+  FAR struct netdev_lowerhalf_s *netdev = &priv->dev;
+
+  /* Reset ring */
+
+  igc_putreg_mem(priv, IGC_TDH0, 0);
+  igc_putreg_mem(priv, IGC_TDT0, 0);
+
+  /* Free any pending TX */
+
+  while (priv->tx_now != priv->tx_done)
+    {
+      /* Free net packet */
+
+      netpkt_free(netdev, priv->tx_pkt[priv->tx_done], NETPKT_TX);
+
+      /* Next descriptor */
+
+      priv->tx_done = (priv->tx_done + 1) % IGC_TX_DESC;
+    }
+
+  priv->tx_now  = 0;
+  priv->tx_done = 0;
+}
+
+/*****************************************************************************
+ * Name: igc_rxclean
+ *
+ * Description:
+ *   Clean receive ring
+ *
+ * Input Parameters:
+ *   priv - Reference to the driver state structure
+ *
+ * Returned Value:
+ *   None
+ *
+ * Assumption:
+ *   This function can be called only after card reset and when RX is disabled
+ *
+ *****************************************************************************/
+
+static void igc_rxclean(FAR struct igc_driver_s *priv)
+{
+  priv->rx_now = 0;
+
+  igc_putreg_mem(priv, IGC_RDH0, 0);
+  igc_putreg_mem(priv, IGC_RDT0, IGC_RX_DESC - 1);
+}
+
+/*****************************************************************************
  * Name: igc_transmit
  *
  * Description:
@@ -430,10 +523,11 @@ static void igc_dump_mem(FAR struct igc_driver_s *priv, FAR const char *msg)
 static int igc_transmit(FAR struct netdev_lowerhalf_s *dev,
                           FAR netpkt_t *pkt)
 {
-  FAR struct igc_driver_s *priv = (FAR struct igc_driver_s *)dev;
-  uint64_t                 pa   = 0;
-  int                      desc = priv->tx_now;
-  size_t                   len  = netpkt_getdatalen(dev, pkt);
+  FAR struct igc_driver_s *priv    = (FAR struct igc_driver_s *)dev;
+  uint64_t                 pa      = 0;
+  int                      desc    = priv->tx_now;
+  size_t                   len     = netpkt_getdatalen(dev, pkt);
+  size_t                   tx_next = (priv->tx_now + 1) % IGC_TX_DESC;
 
   ninfo("transmit\n");
 
@@ -445,13 +539,25 @@ static int igc_transmit(FAR struct netdev_lowerhalf_s *dev,
       return -EINVAL;
     }
 
+  if (!IFF_IS_RUNNING(dev->netdev.d_flags))
+    {
+      return -ENETDOWN;
+    }
+
+  /* Drop packet if ring full */
+
+  if (tx_next == priv->tx_done)
+    {
+      return -ENOMEM;
+    }
+
   /* Store TX packet reference */
 
   priv->tx_pkt[priv->tx_now] = pkt;
 
   /* Prepare next TX descriptor */
 
-  priv->tx_now = (priv->tx_now + 1) % IGC_TX_DESC;
+  priv->tx_now = tx_next;
 
   /* Setup TX descriptor */
 
@@ -464,7 +570,7 @@ static int igc_transmit(FAR struct netdev_lowerhalf_s *dev,
   priv->tx[desc].cso    = 0;
   priv->tx[desc].status = 0;
 
-  SP_DSB();
+  UP_DSB();
 
   /* Update TX tail */
 
@@ -492,7 +598,7 @@ static int igc_transmit(FAR struct netdev_lowerhalf_s *dev,
  *
  *****************************************************************************/
 
-static FAR netpkt_t * igc_receive(FAR struct netdev_lowerhalf_s *dev)
+static FAR netpkt_t *igc_receive(FAR struct netdev_lowerhalf_s *dev)
 {
   FAR struct igc_driver_s *priv = (FAR struct igc_driver_s *)dev;
   FAR netpkt_t            *pkt  = NULL;
@@ -541,12 +647,12 @@ static FAR netpkt_t * igc_receive(FAR struct netdev_lowerhalf_s *dev)
 
   igc_putreg_mem(priv, IGC_RDT0, desc);
 
-  /* Handle errros */
+  /* Handle errors */
 
   if (rx->errors)
     {
       nerr("RX error reported (%"PRIu8")\n", rx->errors);
-      NETDEV_RXERRORS(&priv->dev);
+      NETDEV_RXERRORS(&priv->dev.netdev);
       netpkt_free(dev, pkt, NETPKT_RX);
       return NULL;
     }
@@ -585,7 +691,7 @@ static void igc_txdone(FAR struct netdev_lowerhalf_s *dev)
       if (!(priv->tx[priv->tx_done].status & IGC_TDESC_STATUS_DD))
         {
           nerr("tx failed: 0x%" PRIx32 "\n", priv->tx[priv->tx_done].status);
-          NETDEV_TXERRORS(priv->dev);
+          NETDEV_TXERRORS(&priv->dev.netdev);
         }
 
       /* Free net packet */
@@ -598,6 +704,40 @@ static void igc_txdone(FAR struct netdev_lowerhalf_s *dev)
     }
 
   netdev_lower_txdone(dev);
+}
+
+/*****************************************************************************
+ * Name: igc_link_work
+ *
+ * Description:
+ *   Handle link status change.
+ *
+ * Input Parameters:
+ *   arg - Reference to the lover half driver structure (cast to void *)
+ *
+ * Returned Value:
+ *   None
+ *
+ *****************************************************************************/
+
+static void igc_link_work(FAR void *arg)
+{
+  FAR struct igc_driver_s *priv = arg;
+  uint32_t tmp;
+
+  tmp = igc_getreg_mem(priv, IGC_STATUS);
+  if (tmp & IGC_STATUS_LU)
+    {
+      ninfo("Link up, status = 0x%x\n", tmp);
+
+      netdev_lower_carrier_on(&priv->dev);
+    }
+  else
+    {
+      ninfo("Link down\n");
+
+      netdev_lower_carrier_off(&priv->dev);
+    }
 }
 
 /*****************************************************************************
@@ -621,7 +761,6 @@ static void igc_msix_interrupt(FAR struct igc_driver_s *priv)
 {
   uint32_t icr  = 0;
   uint32_t eicr = 0;
-  uint32_t tmp  = 0;
 
   /* Get interrupts */
 
@@ -648,16 +787,13 @@ static void igc_msix_interrupt(FAR struct igc_driver_s *priv)
 
   if (icr & IGC_IC_LSC)
     {
-      tmp = igc_getreg_mem(priv, IGC_STATUS);
-      if (tmp & IGC_STATUS_LU)
+      if (work_available(&priv->work))
         {
-          ninfo("Link up, status = 0x%x\n", tmp);
-          netdev_lower_carrier_on(&priv->dev);
-        }
-      else
-        {
-          ninfo("Link down\n");
-          netdev_lower_carrier_off(&priv->dev);
+          /* Schedule to work queue because netdev_lower_carrier_xxx API
+           * can't be used in interrupt context
+           */
+
+          work_queue(LPWORK, &priv->work, igc_link_work, priv, 0);
         }
     }
 
@@ -748,12 +884,16 @@ static int igc_ifup(FAR struct netdev_lowerhalf_s *dev)
         dev->netdev.d_ipv6addr[6], dev->netdev.d_ipv6addr[7]);
 #endif
 
+  flags = spin_lock_irqsave(&priv->lock);
+
   /* Enable the Ethernet */
 
-  flags = enter_critical_section();
   igc_enable(priv);
-  priv->bifup = true;
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
+
+  /* Update link status in case link status interrupt is missing */
+
+  igc_link_work(priv);
 
   return OK;
 }
@@ -780,7 +920,7 @@ static int igc_ifdown(FAR struct netdev_lowerhalf_s *dev)
   FAR struct igc_driver_s *priv = (FAR struct igc_driver_s *)dev;
   irqstate_t flags;
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->lock);
 
   /* Put the EMAC in its reset, non-operational state.  This should be
    * a known configuration that will guarantee the igc_ifup() always
@@ -791,8 +931,7 @@ static int igc_ifdown(FAR struct netdev_lowerhalf_s *dev)
 
   /* Mark the device "down" */
 
-  priv->bifup = false;
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
   return OK;
 }
 
@@ -925,17 +1064,8 @@ static int igc_rmmac(FAR struct netdev_lowerhalf_s *dev,
 
 static void igc_disable(FAR struct igc_driver_s *priv)
 {
-  int i = 0;
-
-  /* Reset Tx tail */
-
-  igc_putreg_mem(priv, IGC_TDH0, 0);
-  igc_putreg_mem(priv, IGC_TDT0, 0);
-
-  /* Reset Rx tail */
-
-  igc_putreg_mem(priv, IGC_RDH0, 0);
-  igc_putreg_mem(priv, IGC_RDT0, 0);
+  uint32_t regval;
+  int      i = 0;
 
   /* Disable interrupts */
 
@@ -943,13 +1073,29 @@ static void igc_disable(FAR struct igc_driver_s *priv)
   igc_putreg_mem(priv, IGC_IMC, IGC_MSIX_IMS);
   up_disable_irq(priv->irq);
 
-  /* Disable Transmiter */
+  /* Disable Transmitter */
 
-  igc_putreg_mem(priv, IGC_TCTL, 0);
+  regval = igc_getreg_mem(priv, IGC_TCTL);
+  regval &= ~IGC_TCTL_EN;
+  igc_putreg_mem(priv, IGC_TCTL, regval);
 
   /* Disable Receiver */
 
   igc_putreg_mem(priv, IGC_RCTL, 0);
+
+  /* We have to reset device, otherwise writing to RDH and THD corrupts
+   * the device state.
+   */
+
+  igc_putreg_mem(priv, IGC_CTRL, IGC_CTRL_DEVRST);
+
+  /* Reset Tx tail */
+
+  igc_txclean(priv);
+
+  /* Reset Rx tail */
+
+  igc_rxclean(priv);
 
   /* Free RX packets */
 
@@ -1037,12 +1183,9 @@ static void igc_enable(FAR struct igc_driver_s *priv)
   regval = IGC_TX_DESC * sizeof(struct igc_tx_leg_s);
   igc_putreg_mem(priv, IGC_TDLEN0, regval);
 
-  priv->tx_now = 0;
-
   /* Reset TX tail */
 
-  igc_putreg_mem(priv, IGC_TDH0, 0);
-  igc_putreg_mem(priv, IGC_TDT0, 0);
+  igc_txclean(priv);
 
   /* Setup RX descriptor */
 
@@ -1058,8 +1201,6 @@ static void igc_enable(FAR struct igc_driver_s *priv)
   regval = IGC_RX_DESC * sizeof(struct igc_rx_leg_s);
   igc_putreg_mem(priv, IGC_RDLEN0, regval);
 
-  priv->rx_now = 0;
-
   /* Enable interrupts */
 
   igc_putreg_mem(priv, IGC_EIMS, IGC_MSIX_EIMS);
@@ -1070,7 +1211,7 @@ static void igc_enable(FAR struct igc_driver_s *priv)
 
   igc_putreg_mem(priv, IGC_CTRL, IGC_CTRL_SLU);
 
-  /* Setup and enable Transmiter */
+  /* Setup and enable Transmitter */
 
   regval = igc_getreg_mem(priv, IGC_TCTL);
   regval |= IGC_TCTL_EN | IGC_TCTL_PSP;
@@ -1099,8 +1240,7 @@ static void igc_enable(FAR struct igc_driver_s *priv)
 
   /* Reset RX tail - after queue is enabled */
 
-  igc_putreg_mem(priv, IGC_RDH0, 0);
-  igc_putreg_mem(priv, IGC_RDT0, IGC_RX_DESC);
+  igc_rxclean(priv);
 
 #ifdef CONFIG_DEBUG_NET_INFO
   /* Dump memory */
@@ -1168,7 +1308,7 @@ static int igc_initialize(FAR struct igc_driver_s *priv)
 
   /* Configure Interrupt Throttle */
 
-  igc_putreg_mem(priv, IGC_EITR0, (IGC_INTERRUPT_INTERVAL << 2));
+  igc_putreg_mem(priv, IGC_EITR0, (CONFIG_NET_IGC_INT_INTERVAL << 2));
 
   /* Get MAC if valid */
 
@@ -1181,7 +1321,7 @@ static int igc_initialize(FAR struct igc_driver_s *priv)
     }
   else
     {
-      nwarn("Receive Address not vaild!\n");
+      nwarn("Receive Address not valid!\n");
     }
 
   return OK;
@@ -1299,6 +1439,8 @@ static int igc_probe(FAR struct pci_device_s *dev)
       nerr("igc_initialize failed %d\n", ret);
       return ret;
     }
+
+  spin_lock_init(&priv->lock);
 
   /* Register the network device */
 

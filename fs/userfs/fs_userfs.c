@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/userfs/fs_userfs.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -165,6 +167,8 @@ const struct mountpt_operations g_userfs_operations =
   NULL,              /* mmap */
   userfs_truncate,   /* truncate */
   NULL,              /* poll */
+  NULL,              /* readv */
+  NULL,              /* writev */
 
   userfs_sync,       /* sync */
   userfs_dup,        /* dup */
@@ -255,17 +259,18 @@ static int userfs_open(FAR struct file *filep, FAR const char *relpath,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_open_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -275,11 +280,16 @@ static int userfs_open(FAR struct file *filep, FAR const char *relpath,
   if (resp->resp != USERFS_RESP_OPEN)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   filep->f_priv = resp->openinfo;
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -329,17 +339,18 @@ static int userfs_close(FAR struct file *filep)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_close_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -347,6 +358,7 @@ static int userfs_close(FAR struct file *filep)
   if (resp->resp != USERFS_RESP_CLOSE)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -355,7 +367,11 @@ static int userfs_close(FAR struct file *filep)
       filep->f_priv = NULL;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -371,6 +387,7 @@ static ssize_t userfs_read(FAR struct file *filep, char *buffer,
   ssize_t nsent;
   ssize_t nrecvd;
   int respsize;
+  ssize_t nread;
   int ret;
 
   finfo("Read %zu bytes from offset %jd\n", buflen, (intmax_t)filep->f_pos);
@@ -410,17 +427,18 @@ static ssize_t userfs_read(FAR struct file *filep, char *buffer,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd < SIZEOF_USERFS_READ_RESPONSE_S(0))
     {
       ferr("ERROR: Response too small: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -428,12 +446,14 @@ static ssize_t userfs_read(FAR struct file *filep, char *buffer,
   if (resp->resp != USERFS_RESP_READ)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   if (resp->nread > buflen)
     {
       ferr("ERROR: Response size too large: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -441,13 +461,18 @@ static ssize_t userfs_read(FAR struct file *filep, char *buffer,
   if (respsize != nrecvd)
     {
       ferr("ERROR: Incorrect response size: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   /* Copy the received data to the user buffer */
 
   memcpy(buffer, resp->rddata, resp->nread);
-  return resp->nread;
+  nread = resp->nread;
+
+  nxmutex_unlock(&priv->lock);
+
+  return nread;
 }
 
 /****************************************************************************
@@ -462,6 +487,7 @@ static ssize_t userfs_write(FAR struct file *filep, FAR const char *buffer,
   FAR struct userfs_write_response_s *resp;
   ssize_t nsent;
   ssize_t nrecvd;
+  ssize_t nwritten;
   int ret;
 
   finfo("Write %zu bytes to offset %jd\n", buflen, (intmax_t)filep->f_pos);
@@ -511,17 +537,18 @@ static ssize_t userfs_write(FAR struct file *filep, FAR const char *buffer,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_write_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -529,10 +556,15 @@ static ssize_t userfs_write(FAR struct file *filep, FAR const char *buffer,
   if (resp->resp != USERFS_RESP_WRITE)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->nwritten;
+  nwritten = resp->nwritten;
+
+  nxmutex_unlock(&priv->lock);
+
+  return nwritten;
 }
 
 /****************************************************************************
@@ -546,6 +578,7 @@ static off_t userfs_seek(FAR struct file *filep, off_t offset, int whence)
   FAR struct userfs_seek_response_s *resp;
   ssize_t nsent;
   ssize_t nrecvd;
+  off_t off_ret;
   int ret;
 
   finfo("Offset %lu bytes to whence=%d\n", (unsigned long)offset, whence);
@@ -586,17 +619,18 @@ static off_t userfs_seek(FAR struct file *filep, off_t offset, int whence)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_seek_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -604,10 +638,15 @@ static off_t userfs_seek(FAR struct file *filep, off_t offset, int whence)
   if (resp->resp != USERFS_RESP_SEEK)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  off_ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return off_ret;
 }
 
 /****************************************************************************
@@ -661,17 +700,18 @@ static int userfs_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_ioctl_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -679,10 +719,15 @@ static int userfs_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
   if (resp->resp != USERFS_RESP_IOCTL)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -732,17 +777,18 @@ static int userfs_sync(FAR struct file *filep)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_sync_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -750,10 +796,15 @@ static int userfs_sync(FAR struct file *filep)
   if (resp->resp != USERFS_RESP_SYNC)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -809,17 +860,18 @@ static int userfs_dup(FAR const struct file *oldp, FAR struct file *newp)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_dup_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -827,11 +879,16 @@ static int userfs_dup(FAR const struct file *oldp, FAR struct file *newp)
   if (resp->resp != USERFS_RESP_DUP)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   newp->f_priv = resp->openinfo;
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -886,17 +943,18 @@ static int userfs_fstat(FAR const struct file *filep, FAR struct stat *buf)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_fstat_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -904,6 +962,7 @@ static int userfs_fstat(FAR const struct file *filep, FAR struct stat *buf)
   if (resp->resp != USERFS_RESP_FSTAT)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -911,7 +970,11 @@ static int userfs_fstat(FAR const struct file *filep, FAR struct stat *buf)
 
   DEBUGASSERT(buf != NULL);
   memcpy(buf, &resp->buf, sizeof(struct stat));
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -969,17 +1032,18 @@ static int userfs_fchstat(FAR const struct file *filep,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %zd\n", nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_fchstat_response_s))
     {
       ferr("ERROR: Response size incorrect: %zd\n", nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -987,10 +1051,15 @@ static int userfs_fchstat(FAR const struct file *filep,
   if (resp->resp != USERFS_RESP_FCHSTAT)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1045,17 +1114,18 @@ static int userfs_truncate(FAR struct file *filep, off_t length)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_truncate_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1063,12 +1133,17 @@ static int userfs_truncate(FAR struct file *filep, off_t length)
   if (resp->resp != USERFS_RESP_FSTAT)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   /* Return the result of truncate operation */
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1136,17 +1211,18 @@ static int userfs_opendir(FAR struct inode *mountpt, FAR const char *relpath,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_opendir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1154,6 +1230,7 @@ static int userfs_opendir(FAR struct inode *mountpt, FAR const char *relpath,
   if (resp->resp != USERFS_RESP_OPENDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1163,12 +1240,17 @@ static int userfs_opendir(FAR struct inode *mountpt, FAR const char *relpath,
   udir = fs_heap_zalloc(sizeof(struct userfs_dir_s));
   if (udir == NULL)
     {
+      nxmutex_unlock(&priv->lock);
       return -ENOMEM;
     }
 
   udir->dir = resp->dir;
   *dir = (FAR struct fs_dirent_s *)udir;
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1224,17 +1306,18 @@ static int userfs_closedir(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_closedir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1242,11 +1325,16 @@ static int userfs_closedir(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_CLOSEDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
   fs_heap_free(udir);
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1302,17 +1390,18 @@ static int userfs_readdir(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_readdir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1320,6 +1409,7 @@ static int userfs_readdir(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_READDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1327,7 +1417,11 @@ static int userfs_readdir(FAR struct inode *mountpt,
 
   DEBUGASSERT(dir != NULL);
   memcpy(entry, &resp->entry, sizeof(struct dirent));
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1382,17 +1476,18 @@ static int userfs_rewinddir(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_rewinddir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1400,10 +1495,15 @@ static int userfs_rewinddir(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_REWINDDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1544,17 +1644,18 @@ static int userfs_unbind(FAR void *handle, FAR struct inode **blkdriver,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_destroy_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1562,6 +1663,7 @@ static int userfs_unbind(FAR void *handle, FAR struct inode **blkdriver,
   if (resp->resp != USERFS_RESP_DESTROY)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1569,8 +1671,12 @@ static int userfs_unbind(FAR void *handle, FAR struct inode **blkdriver,
 
   if (resp->ret < 0)
     {
-      return resp->ret;
+      ret = resp->ret;
+      nxmutex_unlock(&priv->lock);
+      return ret;
     }
+
+  nxmutex_unlock(&priv->lock);
 
   /* Free resources and return success */
 
@@ -1629,17 +1735,18 @@ static int userfs_statfs(FAR struct inode *mountpt, FAR struct statfs *buf)
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_statfs_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1647,6 +1754,7 @@ static int userfs_statfs(FAR struct inode *mountpt, FAR struct statfs *buf)
   if (resp->resp != USERFS_RESP_STATFS)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1654,7 +1762,11 @@ static int userfs_statfs(FAR struct inode *mountpt, FAR struct statfs *buf)
 
   DEBUGASSERT(buf != NULL);
   memcpy(buf, &resp->buf, sizeof(struct statfs));
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1719,17 +1831,18 @@ static int userfs_unlink(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_unlink_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1737,10 +1850,15 @@ static int userfs_unlink(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_UNLINK)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1806,17 +1924,18 @@ static int userfs_mkdir(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_mkdir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1824,10 +1943,15 @@ static int userfs_mkdir(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_MKDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1892,17 +2016,18 @@ static int userfs_rmdir(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_rmdir_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -1910,10 +2035,15 @@ static int userfs_rmdir(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_RMDIR)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -1984,17 +2114,18 @@ static int userfs_rename(FAR struct inode *mountpt,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_rename_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -2002,10 +2133,15 @@ static int userfs_rename(FAR struct inode *mountpt,
   if (resp->resp != USERFS_RESP_RENAME)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -2070,17 +2206,18 @@ static int userfs_stat(FAR struct inode *mountpt, FAR const char *relpath,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %d\n", (int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_stat_response_s))
     {
       ferr("ERROR: Response size incorrect: %u\n", (unsigned int)nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -2088,6 +2225,7 @@ static int userfs_stat(FAR struct inode *mountpt, FAR const char *relpath,
   if (resp->resp != USERFS_RESP_STAT)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -2095,7 +2233,11 @@ static int userfs_stat(FAR struct inode *mountpt, FAR const char *relpath,
 
   DEBUGASSERT(buf != NULL);
   memcpy(buf, &resp->buf, sizeof(struct stat));
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************
@@ -2162,17 +2304,18 @@ static int userfs_chstat(FAR struct inode *mountpt, FAR const char *relpath,
 
   nrecvd = psock_recvfrom(&priv->psock, priv->iobuffer, IOBUFFER_SIZE(priv),
                           0, NULL, NULL);
-  nxmutex_unlock(&priv->lock);
 
   if (nrecvd < 0)
     {
       ferr("ERROR: psock_recvfrom failed: %zd\n", nrecvd);
+      nxmutex_unlock(&priv->lock);
       return (int)nrecvd;
     }
 
   if (nrecvd != sizeof(struct userfs_chstat_response_s))
     {
       ferr("ERROR: Response size incorrect: %zd\n", nrecvd);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
@@ -2180,10 +2323,15 @@ static int userfs_chstat(FAR struct inode *mountpt, FAR const char *relpath,
   if (resp->resp != USERFS_RESP_STAT)
     {
       ferr("ERROR: Incorrect response: %u\n", resp->resp);
+      nxmutex_unlock(&priv->lock);
       return -EIO;
     }
 
-  return resp->ret;
+  ret = resp->ret;
+
+  nxmutex_unlock(&priv->lock);
+
+  return ret;
 }
 
 /****************************************************************************

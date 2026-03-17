@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/nxffs/nxffs_inode.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -213,7 +215,7 @@ void nxffs_freeentry(FAR struct nxffs_entry_s *entry)
 {
   if (entry->name)
     {
-      lib_free(entry->name);
+      fs_heap_free(entry->name);
       entry->name = NULL;
     }
 }
@@ -283,7 +285,7 @@ int nxffs_nextentry(FAR struct nxffs_volume_s *volume, off_t offset,
           nerased = 0;
 
           /* Check for the magic sequence indicating the start of an NXFFS
-           * inode. There is the possibility of this magic sequnce occurring
+           * inode. There is the possibility of this magic sequence occurring
            * in FLASH data.  However, the header CRC should distinguish
            * between real NXFFS inode headers and such false alarms.
            */

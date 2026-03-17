@@ -42,6 +42,14 @@
 
 /* sensor type definition */
 
+/* Note: Some of the types of these sensors are aligned with Android, and
+ * the refs link is https://cs.android.com/android/_/android/platform/\
+ * hardware/libhardware/+/0e67aa0caee9500b61b9c1c8b6e5cab18301364c:\
+ * include_all/hardware/sensors-base.h.
+ *
+ * If you need to make modifications, please align with Android standards
+ */
+
 /* Custom Sensor
  * Some special sensor whose event size is not fixed or dynamically change,
  * are called sensor of custom type. You should treat its events as byte
@@ -99,11 +107,12 @@
 
 #define SENSOR_TYPE_BAROMETER                       6
 
-/* Noise Loudness
- * A sensor of this type returns the loudness of noise in SI units (db)
+/* Temperature
+ * A sensor of this type returns the measurement temperature in degree
+ * Celsius.
  */
 
-#define SENSOR_TYPE_NOISE                           7
+#define SENSOR_TYPE_TEMPERATURE                     7
 
 /* Proximity
  * The values correspond to the distance to the nearest
@@ -153,12 +162,12 @@
 
 #define SENSOR_TYPE_AMBIENT_TEMPERATURE             13
 
-/* PM25
- * A sensor of this type returns the content of pm2.5 in the air
- * This value is in SI units (ug/m^3)
+/* Magnetic Field Uncalibrated
+ * Similar to MAGNETIC_FIELD, all values are in micro-Tesla (uT)
+ * and measure the geomagnetic field in X, Y and Z axis.
  */
 
-#define SENSOR_TYPE_PM25                            14
+#define SENSOR_TYPE_MAGNETIC_FIELD_UNCALIBRATED     14
 
 /* PM1P0
  * A sensor of this type returns the content of pm1.0 in the air
@@ -167,12 +176,12 @@
 
 #define SENSOR_TYPE_PM1P0                           15
 
-/* PM10
- * A sensor of this type returns the content of pm10 in the air
- * This value is in SI units (ug/m^3)
+/* Gyroscope Uncalibrated
+ * All values are in radians/second and measure the rate of rotation around
+ * the X, Y and Z axis.
  */
 
-#define SENSOR_TYPE_PM10                            16
+#define SENSOR_TYPE_GYROSCOPE_UNCALIBRATED          16
 
 /* Significant motion
  * A significant motion detector triggers when detecting a significant
@@ -295,7 +304,7 @@
  * Motion detection sensor is used to detect the motion status of the device.
  * motion detect event is produced if the device has been in motion
  * for at least 5 seconds with a maximal latency of 5 additional seconds.
- * ie: it may take up anywhere from 5 to 10 seconds afte the device has been
+ * ie: it may take up anywhere from 5 to 10 seconds after the device has been
  * at rest to trigger this event. The only allowed value is 1.0.
  */
 
@@ -335,12 +344,12 @@
 
 #define SENSOR_TYPE_LOW_LATENCY_OFFBODY_DETECT      34
 
-/* Ultraviolet light sensor
- * This sensor can identify the UV index in ambient light help people
- * to effectively protect themselves from sunburns, cancer or eye damage.
- * This value range is 0 - 15.
+/* Accelerometer Uncalibrate
+ * All values are in SI units (m/s^2), and measure the acceleration of the
+ * device minus the acceleration dut to gravity.
  */
-#define SENSOR_TYPE_ULTRAVIOLET                     35
+
+#define SENSOR_TYPE_ACCELEROMETER_UNCALIBRATED      35
 
 /* Hinge angle
  * A hinge angle sensor measures the angle, in degrees, between two integral
@@ -393,7 +402,7 @@
  * measurements come from photodiodes and following current amplifiers and
  * ADCs, where a photodiode switches reflected light intensity to current.
  * The LED current decides the lightness of LED, which is the input of PPG
- * measurements. The ADC gains are multipled on the output and affect SNR.
+ * measurements. The ADC gains are multiplied on the output and affect SNR.
  */
 
 #define SENSOR_TYPE_PPGD                            42
@@ -404,7 +413,7 @@
  * measurements come from photodiodes and following current amplifiers and
  * ADCs, where a photodiode switches reflected light intensity to current.
  * The LED current decides the lightness of LED, which is the input of PPG
- * measurements. The ADC gains are multipled on the output and affect SNR.
+ * measurements. The ADC gains are multiplied on the output and affect SNR.
  */
 
 #define SENSOR_TYPE_PPGQ                            43
@@ -420,7 +429,7 @@
 /* OTS (Optical tracking sensor)
  * A sensor of this type returns the OTS measurements in counts. It
  * integrates an optical chip and a LASER light source in a single miniature
- * package. It provies wide depth of field range on glossy surface, and
+ * package. It provides wide depth of field range on glossy surface, and
  * design flexibility into a compact device.
  */
 
@@ -467,9 +476,55 @@
 
 #define SENSOR_TYPE_GNSS_GEOFENCE                   52
 
-/* The total number of sensor */
+/* Velocity Sensor
+ * A sensor of this type measures the velocity as it is moving.
+ * The default unit velocity is meter by seconds m/s (SI).
+ */
 
-#define SENSOR_TYPE_COUNT                           53
+#define SENSOR_TYPE_VELOCITY                        53
+
+/* Noise Loudness
+ * A sensor of this type returns the loudness of noise in SI units (db)
+ */
+
+#define SENSOR_TYPE_NOISE                           54
+
+/* PM25
+ * A sensor of this type returns the content of pm2.5 in the air
+ * This value is in SI units (ug/m^3)
+ */
+
+#define SENSOR_TYPE_PM25                            55
+
+/* PM10
+ * A sensor of this type returns the content of pm10 in the air
+ * This value is in SI units (ug/m^3)
+ */
+
+#define SENSOR_TYPE_PM10                            56
+
+/* Ultraviolet light sensor
+ * This sensor can identify the UV index in ambient light help people
+ * to effectively protect themselves from sunburns, cancer or eye damage.
+ * This value range is 0 - 15.
+ */
+
+#define SENSOR_TYPE_ULTRAVIOLET                     57
+
+/* ENG (Electroneurography)
+ * A sensor of this type measures the electrical activity of peripheral
+ * nerves. This neural electrical signal, generated by nerve impulses
+ * traveling through axons and captured by electrodes, provides valuable
+ * information about nervous system and muscle-nerve communication.
+ */
+
+#define SENSOR_TYPE_ENG                             58
+
+/* The total number of sensor
+ * please increase it if you added a new sensor type!
+ */
+
+#define SENSOR_TYPE_COUNT                           59
 
 /* The additional sensor open flags */
 
@@ -479,6 +534,17 @@
 /* GNSS satellite info slots */
 
 #define SENSOR_GNSS_SAT_INFO_MAX                    4
+
+/* GNSS satellite status flags, see `flags` of `struct sensor_gnss_satellite`
+ * Refs: https://android.googlesource.com/platform/hardware/libhardware/+/
+ *       refs/heads/android14-release/include/hardware/gnss-base.h#134
+ */
+
+#define SENSOR_GNSS_SV_FLAGS_NONE                   (0)
+#define SENSOR_GNSS_SV_FLAGS_HAS_EPHEMERIS_DATA     (1 << 0)
+#define SENSOR_GNSS_SV_FLAGS_HAS_ALMANAC_DATA       (1 << 1)
+#define SENSOR_GNSS_SV_FLAGS_USED_IN_FIX            (1 << 2)
+#define SENSOR_GNSS_SV_FLAGS_HAS_CARRIER_FREQUENCY  (1 << 3)
 
 /* Maximum length of sensor device information name and path name. */
 
@@ -588,12 +654,37 @@ struct sensor_accel         /* Type: Accerometer */
   float temperature;        /* Temperature in degrees celsius */
 };
 
+struct sensor_accel_uncal   /* Type: Accerometer Uncalibrated */
+{
+  uint64_t timestamp;       /* Units is microseconds */
+  float x;                  /* Axis X in m/s^2 */
+  float y;                  /* Axis Y in m/s^2 */
+  float z;                  /* Axis Z in m/s^2 */
+  float x_bias;             /* Axis X bias in m/s^2 */
+  float y_bias;             /* Axis Y bias in m/s^2 */
+  float z_bias;             /* Axis Z bias in m/s^2 */
+  float temperature;        /* Temperature in degrees celsius */
+};
+
 struct sensor_mag           /* Type: Magnetic Field */
 {
   uint64_t timestamp;       /* Units is microseconds */
   float x;                  /* Axis X in Gauss or micro Tesla (uT) */
   float y;                  /* Axis Y in Gauss or micro Tesla (uT) */
   float z;                  /* Axis Z in Gauss or micro Tesla (uT) */
+  float temperature;        /* Temperature in degrees celsius */
+  int32_t status;           /* Status of calibration */
+};
+
+struct sensor_mag_uncal     /* Type: Magnetic Field Uncalibrated */
+{
+  uint64_t timestamp;       /* Units is microseconds */
+  float x;                  /* Axis X in Gauss or micro Tesla (uT) */
+  float y;                  /* Axis Y in Gauss or micro Tesla (uT) */
+  float z;                  /* Axis Z in Gauss or micro Tesla (uT) */
+  float x_bias;             /* Axis X bias in Gauss or micro Tesla (uT) */
+  float y_bias;             /* Axis Y bias in Gauss or micro Tesla (uT) */
+  float z_bias;             /* Axis Z bias in Gauss or micro Tesla (uT) */
   float temperature;        /* Temperature in degrees celsius */
   int32_t status;           /* Status of calibration */
 };
@@ -612,6 +703,18 @@ struct sensor_gyro          /* Type: Gyroscope */
   float x;                  /* Axis X in rad/s */
   float y;                  /* Axis Y in rad/s */
   float z;                  /* Axis Z in rad/s */
+  float temperature;        /* Temperature in degrees celsius */
+};
+
+struct sensor_gyro_uncal    /* Type: Gyroscope Uncalibrated */
+{
+  uint64_t timestamp;       /* Units is microseconds */
+  float x;                  /* Axis X in rad/s */
+  float y;                  /* Axis Y in rad/s */
+  float z;                  /* Axis Z in rad/s */
+  float x_bias;             /* Axis X bias in rad/s */
+  float y_bias;             /* Axis Y bias in rad/s */
+  float z_bias;             /* Axis Z bias in rad/s */
   float temperature;        /* Temperature in degrees celsius */
 };
 
@@ -747,6 +850,12 @@ struct sensor_force         /* Type: Force */
   int32_t event;            /* Force event */
 };
 
+struct sensor_velocity      /* Type: Velocity */
+{
+  uint64_t timestamp;       /* Unit is microseconds */
+  float velocity;           /* Velocity value, units is m/s (SI) */
+};
+
 struct sensor_hall          /* Type: HALL */
 {
   uint64_t timestamp;       /* Units is microseconds */
@@ -839,6 +948,13 @@ struct sensor_cap           /* Type: Capacitance */
   int32_t rawdata[4];       /* in SI units pF */
 };
 
+struct sensor_eng           /* Type: ENG */
+{
+  uint64_t timestamp;       /* Unit is microseconds */
+  float voltage[4];         /* Voltage unit in mV */
+  uint32_t stat;            /* Status. bit3:0 - value 3:0 is valid or not */
+};
+
 struct sensor_gnss          /* Type: GNSS */
 {
   uint64_t timestamp;       /* Time since system start, Units is microseconds */
@@ -871,6 +987,7 @@ struct sensor_gnss          /* Type: GNSS */
   float course;
 
   uint32_t satellites_used; /* Number of satellites used */
+  uint32_t firmware_ver;    /* Version of GNSS firmware */
 };
 
 /* Ref: android14-release/hardware/libhardware/include_all/hardware/\
@@ -898,6 +1015,12 @@ struct sensor_gnss_satellite
 
   uint32_t constellation;
 
+  /* Carrier Frequency(Hz), GSV.signal_id.
+   * Flag: SENSOR_GNSS_SV_FLAGS_HAS_CARRIER_FREQUENCY
+   */
+
+  float cf;
+
   struct satellite
   {
     uint32_t svid;          /* Space vehicle ID */
@@ -917,12 +1040,18 @@ struct sensor_gnss_satellite
    */
 
     uint32_t snr;
+
+  /* Indicating what fields are valid. */
+
+    uint32_t flags;
   }
   info[SENSOR_GNSS_SAT_INFO_MAX];
 };
 
 struct sensor_gnss_measurement
 {
+  uint64_t timestamp;       /* Time since system start, Units is microseconds */
+
   /* Indicating what fields are valid.
    * See SENSOR_GNSS_MEASUREMENT_HAS_*.
    */
@@ -993,6 +1122,8 @@ struct sensor_gnss_measurement
 
 struct sensor_gnss_clock
 {
+  uint64_t timestamp;       /* Time since system start, Units is microseconds */
+
   /* Indicating what fields are valid.
    * See SENSOR_GNSS_CLOCK_HAS_*.
    */
@@ -1111,9 +1242,10 @@ struct sensor_state_s
   uint32_t nbuffer;            /* The number of events that the circular buffer can hold */
   uint32_t min_latency;        /* The minimum batch latency for sensor, in us */
   uint32_t min_interval;       /* The minimum subscription interval for sensor, in us */
-  uint32_t nsubscribers;       /* The number of subcribers */
+  uint32_t nsubscribers;       /* The number of subscribers */
   uint32_t nadvertisers;       /* The number of advertisers */
   uint32_t generation;         /* The recent generation of circular buffer */
+  uint32_t nonwakeup;          /* The non wakeup state of sensor device */
   uint64_t priv;               /* The pointer to private data of userspace user */
 };
 
@@ -1124,25 +1256,9 @@ struct sensor_ustate_s
   uint32_t esize;              /* The element size of circular buffer */
   uint32_t latency;            /* The batch latency for user, in us */
   uint32_t interval;           /* The subscription interval for user, in us */
-  uint64_t generation;         /* The recent generation of circular buffer */
+  uint32_t nonwakeup;          /* The non wakeup state of sensor user */
+  uint32_t generation;         /* The recent generation of circular buffer */
 };
-
-/* This structure describes the register info for the user sensor */
-
-#ifdef CONFIG_USENSOR
-struct sensor_reginfo_s
-{
-  char     path[NAME_MAX];     /* The path of user sensor */
-  uint32_t esize;              /* The element size of user sensor */
-  uint32_t nbuffer;            /* The number of queue buffered elements */
-
-  /* The flag is used to indicate that the validity of sensor data
-   * is persistent.
-   */
-
-  int persist;
-};
-#endif
 
 /* This structure describes the context custom ioctl for device */
 
@@ -1217,5 +1333,23 @@ struct sensor_device_info_s
 
   char          vendor[SENSOR_INFO_NAME_SIZE];
 };
+
+/* This structure describes the register info for the user sensor */
+
+#ifdef CONFIG_USENSOR
+struct sensor_reginfo_s
+{
+  char     path[NAME_MAX];             /* The path of user sensor */
+  uint32_t esize;                      /* The element size of user sensor */
+  uint32_t nbuffer;                    /* The number of queue buffered elements */
+  struct sensor_device_info_s devinfo; /* The device info. */
+
+  /* The flag is used to indicate that the validity of sensor data
+   * is persistent.
+   */
+
+  int persist;
+};
+#endif
 
 #endif /* __INCLUDE_NUTTX_SENSORS_SENSOR_H */

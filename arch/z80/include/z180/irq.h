@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/z80/include/z180/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -173,6 +175,7 @@ struct xcptcontext
 
   chipreg_t regs[XCPTCONTEXT_REGS];
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   /* The following retains that state during signal execution
    *
    * REVISIT:  Because there is only one copy of these save areas,
@@ -183,6 +186,7 @@ struct xcptcontext
 
   uint16_t saved_pc;    /* Saved return address */
   uint16_t saved_i;     /* Saved interrupt state */
+#endif /* CONFIG_ENABLE_ALL_SIGNALS */
 };
 #endif
 

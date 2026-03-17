@@ -1,5 +1,7 @@
 # ##############################################################################
-# arch/tricore/src/cmake/Toolchain.cmake
+# arch/tricore/src/cmake/ToolchainGnuc.cmake
+#
+# SPDX-License-Identifier: Apache-2.0
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
@@ -23,15 +25,13 @@
 set(CMAKE_SYSTEM_NAME Generic)
 set(CMAKE_SYSTEM_VERSION 1)
 
-set(ARCH_SUBDIR)
-
-if(CONFIG_ARCH_TC3XX) # TC3XX
+if(CONFIG_ARCH_CHIP_TC3XX)
   set(ARCH_SUBDIR tc3xx)
-else()
-  set(ARCH_SUBDIR tc3xx)
+elseif(CONFIG_ARCH_CHIP_TC4XX)
+  set(ARCH_SUBDIR tc4xx)
 endif()
 
-include(${ARCH_SUBDIR})
+include(${CMAKE_CURRENT_LIST_DIR}/chip.cmake)
 
 set(TOOLCHAIN_PREFIX tricore-elf)
 set(CMAKE_LIBRARY_ARCHITECTURE ${TOOLCHAIN_PREFIX})
@@ -81,11 +81,11 @@ else()
 endif()
 
 if(CONFIG_STACK_CANARIES)
-  add_compile_options(-fstack-protector-all)
+  add_compile_options(${CONFIG_STACK_CANARIES_LEVEL})
 endif()
 
-if(CONFIG_ARCH_COVERAGE)
-  add_compile_options(-fprofile-generate -ftest-coverage)
+if(CONFIG_COVERAGE_ALL)
+  add_compile_options(-fprofile-arcs -ftest-coverage -fno-inline)
 endif()
 
 # Optimization of unused sections

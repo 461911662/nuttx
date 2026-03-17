@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/stm32h7/weact-stm32h743/src/stm32_usb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -61,7 +63,7 @@
 #endif
 
 #ifndef CONFIG_WEACT_STM32H743_USBHOST_STACKSIZE
-#  define CONFIG_WEACT_STM32H743_USBHOST_STACKSIZE 1024
+#  define CONFIG_WEACT_STM32H743_USBHOST_STACKSIZE 2048
 #endif
 
 /****************************************************************************

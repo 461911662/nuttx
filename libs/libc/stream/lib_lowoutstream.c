@@ -40,8 +40,8 @@
  ****************************************************************************/
 
 static void lowoutstream_putc(FAR struct lib_outstream_s *self, int ch);
-static int lowoutstream_puts(FAR struct lib_outstream_s *self,
-                             FAR const void *buf, int len);
+static ssize_t lowoutstream_puts(FAR struct lib_outstream_s *self,
+                                 FAR const void *buf, size_t len);
 
 /****************************************************************************
  * Public Data
@@ -67,7 +67,9 @@ static void lowoutstream_putc(FAR struct lib_outstream_s *self, int ch)
 {
   DEBUGASSERT(self);
 
-  if (up_putc(ch) != EOF)
+  up_lowputc(ch);
+
+  if (ch != EOF)
     {
       self->nput++;
     }
@@ -77,13 +79,19 @@ static void lowoutstream_putc(FAR struct lib_outstream_s *self, int ch)
  * Name: lowoutstream_puts
  ****************************************************************************/
 
-static int lowoutstream_puts(FAR struct lib_outstream_s *self,
-                             FAR const void *buf, int len)
+static ssize_t lowoutstream_puts(FAR struct lib_outstream_s *self,
+                                 FAR const void *buf, size_t len)
 {
+  FAR const char *str = (FAR const char *)buf;
+  size_t idx          = 0;
   DEBUGASSERT(self);
 
-  self->nput += len;
-  up_nputs(buf, len);
+  while (str[idx] != 0 && idx < len)
+    {
+      lowoutstream_putc(self, str[idx]);
+      idx++;
+    }
+
   return len;
 }
 

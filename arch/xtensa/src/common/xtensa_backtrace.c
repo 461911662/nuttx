@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/xtensa/src/common/xtensa_backtrace.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -41,7 +43,7 @@
  * addressing instructions within a 1GB region. To convert the return address
  * to a valid PC, we need to add the base address of the instruction region.
  * The following macro is used to define the base address of the 1GB region,
- * which may not start in 0x00000000. This macro can be overriden in
+ * which may not start in 0x00000000. This macro can be overridden in
  * `chip_memory.h` of the chip directory.
  */
 
@@ -71,8 +73,8 @@ struct xtensa_windowregs_s
  * Private Function Prototypes
  ****************************************************************************/
 
-static void inline get_window_regs(struct xtensa_windowregs_s *frame)
-always_inline_function;
+always_inline_function static
+void get_window_regs(struct xtensa_windowregs_s *frame);
 
 /****************************************************************************
  * Private Functions
@@ -87,7 +89,8 @@ always_inline_function;
  ****************************************************************************/
 
 #ifndef __XTENSA_CALL0_ABI__
-static void get_window_regs(struct xtensa_windowregs_s *frame)
+always_inline_function static
+void get_window_regs(struct xtensa_windowregs_s *frame)
 {
   __asm__ __volatile__("\trsr %0, WINDOWSTART\n": "=r"(frame->windowstart));
   __asm__ __volatile__("\trsr %0, WINDOWBASE\n": "=r"(frame->windowbase));
@@ -277,8 +280,8 @@ int up_backtrace(struct tcb_s *tcb, void **buffer, int size, int skip)
 #endif
           ret += backtrace_stack(rtcb->stack_base_ptr,
                                  rtcb->stack_base_ptr + rtcb->adj_stack_size,
-                                 (void *)up_current_regs()[REG_A1],
-                                 (void *)up_current_regs()[REG_A0],
+                                 running_regs()[REG_A1],
+                                 running_regs()[REG_A0],
                                  &buffer[ret], size - ret, &skip);
         }
       else

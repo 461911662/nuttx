@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-r/arm_cpustart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -74,10 +76,6 @@ int arm_start_handler(int irq, void *context, void *arg)
 
   sched_note_cpu_started(tcb);
 #endif
-
-  /* Reset scheduler parameters */
-
-  nxsched_resume_scheduler(tcb);
 
   UNUSED(tcb);
 

@@ -1,7 +1,7 @@
 /****************************************************************************
  * drivers/sensors/wtgahrs2_uorb.c
- * Driver for the Wit-Motion WTGAHRS2 accelerometer, gyroscope, magnetic,
- * angle, barometer, temperature, GNSS sensors by serial interface with host
+ *
+ * SPDX-License-Identifier: Apache-2.0
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -89,10 +89,6 @@ struct wtgahrs2_dev_s
 };
 
 /****************************************************************************
- * Private
- ****************************************************************************/
-
-/****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
 
@@ -152,7 +148,7 @@ static void wtgahrs2_sendcmd(FAR struct wtgahrs2_dev_s *rtdata,
                              const void *cmd)
 {
   file_write(&rtdata->file, cmd, WTGAHRS2_CMD_LENGTH);
-  nxsig_usleep(10000);
+  nxsched_usleep(10000);
 }
 
 static int wtgahrs2_activate(FAR struct sensor_lowerhalf_s *lower,

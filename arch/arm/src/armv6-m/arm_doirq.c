@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv6-m/arm_doirq.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,66 +37,96 @@
 
 #include "arm_internal.h"
 #include "exc_return.h"
+#include "nvic.h"
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
+void exception_direct(void)
+{
+  int irq = getipsr();
+
+  arm_ack_irq(irq);
+  irq_dispatch(irq, NULL);
+
+  if (g_running_tasks[this_cpu()] != this_task())
+    {
+      up_trigger_irq(NVIC_IRQ_PENDSV, 0);
+    }
+}
+
 uint32_t *arm_doirq(int irq, uint32_t *regs)
 {
-  struct tcb_s *tcb = this_task();
+  struct tcb_s **running_task = &g_running_tasks[this_cpu()];
+  struct tcb_s *tcb           = *running_task;
+
+  /* This judgment proves that (*running_task)->xcp.regs
+   * is invalid, and we can safely overwrite it.
+   */
+
+  if (*running_task != NULL)
+    {
+      tcb->xcp.regs = regs;
+    }
 
   board_autoled_on(LED_INIRQ);
 #ifdef CONFIG_SUPPRESS_INTERRUPTS
   PANIC();
 #else
 
-  if (regs[REG_EXC_RETURN] & EXC_RETURN_THREAD_MODE)
-    {
-      tcb->xcp.regs = regs;
-      up_set_current_regs(regs);
-    }
-
   /* Acknowledge the interrupt */
 
   arm_ack_irq(irq);
 
-  /* Deliver the IRQ */
-
-  irq_dispatch(irq, regs);
-
-  /* If a context switch occurred while processing the interrupt then
-   * current_regs may have change value.  If we return any value different
-   * from the input regs, then the lower level will know that a context
-   * switch occurred during interrupt processing.
-   */
-
-  if (regs[REG_EXC_RETURN] & EXC_RETURN_THREAD_MODE)
+  if (irq == NVIC_IRQ_PENDSV)
     {
-      tcb = this_task();
+#ifdef CONFIG_ARCH_HIPRI_INTERRUPT
+      /* Dispatch the PendSV interrupt */
 
-      if (regs != tcb->xcp.regs)
+      irq_dispatch(irq, regs);
+#endif
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
+      if (tcb->sigdeliver)
         {
-          /* Update scheduler parameters */
+          /* Pendsv able to access running tcb with no critical section */
 
-          nxsched_suspend_scheduler(g_running_tasks[this_cpu()]);
-          nxsched_resume_scheduler(tcb);
-
-          /* Record the new "running" task when context switch occurred.
-           * g_running_tasks[] is only used by assertion logic for reporting
-           * crashes.
-           */
-
-          g_running_tasks[this_cpu()] = tcb;
-          regs = tcb->xcp.regs;
+          up_schedule_sigaction(tcb);
         }
 
-      /* Update the current_regs to NULL. */
-
-      up_set_current_regs(NULL);
+#endif
+      up_irq_save();
     }
+  else
+    {
+      irq_dispatch(irq, regs);
+    }
+
+  tcb = this_task();
+
+  /* Update scheduler parameters.
+   * The arm-m architecture svc call will trigger an interrupt,
+   * and the actual context switch is executed after doirq is completed,
+   * so only the scheduling information needs to be updated in doirq.
+   */
+
+  nxsched_switch_context(*running_task, tcb);
+
+  /* Record the new "running" task when context switch occurred.
+   * g_running_tasks[] is only used by assertion logic for reporting
+   * crashes.
+   */
+
+  *running_task = tcb;
+  regs = tcb->xcp.regs;
 #endif
 
   board_autoled_off(LED_INIRQ);
+
+  /* (*running_task)->xcp.regs is about to become invalid
+   * and will be marked as NULL to avoid misusage.
+   */
+
+  (*running_task)->xcp.regs = NULL;
   return regs;
 }

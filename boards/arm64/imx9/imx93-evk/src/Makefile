@@ -1,6 +1,8 @@
 ############################################################################
 # boards/arm64/imx9/imx93-evk/src/Makefile
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.  The
@@ -42,10 +44,16 @@ ifeq ($(CONFIG_IMX9_USDHC),y)
 CSRCS += imx9_usdhc.c
 endif
 
+ifeq ($(CONFIG_IMX9_DDR_TRAINING),y)
+CSRCS += imx9_ddr_config.c
+endif
+
+
 include $(TOPDIR)/boards/Board.mk
 
 ifeq ($(CONFIG_IMX9_BOOTLOADER),y)
 .PHONY: distclean
 distclean::
 	$(call DELFILE, ${TOPDIR}${DELIM}imx9-sdimage.img)
+	$(call DELFILE, ${TOPDIR}${DELIM}imx9-norimage.img)
 endif

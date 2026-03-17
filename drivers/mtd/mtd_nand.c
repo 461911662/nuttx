@@ -1,7 +1,8 @@
 /****************************************************************************
  * drivers/mtd/mtd_nand.c
  *
- *   Copyright (c) 2011, 2012, Atmel Corporation
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: Copyright (c) 2011, 2012, Atmel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -833,6 +834,15 @@ static int nand_ioctl(FAR struct mtd_dev_s *dev, int cmd, unsigned long arg)
         {
           FAR struct mtd_erase_s *erase = (FAR struct mtd_erase_s *)arg;
           ret = nand_erase(dev, erase->startblock, erase->nblocks);
+        }
+        break;
+
+      case MTDIOC_ISBAD:
+        {
+          FAR struct mtd_bad_block_s *bad_block =
+                                     (FAR struct mtd_bad_block_s *)arg;
+          bad_block->bad_flag = nand_isbad(dev, bad_block->block_num);
+          ret = OK;
         }
         break;
 

@@ -21,6 +21,7 @@
 # ##############################################################################
 
 set(SRCS
+    task_argvstr.c
     task_create.c
     task_init.c
     task_setup.c
@@ -57,10 +58,6 @@ if(NOT CONFIG_BINFMT_DISABLE)
   if(CONFIG_LIBC_EXECFUNCS)
     list(APPEND SRCS task_execve.c task_posixspawn.c)
   endif()
-endif()
-
-if(CONFIG_SCHED_STARTHOOK)
-  list(APPEND SRCS task_starthook.c)
 endif()
 
 target_sources(sched PRIVATE ${SRCS})

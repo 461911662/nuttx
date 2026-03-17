@@ -1,15 +1,12 @@
 /****************************************************************************
  * arch/arm/src/lpc54xx/lpc54_ethernet.c
  *
- *   Copyright (C) 2017 Gregory Nutt. All rights reserved.
- *   Author: Gregory Nutt <gnutt@nuttx.org>
- *
- * Some of the logic in this file was developed using sample code provided by
- * NXP that has a compatible BSD license:
- *
- *   Copyright (c) 2016, Freescale Semiconductor, Inc.
- *   Copyright 2016-2017 NXP
- *   All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ * SPDX-FileCopyrightText: 2017 Gregory Nutt. All rights reserved.
+ * SPDX-FileCopyrightText: 2016 Freescale Semiconductor Inc.
+ * SPDX-FileCopyrightText: 2016 - 2017, NXP
+ * SPDX-FileContributor: Gregory Nutt <gnutt@nuttx.org>
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1974,6 +1971,9 @@ static int lpc54_eth_ifup(struct net_driver_s *dev)
 
   priv->eth_bifup = 1;
   up_enable_irq(LPC54_IRQ_ETHERNET);
+
+  netdev_carrier_on(dev);
+
   return OK;
 }
 
@@ -2051,6 +2051,9 @@ static int lpc54_eth_ifdown(struct net_driver_s *dev)
 
   priv->eth_bifup = 0;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 
@@ -2654,7 +2657,7 @@ static void lpc54_phy_write(struct lpc54_ethdriver_s *priv,
  * Name: lpc54_phy_linkstatus
  *
  * Description:
- *   Read the MII status register and return tru if the link is up.
+ *   Read the MII status register and return true if the link is up.
  *
  * Input Parameters:
  *   priv - Reference to the driver state structure
@@ -2666,7 +2669,7 @@ static void lpc54_phy_write(struct lpc54_ethdriver_s *priv,
 
 static inline bool lpc54_phy_linkstatus(struct lpc54_ethdriver_s *priv)
 {
-  /* Read the status register and return tru of the linkstatus bit is set. */
+  /* Read the status register and return true if the linkstatus bit is set. */
 
   return ((lpc54_phy_read(priv, MII_MSR) & MII_MSR_LINKSTATUS) != 0);
 }

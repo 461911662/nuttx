@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/mxt.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1740,7 +1742,7 @@ static int mxt_hwinitialize(FAR struct mxt_dev_s *priv)
       goto errout_with_objtab;
     }
 
-  nxsig_usleep(MXT_RESET_TIME);
+  nxsched_usleep(MXT_RESET_TIME);
 
   /* Update matrix size in the info structure */
 

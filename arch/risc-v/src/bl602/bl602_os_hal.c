@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/bl602/bl602_os_hal.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,6 +50,7 @@
 #include <syslog.h>
 
 #include <nuttx/config.h>
+#include <nuttx/arch.h>
 #include <nuttx/irq.h>
 #include <nuttx/kthread.h>
 #include <nuttx/mqueue.h>
@@ -515,7 +518,9 @@ int bl_os_msleep(long msec)
 {
   useconds_t usec = msec * 1000;
 
-  return nxsig_usleep(usec);
+  nxsched_usleep(usec);
+
+  return 0;
 }
 
 /****************************************************************************
@@ -531,7 +536,9 @@ int bl_os_msleep(long msec)
 
 int bl_os_sleep(unsigned int seconds)
 {
-  return nxsig_sleep(seconds);
+  nxsched_sleep(seconds);
+
+  return 0;
 }
 
 /****************************************************************************

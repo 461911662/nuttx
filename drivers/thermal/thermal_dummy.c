@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/thermal/thermal_dummy.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -46,6 +48,7 @@ struct dummy_zone_device_s
 {
   int temperature;
   bool raising;
+  bool temp_jump;
 };
 
 struct dummy_cooling_device_s
@@ -107,9 +110,9 @@ static int dummy_cpufreq_resume (FAR struct cpufreq_policy *driver);
 
 static const struct thermal_zone_trip_s g_dummy_trips[] =
 {
-  {.name = "cpu_crit",   .temp = 90, .hyst = 10, .type = THERMAL_CRITICAL},
-  {.name = "cpu_alert1", .temp = 70, .hyst = 10, .type = THERMAL_HOT},
-  {.name = "cpu_alert0", .temp = 60, .hyst = 10, .type = THERMAL_NORMAL},
+  {.name = "cpu_crit",   .temp = 90, .hyst = 5, .type = THERMAL_CRITICAL},
+  {.name = "cpu_alert1", .temp = 70, .hyst = 5, .type = THERMAL_HOT},
+  {.name = "cpu_alert0", .temp = 60, .hyst = 5, .type = THERMAL_PASSIVE},
 };
 
 static const struct thermal_zone_map_s g_dummy_maps[] =
@@ -135,11 +138,19 @@ static const struct thermal_zone_map_s g_dummy_maps[] =
     .high   = 2,
     .weight = 20
   },
+  {
+    .trip_name = "cpu_alert0",
+    .cdev_name = "passive_dev",
+    .low    = THERMAL_NO_LIMIT,
+    .high   = THERMAL_NO_LIMIT,
+    .weight = 20
+  },
 };
 
 static const struct thermal_zone_params_s g_dummy_params =
 {
   .gov_name = "step_wise",
+  .passive_delay = CONFIG_THERMAL_DUMMY_POLLING_DELAY * 2,
   .polling_delay = CONFIG_THERMAL_DUMMY_POLLING_DELAY,
   .trips = g_dummy_trips,
   .num_trips = nitems(g_dummy_trips),
@@ -159,6 +170,14 @@ static struct dummy_zone_device_s g_dummy_zone =
 {
   .temperature = 45,
   .raising = true,
+  .temp_jump = true,
+};
+
+static const struct thermal_cooling_device_ops_s g_dummy_cooling_ops =
+{
+  .set_state     = dummy_cdev_set_state,
+  .get_state     = dummy_cdev_get_state,
+  .get_max_state = dummy_cdev_get_max_state,
 };
 
 /* Cooling Device - fan0 */
@@ -167,13 +186,6 @@ static struct dummy_cooling_device_s g_dummy_fan0_data =
 {
   .cur_state = 0,
   .max_state = 16,
-};
-
-static const struct thermal_cooling_device_ops_s g_dummy_fan0_ops =
-{
-  .set_state     = dummy_cdev_set_state,
-  .get_state     = dummy_cdev_get_state,
-  .get_max_state = dummy_cdev_get_max_state,
 };
 
 /* Cooling Device - cpufreq */
@@ -200,6 +212,12 @@ static struct dummy_cpufreq_driver_s g_dummy_cpufreq_driver =
     },
   .table = g_dummy_cpufreq_table,
   .table_len = nitems(g_dummy_cpufreq_table),
+};
+#else
+static struct dummy_cooling_device_s g_dummy_passive =
+{
+  .cur_state = 0,
+  .max_state = 1,
 };
 #endif /* CONFIG_THERMAL_DUMMY_CPUFREQ */
 
@@ -262,7 +280,8 @@ static int dummy_zdev_get_temp(FAR struct thermal_zone_device_s *zdev,
       s->temperature--;
     }
 
-  *temp = s->temperature;
+  *temp = s->temperature + (s->temp_jump ? 2 : -2);
+  s->temp_jump = !s->temp_jump;
   return OK;
 }
 
@@ -328,12 +347,20 @@ int thermal_dummy_init(void)
       therr("Dummy cpufreq driver init failed!\n");
       return ret;
     }
+#else
+  cdev = thermal_cooling_device_register("passive_dev", &g_dummy_passive,
+                                         &g_dummy_cooling_ops);
+  if (cdev == NULL)
+    {
+      therr("Register cooling device passive_dev failed!\n");
+      return -ENOTSUP;
+    }
 #endif /* CONFIG_THERMAL_DUMMY_CPUFREQ */
 
   /* Cooling Device */
 
   cdev = thermal_cooling_device_register("fan0", &g_dummy_fan0_data,
-                                         &g_dummy_fan0_ops);
+                                         &g_dummy_cooling_ops);
   if (cdev == NULL)
     {
       therr("Register cooling device fan0 failed!\n");
@@ -346,7 +373,7 @@ int thermal_dummy_init(void)
                                       &g_dummy_zone_ops, &g_dummy_params);
   if (zdev == NULL)
     {
-      therr("Register zone deivce failed!\n");
+      therr("Register zone device failed!\n");
       return -ENOTSUP;
     }
 

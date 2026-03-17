@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm/src/armv8-r/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -31,7 +33,7 @@ list(APPEND SRCS arm_head.S arm_vectors.S arm_saveusercontext.S)
 list(
   APPEND
   SRCS
-  arm_arch_timer.c
+  arm_timer.c
   arm_cache.c
   arm_cpuinfo.c
   arm_dataabort.c
@@ -39,16 +41,22 @@ list(
   arm_gicv3.c
   arm_initialstate.c
   arm_prefetchabort.c
-  arm_schedulesigaction.c
-  arm_sigdeliver.c
   arm_syscall.c
   arm_tcbinfo.c
   arm_undefinedinsn.c
   arm_perf.c
   cp15_cacheops.c)
 
+if(CONFIG_ENABLE_ALL_SIGNALS)
+  list(APPEND SRCS arm_schedulesigaction.c arm_sigdeliver.c)
+endif()
+
 if(CONFIG_ARCH_FPU)
   list(APPEND SRCS arm_fpucmp.c arm_fpuconfig.S)
+endif()
+
+if(CONFIG_ARCH_HIPRI_INTERRUPT)
+  list(APPEND SRCS arm_dofiq.c)
 endif()
 
 target_sources(arch PRIVATE ${SRCS})

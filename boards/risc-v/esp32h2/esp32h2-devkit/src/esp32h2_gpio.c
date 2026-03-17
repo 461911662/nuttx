@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/risc-v/esp32h2/esp32h2-devkit/src/esp32h2_gpio.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,6 +44,9 @@
 /* Arch */
 
 #include "espressif/esp_gpio.h"
+#ifdef CONFIG_ESPRESSIF_DEDICATED_GPIO
+#include "espressif/esp_dedic_gpio.h"
+#endif
 
 /* Board */
 
@@ -72,6 +77,14 @@
  */
 
 #define GPIO_IRQPIN  9
+
+/* Dedicated GPIO pins. GPIO4 and GPIO5 is used as an example, any other
+ * GPIOs could be used.
+ */
+
+#define GPIO_DEDIC1       4
+#define GPIO_DEDIC2       5
+#define GPIO_DEDIC_COUNT  2
 
 /****************************************************************************
  * Private Types
@@ -151,6 +164,33 @@ static const uint32_t g_gpiointinputs[BOARD_NGPIOINT] =
 };
 
 static struct espgpint_dev_s g_gpint[BOARD_NGPIOINT];
+#endif
+
+/* This array maps the GPIO pins used as Dedicated GPIO */
+
+#ifdef CONFIG_ESPRESSIF_DEDICATED_GPIO
+static const int g_gpioidedic[GPIO_DEDIC_COUNT] =
+{
+  GPIO_DEDIC1, GPIO_DEDIC2
+};
+
+static struct esp_dedic_gpio_flags_s dedic_gpio_flags =
+{
+  .input_enable = 1,
+  .invert_input_enable = 0,
+  .output_enable = 1,
+  .invert_output_enable = 0
+};
+
+struct esp_dedic_gpio_config_s dedic_gpio_conf =
+{
+  .gpio_array = g_gpioidedic,
+  .array_size = GPIO_DEDIC_COUNT,
+  .flags = &dedic_gpio_flags,
+  .path = "/dev/dedic_gpio0"
+};
+
+struct file *dedicated_gpio = NULL;
 #endif
 
 /****************************************************************************
@@ -345,22 +385,26 @@ static int gpint_attach(struct gpio_dev_s *dev,
 {
   struct espgpint_dev_s *espgpint =
     (struct espgpint_dev_s *)dev;
-  int irq = ESP_PIN2IRQ(g_gpiointinputs[espgpint->espgpio.id]);
   int ret;
 
   gpioinfo("Attaching the callback\n");
 
   /* Make sure the interrupt is disabled */
 
-  esp_gpioirqdisable(irq);
-  ret = irq_attach(irq,
-                   espgpio_interrupt,
-                   &g_gpint[espgpint->espgpio.id]);
+  esp_gpioirqdisable(g_gpiointinputs[espgpint->espgpio.id]);
+
+  ret = esp_gpio_irq(g_gpiointinputs[espgpint->espgpio.id],
+                     espgpio_interrupt,
+                     &g_gpint[espgpint->espgpio.id]);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: gpint_attach() failed: %d\n", ret);
       return ret;
     }
+
+  /* Make sure the interrupt is disabled */
+
+  esp_gpioirqdisable(g_gpiointinputs[espgpint->espgpio.id]);
 
   gpioinfo("Attach %p\n", callback);
   espgpint->callback = callback;
@@ -385,7 +429,6 @@ static int gpint_attach(struct gpio_dev_s *dev,
 static int gpint_enable(struct gpio_dev_s *dev, bool enable)
 {
   struct espgpint_dev_s *espgpint = (struct espgpint_dev_s *)dev;
-  int irq = ESP_PIN2IRQ(g_gpiointinputs[espgpint->espgpio.id]);
 
   if (enable)
     {
@@ -395,13 +438,13 @@ static int gpint_enable(struct gpio_dev_s *dev, bool enable)
 
           /* Configure the interrupt for rising edge */
 
-          esp_gpioirqenable(irq, RISING);
+          esp_gpioirqenable(g_gpiointinputs[espgpint->espgpio.id]);
         }
     }
   else
     {
       gpioinfo("Disable the interrupt\n");
-      esp_gpioirqdisable(irq);
+      esp_gpioirqdisable(g_gpiointinputs[espgpint->espgpio.id]);
     }
 
   return OK;
@@ -434,11 +477,11 @@ static int gpint_setpintype(struct gpio_dev_s *dev,
     {
       case GPIO_INTERRUPT_HIGH_PIN:
         esp_configgpio(g_gpiointinputs[espgpint->espgpio.id],
-                       INPUT_PULLUP);
+                       INPUT_PULLUP | FALLING);
         break;
       case GPIO_INTERRUPT_LOW_PIN:
         esp_configgpio(g_gpiointinputs[espgpint->espgpio.id],
-                       INPUT_PULLDOWN);
+                       INPUT_PULLDOWN | RISING);
         break;
       default:
         return ERROR;
@@ -482,7 +525,7 @@ int esp_gpio_init(void)
       /* Configure the pins that will be used as output */
 
       esp_gpio_matrix_out(g_gpiooutputs[i], SIG_GPIO_OUT_IDX, 0, 0);
-      esp_configgpio(g_gpiooutputs[i], OUTPUT_FUNCTION_1 | INPUT_FUNCTION_1);
+      esp_configgpio(g_gpiooutputs[i], OUTPUT_FUNCTION_2 | INPUT_FUNCTION_2);
       esp_gpiowrite(g_gpiooutputs[i], 0);
 
       pincount++;
@@ -499,12 +542,21 @@ int esp_gpio_init(void)
       g_gpint[i].espgpio.id              = i;
       gpio_pin_register(&g_gpint[i].espgpio.gpio, pincount);
 
-      /* Configure the pins that will be used as interrupt input */
+      /* Configure the pins that will be used as interrupt input with
+       * falling edge.
+       */
 
-      esp_configgpio(g_gpiointinputs[i], INPUT_FUNCTION_1 | PULLDOWN);
+      esp_configgpio(g_gpiointinputs[i],
+                     INPUT_FUNCTION_2 | PULLUP | FALLING);
 
       pincount++;
     }
+#endif
+
+#ifdef CONFIG_ESPRESSIF_DEDICATED_GPIO
+  dedicated_gpio = esp_dedic_gpio_new_bundle(&dedic_gpio_conf);
+
+  pincount++;
 #endif
 
   return OK;

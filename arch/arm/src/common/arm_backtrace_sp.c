@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/common/arm_backtrace_sp.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -33,7 +35,7 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-/* Macro and definitions for simple decoding of instuctions.
+/* Macro and definitions for simple decoding of instructions.
  * To check an instruction, it is ANDed with the IMASK_ and
  * the result is compared with the IOP_. The macro INSTR_IS
  * does this and returns !0 to indicate a match.
@@ -277,7 +279,7 @@ int up_backtrace(struct tcb_s *tcb,
               ret += backtrace_branch((unsigned long)
                                       rtcb->stack_base_ptr +
                                       rtcb->adj_stack_size,
-                                      up_current_regs()[REG_SP],
+                                      ((uint32_t *)running_regs())[REG_SP],
                                       &buffer[ret],
                                       size - ret, &skip);
             }

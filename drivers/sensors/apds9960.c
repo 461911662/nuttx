@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/apds9960.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /* Character driver for the APDS9960 Gesture Sensor
  *
@@ -45,14 +60,6 @@
 #include <nuttx/sensors/apds9960.h>
 
 #if defined(CONFIG_I2C) && defined(CONFIG_SENSORS_APDS9960)
-
-/****************************************************************************
- * Pre-process Definitions
- ****************************************************************************/
-
-#ifndef CONFIG_APDS9960_I2C_FREQUENCY
-#  define CONFIG_APDS9960_I2C_FREQUENCY 400000
-#endif
 
 /****************************************************************************
  * Private Types
@@ -991,7 +998,7 @@ static int apds9960_readgesture(FAR struct apds9960_dev_s *priv)
     {
       /* Wait some time to collect next batch of FIFO data */
 
-      nxsig_usleep(FIFO_PAUSE_TIME);
+      nxsched_usleep(FIFO_PAUSE_TIME);
 
       /* Get the contents of the STATUS register. Is data still valid? */
 
@@ -1087,7 +1094,7 @@ static int apds9960_readgesture(FAR struct apds9960_dev_s *priv)
         {
           /* Determine best guessed gesture and clean up */
 
-          nxsig_usleep(FIFO_PAUSE_TIME);
+          nxsched_usleep(FIFO_PAUSE_TIME);
           apds9960_decodegesture(priv);
           motion = priv->gesture_motion;
 
@@ -1232,7 +1239,7 @@ int apds9960_register(FAR const char *devpath,
 
   /* Wait 100ms */
 
-  nxsig_usleep(100000);
+  nxsched_usleep(100000);
 
   /* Initialize the device (leave RESET) */
 

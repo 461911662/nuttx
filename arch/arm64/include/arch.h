@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/include/arch.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,14 +38,13 @@
 #  include <stddef.h>
 #endif
 
+#include <nuttx/irq.h>
+
 /****************************************************************************
  * Pre-processor Prototypes
  ****************************************************************************/
 
 #ifdef CONFIG_ARCH_ADDRENV
-#if CONFIG_MM_PGSIZE != 4096
-#  error Only pages sizes of 4096 are currently supported (CONFIG_ARCH_ADDRENV)
-#endif
 
 /* All implementations have 4 levels of page tables */
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/mpfs/mpfs_emmcsd.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -403,6 +405,7 @@ struct mpfs_dev_s g_emmcsd_dev =
   },
   .hw_base           = MPFS_EMMC_SD_BASE,
   .plic_irq          = MPFS_IRQ_MMC_MAIN,
+  .lock              = SP_UNLOCKED,
 #ifdef CONFIG_MPFS_EMMCSD_MUX_EMMC
   .emmc              = true,
 #else
@@ -614,13 +617,13 @@ static void mpfs_configwaitints(struct mpfs_dev_s *priv, uint32_t waitmask,
    * operation.
    */
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->lock);
 
   priv->waitevents = waitevents;
   priv->wkupevent  = wkupevent;
   priv->waitmask   = waitmask;
 
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 /****************************************************************************
@@ -642,14 +645,12 @@ static void mpfs_configxfrints(struct mpfs_dev_s *priv, uint32_t xfrmask)
 {
   irqstate_t flags;
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->lock);
   priv->xfrmask = xfrmask;
-
-  mcinfo("Mask: %08" PRIx32 "\n", priv->xfrmask | priv->waitmask);
 
   putreg32(priv->xfrmask | priv->waitmask, MPFS_EMMCSD_SRS14);
 
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
 }
 
 /****************************************************************************
@@ -985,6 +986,20 @@ static int mpfs_emmcsd_interrupt(int irq, void *context, void *arg)
 
   DEBUGASSERT(priv != NULL);
 
+#ifdef CONFIG_SPINLOCK
+  spin_lock(&priv->lock);
+
+  /* Check if any of the interrupt sources are even enabled */
+
+  if (priv->xfrmask == 0 && priv->waitmask == 0 && priv->xfr_blkmask == 0)
+    {
+      spin_unlock(&priv->lock);
+      return OK;
+    }
+
+  spin_unlock(&priv->lock);
+#endif
+
   status = getreg32(MPFS_EMMCSD_SRS12);
 
   mcinfo("status: %08" PRIx32 "\n", status);
@@ -1283,7 +1298,7 @@ static void mpfs_set_sdhost_power(struct mpfs_dev_s *priv, uint32_t voltage)
         DEBUGPANIC();
     }
 
-  nxsig_usleep(1000);
+  nxsched_usleep(1000);
 }
 
 /****************************************************************************
@@ -1406,7 +1421,6 @@ static void mpfs_emmc_card_init(struct mpfs_dev_s *priv)
 static bool mpfs_device_reset(struct sdio_dev_s *dev)
 {
   struct mpfs_dev_s *priv = (struct mpfs_dev_s *)dev;
-  irqstate_t flags;
   uint32_t regval;
   uint32_t cap;
 #ifdef CONFIG_MPFS_EMMCSD_CD
@@ -1414,8 +1428,6 @@ static bool mpfs_device_reset(struct sdio_dev_s *dev)
 #endif
   bool retval = true;
   int status = MPFS_EMMCSD_INITIALIZED;
-
-  flags = enter_critical_section();
 
   up_disable_irq(priv->plic_irq);
 
@@ -1471,13 +1483,13 @@ static bool mpfs_device_reset(struct sdio_dev_s *dev)
   modifyreg32(MPFS_SYSREG_SOFT_RESET_CR,
               SYSREG_SOFT_RESET_CR_MMC, 0);
 
-  nxsig_sleep(1);
+  nxsched_sleep(1);
 
   /* Perform module-level reset */
 
   modifyreg32(MPFS_EMMCSD_HRS00, 0, MPFS_EMMCSD_HRS00_SWR);
 
-  nxsig_usleep(1000);
+  nxsched_usleep(1000);
 
   do
     {
@@ -1625,7 +1637,7 @@ static bool mpfs_device_reset(struct sdio_dev_s *dev)
       mpfs_setclkrate(priv, MPFS_MMC_CLOCK_400KHZ);
     }
 
-  nxsig_usleep(1000);
+  nxsched_usleep(1000);
 
   /* Reset data */
 
@@ -1644,8 +1656,6 @@ static bool mpfs_device_reset(struct sdio_dev_s *dev)
   priv->widebus    = false;
 
   mpfs_reset_lines(priv);
-
-  leave_critical_section(flags);
 
   return retval;
 }
@@ -2536,7 +2546,7 @@ static int mpfs_check_recverror(struct mpfs_dev_s *priv)
  * Input Parameters:
  *   dev    - An instance of the SDIO device interface
  *   cmd    - Command
- *   rshort - Buffer for reveiving the response
+ *   rshort - Buffer for receiving the response
  *
  * Returned Value:
  *   OK on success; a negated errno on failure.
@@ -2574,7 +2584,7 @@ static int mpfs_recvshortcrc(struct sdio_dev_s *dev, uint32_t cmd,
  * Input Parameters:
  *   dev    - An instance of the SDIO device interface
  *   cmd    - Command
- *   rshort - Buffer for reveiving the response
+ *   rshort - Buffer for receiving the response
  *
  * Returned Value:
  *   OK on success; a negated errno on failure.
@@ -2610,7 +2620,7 @@ static int mpfs_recvshort(struct sdio_dev_s *dev, uint32_t cmd,
  * Input Parameters:
  *   dev    - An instance of the SDIO device interface
  *   cmd    - Command
- *   rlong  - Buffer for reveiving the response
+ *   rlong  - Buffer for receiving the response
  *
  * Returned Value:
  *   OK on success; a negated errno on failure.
@@ -2771,8 +2781,18 @@ static sdio_eventset_t mpfs_eventwait(struct sdio_dev_s *dev)
 {
   struct mpfs_dev_s *priv = (struct mpfs_dev_s *)dev;
   sdio_eventset_t wkupevent = 0;
-  irqstate_t flags;
   int ret;
+
+#if defined(CONFIG_MMCSD_SDIOWAIT_WRCOMPLETE)
+  if ((priv->waitevents & SDIOWAIT_WRCOMPLETE) != 0)
+    {
+      /* Do not wait for SDIOWAIT_WRCOMPLETE as the SDIOWAIT_TRANSFERDONE
+       * event has already taken care of that part also.
+       */
+
+      return SDIOWAIT_WRCOMPLETE;
+    }
+#endif
 
   mcinfo("wait\n");
 
@@ -2780,8 +2800,6 @@ static sdio_eventset_t mpfs_eventwait(struct sdio_dev_s *dev)
    * we get here.  In this case waitevents will be zero, but wkupevents will
    * be non-zero (and, hopefully, the semaphore count will also be non-zero.
    */
-
-  flags = enter_critical_section();
 
   DEBUGASSERT(priv->waitevents != 0 || priv->wkupevent != 0);
 
@@ -2830,7 +2848,6 @@ static sdio_eventset_t mpfs_eventwait(struct sdio_dev_s *dev)
 errout_with_waitints:
   mpfs_configwaitints(priv, 0, 0, 0);
 
-  leave_critical_section(flags);
   return wkupevent;
 }
 
@@ -3051,7 +3068,7 @@ void mpfs_emmcsd_sdio_mediachange(struct sdio_dev_s *dev, bool cardinslot)
 
   /* Update card status */
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->lock);
   cdstatus = priv->cdstatus;
   if (cardinslot)
     {
@@ -3062,7 +3079,7 @@ void mpfs_emmcsd_sdio_mediachange(struct sdio_dev_s *dev, bool cardinslot)
       priv->cdstatus &= ~SDIO_STATUS_PRESENT;
     }
 
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
 
   mcinfo("cdstatus OLD: %02" PRIx8 " NEW: %02" PRIx8 "\n",
          cdstatus, priv->cdstatus);
@@ -3098,7 +3115,7 @@ void mpfs_emmcsd_sdio_wrprotect(struct sdio_dev_s *dev, bool wrprotect)
 
   /* Update card status */
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&priv->lock);
   if (wrprotect)
     {
       priv->cdstatus |= SDIO_STATUS_WRPROTECTED;
@@ -3108,7 +3125,5 @@ void mpfs_emmcsd_sdio_wrprotect(struct sdio_dev_s *dev, bool wrprotect)
       priv->cdstatus &= ~SDIO_STATUS_WRPROTECTED;
     }
 
-  mcinfo("cdstatus: %02" PRIx8 "\n", priv->cdstatus);
-
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&priv->lock, flags);
 }

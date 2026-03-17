@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/mnemofs/mnemofs.h
  *
+ * SPDX-License-Identifier: Apache-2.0 or BSD-3-Clause
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -97,6 +99,14 @@
 
 #define MFS_JRNL_LIM(sb)           (MFS_JRNL(sb).n_blks / 2)
 #define MFS_TRAVERSE_INITSZ        8
+
+#define MFS_LOG(fn, fmt, ...)          finfo("[mnemofs | " fn "] " fmt, ##__VA_ARGS__)
+#ifdef CONFIG_MNEMOFS_EXTRA_DEBUG
+#define MFS_EXTRA_LOG(fn, fmt, ...)    MFS_LOG(fn, fmt, ##__VA_ARGS__)
+#else
+#define MFS_EXTRA_LOG(fmt, ...)    { }
+#endif
+#define MFS_STRLITCMP(a, lit)      strncmp(a, lit, strlen(lit))
 
 /****************************************************************************
  * Public Types
@@ -201,7 +211,7 @@ struct mfs_sb_s
 
 /* This is for *dir VFS methods. */
 
-struct mfs_fsdirent
+struct mfs_fsdirent_s
 {
   struct fs_dirent_s    base; /* VFS directory structure */
   uint8_t               idx;  /* This only goes from 0 for ., 1 for .. and
@@ -277,9 +287,9 @@ struct mfs_dirent_s
 
 struct mfs_pitr_s
 {
-  struct mfs_path_s p;     /* Parent representation */
+  struct mfs_path_s p;     /* Parent's path representation */
   mfs_t             depth;
-  mfs_t             c_off; /* Current offset. */
+  mfs_t             c_off; /* Current iteration offset. */
 };
 
 /* TODO: depth >= 1 */
@@ -328,73 +338,129 @@ static mfs_t inline mfs_blkremsz(FAR const struct mfs_sb_s * const sb,
 static inline mfs_t mfs_ctz(const uint32_t x)
 {
   if (predict_false(x == 0))
-  {
-/* Special case, since we're using this for the CTZ skip list. The 0th
- * block has no pointers.
- */
+    {
+      /* Special case, since we're using this for the CTZ skip list. The 0th
+       * block has no pointers.
+       */
 
-    return 0;
-  }
-
+      return 0;
+    }
 #if defined(__GNUC__)
   return __builtin_ctz(x);
 #else
   uint32_t c;
 
-/* Credits:
- * http://graphics.stanford.edu/~seander/bithacks.html#ZerosOnRightBinSearch
- */
+  /* Credits:
+   * http://graphics.stanford.edu/~seander/bithacks.html
+   * #ZerosOnRightBinSearch
+   */
 
   if (x & 0x1)
-  {
-    /* special case for odd x (assumed to happen half of the time) */
+    {
+      /* special case for odd x (assumed to happen half of the time) */
 
-    c = 0;
-  }
+      c = 0;
+    }
   else
-  {
-    c = 1;
-    if ((x & 0xffff) == 0)
     {
-      x >>= 16;
-      c += 16;
+      c = 1;
+      if ((x & 0xffff) == 0)
+        {
+          x >>= 16;
+          c += 16;
+        }
+
+      if ((x & 0xff) == 0)
+        {
+          x >>= 8;
+          c += 8;
+        }
+
+      if ((x & 0xf) == 0)
+        {
+          x >>= 4;
+          c += 4;
+        }
+
+      if ((x & 0x3) == 0)
+        {
+          x >>= 2;
+          c += 2;
+        }
+
+      c -= x & 0x1;
     }
-    if ((x & 0xff) == 0)
-    {
-      x >>= 8;
-      c += 8;
-    }
-    if ((x & 0xf) == 0)
-    {
-      x >>= 4;
-      c += 4;
-    }
-    if ((x & 0x3) == 0)
-    {
-      x >>= 2;
-      c += 2;
-    }
-    c -= x & 0x1;
-  }
+
   return c;
 #endif
 }
 
+/****************************************************************************
+ * Name: mfs_clz
+ *
+ * Description:
+ *   Count Leading Zeros. Returns the number of leading zeros in a 32-bit
+ *   integer.
+ *
+ * Input Parameters:
+ *   x - 32-bit integer to check.
+ *
+ * Returned Value:
+ *   The number of leading zeros.
+ *
+ ****************************************************************************/
+
 static inline mfs_t mfs_clz(const uint32_t x)
 {
   if (predict_false(x == UINT32_MAX))
-  {
-/* Special case, since we're using this for the CTZ skip list. The 0th
- * block has no pointers.
- */
+    {
+      /* Special case, since we're using this for the CTZ skip list. The 0th
+       * block has no pointers.
+       */
 
-    return 0;
-  }
-
+      return 0;
+    }
 #if defined(__GNUC__)
   return __builtin_clz(x);
 #else
-  return 0; /* TODO */
+  uint32_t n = 0;
+  uint32_t x_tmp = x;
+
+  if (x_tmp == 0)
+    {
+      return 32;
+    }
+
+  if (x_tmp <= 0x0000ffff)
+    {
+      n += 16;
+      x_tmp <<= 16;
+    }
+
+  if (x_tmp <= 0x00ffffff)
+    {
+      n += 8;
+      x_tmp <<= 8;
+    }
+
+  if (x_tmp <= 0x0fffffff)
+    {
+      n += 4;
+      x_tmp <<= 4;
+    }
+
+  if (x_tmp <= 0x3fffffff)
+    {
+      n += 2;
+      x_tmp <<= 2;
+    }
+
+  if (x_tmp <= 0x7fffffff)
+    {
+      n += 1;
+    }
+
+  return n;
 #endif
 }
 
@@ -416,6 +482,86 @@ static inline mfs_t mfs_popcnt(mfs_t x)
 #endif
 }
 
+static inline void MFS_EXTRA_LOG_DIRENT(FAR const struct mfs_dirent_s * const
+                                        dirent)
+{
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "Direntry details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tDirent location %p", dirent);
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tMode is %" PRIu16, dirent->mode);
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tName is \"%.*s\"", dirent->namelen,
+                dirent->name);
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tNamelen is %" PRIu32,
+                dirent->namelen);
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tName Hash is %" PRIu16,
+                dirent->name_hash);
+  MFS_EXTRA_LOG("EXTRA_LOG_DIRENT", "\tSize is %" PRIu16,
+                dirent->sz);
+
+  /* TODO: Timespecs */
+}
+
+static inline void MFS_EXTRA_LOG_FSDIRENT(FAR const struct mfs_fsdirent_s *
+                                          const fsdirent)
+{
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "FS Direntry details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "\tDirentry depth %" PRIu32,
+                fsdirent->depth);
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "\tRead index %" PRIu32,
+                fsdirent->idx);
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "\tPath %p.", fsdirent->path);
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "\tPitr %p.", fsdirent->pitr);
+  MFS_EXTRA_LOG("EXTRA_LOG_FSDIRENT", "\tDepth %" PRIu32, fsdirent->depth);
+}
+
+static inline void MFS_EXTRA_LOG_PITR(FAR const struct mfs_pitr_s * const
+                                      pitr)
+{
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "Pitr details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "\tDepth %" PRIu32, pitr->depth);
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "\tCurrent Offset %" PRIu32, pitr->c_off);
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "\tParent CTZ (%" PRIu32 ", %" PRIu32 ")",
+                pitr->p.ctz.idx_e, pitr->p.ctz.pg_e);
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "\tParent Size %" PRIu32, pitr->p.sz);
+  MFS_EXTRA_LOG("EXTRA_LOG_PITR", "\tParent Offset %" PRIu32, pitr->p.off);
+}
+
+static inline void MFS_EXTRA_LOG_MN(FAR const struct mfs_mn_s * const mn)
+{
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "Master node details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "\tFirst journal block is %" PRIu32,
+                mn->jrnl_blk);
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "\tNext MN entry index %" PRIu32,
+                mn->mblk_idx);
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "\tRoot CTZ (%" PRIu32 ", %" PRIu32 ")",
+                mn->root_ctz.idx_e, mn->root_ctz.pg_e);
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "\tRoot Size %" PRIu32, mn->root_sz);
+  MFS_EXTRA_LOG("EXTRA_LOG_MN", "\tRoot Mode is %u.", mn->root_mode);
+
+  /* TODO: Timespecs */
+}
+
+static inline void MFS_EXTRA_LOG_F(FAR struct mfs_ofd_s *f)
+{
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "File structure details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\tList details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tPrevious node %p.", f->list.prev);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tNext node %p.", f->list.next);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\tCommon structure details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tDepth: %" PRIu32, f->com->depth);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tNew Entry: %s.",
+                f->com->new_ent ? "true" : "false");
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tOffset: %" PRIu32, f->com->off);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tFlags: 0x%x.", f->com->oflags);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tReference Counter: %" PRIu8,
+                f->com->refcount);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tFile Size: %" PRIu32, f->com->sz);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\tPath details.");
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\t\tOffset: %" PRIu32, f->com->path->off);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\t\tSize: %" PRIu32, f->com->path->sz);
+  MFS_EXTRA_LOG("EXTRA_LOG_F", "\t\t\tCTZ (%" PRIu32 ", %" PRIu32 ").",
+                f->com->path->ctz.idx_e, f->com->path->ctz.pg_e);
+}
+
 /****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
@@ -430,7 +576,7 @@ int mnemofs_flush(FAR struct mfs_sb_s *sb);
  * Name: mfs_jrnl_init
  *
  * Description:
- *   Initialize journal if device is already formatted.
+ *   Initializes journal when it's already formatted into the device.
  *
  * Input Parameters:
  *   sb  - Superblock instance of the device.
@@ -439,6 +585,9 @@ int mnemofs_flush(FAR struct mfs_sb_s *sb);
  * Returned Value:
  *   0   - OK
  *   < 0 - Error
+ *
+ * Assumptions/Limitations:
+ *   Does not initialize the master node.
  *
  ****************************************************************************/
 
@@ -463,6 +612,8 @@ int mfs_jrnl_init(FAR struct mfs_sb_s * const sb, mfs_t blk);
  *   If blk1 == 0 and blk2 == 0, this means that this will also format in the
  *   master blocks. If this is not satisfied, the provided values will be
  *   taken to denote the master nodes.
+ *
+ *   Does not format the master node.
  *
  ****************************************************************************/
 
@@ -946,10 +1097,6 @@ int mfs_erase_nblks(FAR const struct mfs_sb_s * const sb, const off_t blk,
  *
  ****************************************************************************/
 
-uint8_t mfs_arrhash(FAR const char *arr, ssize_t len);
-
-/* TODO: Put below in place of above. */
-
 uint16_t mfs_hash(FAR const char *arr, ssize_t len);
 
 /****************************************************************************
@@ -1009,10 +1156,10 @@ FAR char *mfs_ser_str(FAR const char * const str, const mfs_t len,
  * Name: mfs_deser_str
  *
  * Description:
- *   Deserialize a string from intput.
+ *   Deserialize a string from input.
  *
  * Input Parameters:
- *   in  - Intput array from where to deserialize.
+ *   in  - Input array from where to deserialize.
  *   str - String to deserialize
  *   len - Length of string
  *
@@ -1265,7 +1412,7 @@ int mfs_ctz_wrtnode(FAR struct mfs_sb_s * const sb,
  *   number of index `idx_dest`.
  *
  *   The source is preferably the last CTZ block in the CTZ list, but it can
- *   realistically be any CTZ block in the CTZ list whos position is known.
+ *   realistically be any CTZ block in the CTZ list whose position is known.
  *   However, `idx_dest <= idx_src` has to be followed. Takes O(log(n))
  *   complexity to travel.
  *
@@ -1378,10 +1525,10 @@ int mfs_lru_rdfromoff(FAR const struct mfs_sb_s * const sb,
                       FAR char *buf, const mfs_t buflen);
 
 /****************************************************************************
- * Name: mfs_lru_updatedinfo
+ * Name: mfs_lru_getupdatedinfo
  *
  * Description:
- *   Update information of the path.
+ *   Update information of the path from the LRU.
  *
  * Input Parameters:
  *   sb       - Superblock instance of the device.
@@ -1393,9 +1540,9 @@ int mfs_lru_rdfromoff(FAR const struct mfs_sb_s * const sb,
  *
  ****************************************************************************/
 
-int mfs_lru_updatedinfo(FAR const struct mfs_sb_s * const sb,
-                        FAR struct mfs_path_s * const path,
-                        const mfs_t depth);
+int mfs_lru_getupdatedinfo(FAR const struct mfs_sb_s * const sb,
+                           FAR struct mfs_path_s * const path,
+                           const mfs_t depth);
 
 /****************************************************************************
  * Name: mfs_lru_updatectz
@@ -1476,7 +1623,7 @@ int mfs_mn_fmt(FAR struct mfs_sb_s * const sb, const mfs_t blk1,
  * Input Parameters:
  *   sb      - Superblock instance of the device.
  *   root    - New location of the root of the file system.
- *   root_sz - New size of the CTZ list of the root of the file syste.
+ *   root_sz - New size of the CTZ list of the root of the file system.
  *
  * Returned Value:
  *   0   - OK
@@ -1557,8 +1704,8 @@ mfs_t mfs_get_fsz(FAR struct mfs_sb_s * const sb,
  *
  * Assumptions/Limitations:
  *   This allocates the `path` array in heap, and transfers the ownership
- *   of this array to the caller. It's the caller's reponsibility to use this
- *   with `mfs_free_patharr`.
+ *   of this array to the caller. It's the caller's responsibility to use
+ *   this with `mfs_free_patharr`.
  *
  ****************************************************************************/
 

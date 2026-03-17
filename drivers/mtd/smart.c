@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/mtd/smart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -2882,7 +2884,7 @@ static int smart_relocate_static_data(FAR struct smart_struct_s *dev,
 
       x = minblock;
 
-      /* We are resuing nextsector and newsector variables here simply as
+      /* We are reusing nextsector and newsector variables here simply as
        * variables for displaying debug data.  I have learned through my
        * years of programming that this is a really good way to create
        * spaghetti code, but I didn't want to add stack variables just
@@ -5310,7 +5312,7 @@ static inline int smart_allocsector(FAR struct smart_struct_s *dev,
 
       if (allocsect == NULL)
         {
-          ferr("ERROR: Out of memory allocting sector\n");
+          ferr("ERROR: Out of memory allocating sector\n");
           return -ENOMEM;
         }
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/vhost/vhost.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,12 +32,13 @@
 #include <nuttx/vhost/vhost.h>
 
 #include "vhost-rng.h"
+#include "vhost-rpmsg.h"
 
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define VHOST_DEFERED_PROBE_PERIOD 100
+#define VHOST_DEFERED_PROBE_PERIOD MSEC2TICK(100)
 
 /****************************************************************************
  * Private Types
@@ -45,9 +48,9 @@ struct vhost_bus_s
 {
   mutex_t          lock;           /* Lock for the list */
   struct list_node device;         /* Wait match vhost device list */
-  struct list_node defered_device; /* Defered vhost device list */
+  struct list_node defered_device; /* Deferred vhost device list */
   struct list_node driver;         /* Vhost driver list */
-  struct work_s    defered_work;   /* Defered probe work */
+  struct work_s    defered_work;   /* Deferred probe work */
 };
 
 struct vhost_device_item_s
@@ -81,8 +84,15 @@ static struct vhost_bus_s g_vhost_bus =
 
 static bool vhost_status_driver_ok(FAR struct vhost_device *hdev)
 {
-  uint8_t status = vhost_get_status(hdev);
   bool driver_ok = false;
+  uint8_t status;
+  int ret;
+
+  ret = vhost_get_status(hdev, &status);
+  if (ret)
+    {
+      return driver_ok;
+    }
 
   /* Busy wait until the remote is ready */
 
@@ -153,6 +163,52 @@ static void vhost_defered_probe_work(FAR void *arg)
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: vhost_get_vq_buf
+ ****************************************************************************/
+
+int vhost_get_vq_buffers(FAR struct virtqueue *vq,
+                         FAR struct virtqueue_buf *vb, size_t vbsize,
+                         FAR size_t *vbcnt)
+{
+  FAR void *buf;
+  uint16_t head;
+  uint16_t idx;
+  uint32_t len;
+  size_t i;
+
+  DEBUGASSERT(vb != NULL && vbsize >= 1 && vbcnt != NULL);
+
+  buf = virtqueue_get_first_avail_buffer(vq, &head, &len);
+  if (buf == NULL)
+    {
+      return -ENOMEM;
+    }
+
+  vb[0].buf = buf;
+  vb[0].len = len;
+
+  for (i = 1, idx = head; ; i++)
+    {
+      buf = virtqueue_get_next_avail_buffer(vq, idx, &idx, &len);
+      if (buf == NULL)
+        {
+          break;
+        }
+      else if (i >= vbsize)
+        {
+          vhosterr("vbsize %zu is not enough\n", vbsize);
+          return -EINVAL;
+        }
+
+      vb[i].buf = buf;
+      vb[i].len = len;
+    }
+
+  *vbcnt = i;
+  return head;
+}
 
 /****************************************************************************
  * Name: vhost_register_driver
@@ -266,7 +322,7 @@ int vhost_register_device(FAR struct vhost_device *device)
       return ret;
     }
 
-  /* 1. Add device to defered device list if virtio driver not OK;
+  /* 1. Add device to deferred device list if virtio driver not OK;
    * 2. Add device to the normal device list and try to probe the driver
    *    if virtio driver has been OK.
    */
@@ -385,6 +441,14 @@ void vhost_register_drivers(void)
   if (ret < 0)
     {
       vhosterr("vhost_register_rng_driver failed, ret=%d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_DRIVERS_VHOST_RPMSG
+  ret = vhost_register_rpmsg_driver();
+  if (ret < 0)
+    {
+      vhosterr("vhost_register_rpmsg_driver failed, ret=%d\n", ret);
     }
 #endif
 

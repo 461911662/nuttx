@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/sensor.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,14 +33,16 @@
 #include <assert.h>
 #include <errno.h>
 #include <debug.h>
+#include <libgen.h>
 
 #include <poll.h>
 #include <fcntl.h>
 #include <nuttx/list.h>
 #include <nuttx/kmalloc.h>
-#include <nuttx/mm/circbuf.h>
+#include <nuttx/circbuf.h>
 #include <nuttx/mutex.h>
 #include <nuttx/sensors/sensor.h>
+#include <nuttx/lib/lib.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -47,8 +51,7 @@
 /* Device naming ************************************************************/
 
 #define ROUND_DOWN(x, y)    (((x) / (y)) * (y))
-#define DEVNAME_FMT         "/dev/uorb/sensor_%s%s%d"
-#define DEVNAME_UNCAL       "_uncal"
+#define DEVNAME_FMT         "/dev/uorb/sensor_%s%d"
 #define TIMING_BUF_ESIZE    (sizeof(uint32_t))
 
 /****************************************************************************
@@ -119,6 +122,7 @@ struct sensor_upperhalf_s
   struct circbuf_s   buffer;             /* The circular buffer of data */
   rmutex_t           lock;               /* Manages exclusive access to file operations */
   struct list_node   userlist;           /* List of users */
+  char               name[NAME_MAX];     /* Upper topic name */
 };
 
 /****************************************************************************
@@ -165,16 +169,16 @@ static const struct sensor_meta_s g_sensor_meta[] =
   {sizeof(struct sensor_gyro),                "gyro"},
   {sizeof(struct sensor_light),               "light"},
   {sizeof(struct sensor_baro),                "baro"},
-  {sizeof(struct sensor_noise),               "noise"},
+  {sizeof(struct sensor_temp),                "temp"},
   {sizeof(struct sensor_prox),                "prox"},
   {sizeof(struct sensor_rgb),                 "rgb"},
   {sizeof(struct sensor_accel),               "linear_accel"},
   {sizeof(struct sensor_rotation),            "rotation"},
   {sizeof(struct sensor_humi),                "humi"},
-  {sizeof(struct sensor_temp),                "temp"},
-  {sizeof(struct sensor_pm25),                "pm25"},
+  {sizeof(struct sensor_temp),                "ambient_temp"},
+  {sizeof(struct sensor_mag_uncal),           "mag_uncal"},
   {sizeof(struct sensor_pm1p0),               "pm1p0"},
-  {sizeof(struct sensor_pm10),                "pm10"},
+  {sizeof(struct sensor_gyro_uncal),          "gyro_uncal"},
   {sizeof(struct sensor_event),               "motion_detect"},
   {sizeof(struct sensor_event),               "step_detector"},
   {sizeof(struct sensor_step_counter),        "step_counter"},
@@ -193,7 +197,7 @@ static const struct sensor_meta_s g_sensor_meta[] =
   {sizeof(struct sensor_force),               "force"},
   {sizeof(struct sensor_hall),                "hall"},
   {sizeof(struct sensor_event),               "offbody_detector"},
-  {sizeof(struct sensor_uv),                  "uv"},
+  {sizeof(struct sensor_accel_uncal),         "accel_uncal"},
   {sizeof(struct sensor_angle),               "hinge_angle"},
   {sizeof(struct sensor_ir),                  "ir"},
   {sizeof(struct sensor_hcho),                "hcho"},
@@ -211,6 +215,12 @@ static const struct sensor_meta_s g_sensor_meta[] =
   {sizeof(struct sensor_gnss_measurement),    "gnss_measurement"},
   {sizeof(struct sensor_gnss_clock),          "gnss_clock"},
   {sizeof(struct sensor_gnss_geofence_event), "gnss_geofence_event"},
+  {sizeof(struct sensor_velocity),            "velocity"},
+  {sizeof(struct sensor_noise),               "noise"},
+  {sizeof(struct sensor_pm25),                "pm25"},
+  {sizeof(struct sensor_pm10),                "pm10"},
+  {sizeof(struct sensor_uv),                  "uv"},
+  {sizeof(struct sensor_eng),                 "eng"},
 };
 
 static const struct file_operations g_sensor_fops =
@@ -252,6 +262,8 @@ static int sensor_update_interval(FAR struct file *filep,
   uint32_t min_interval = interval;
   uint32_t min_latency = interval != UINT32_MAX ?
                          user->state.latency : UINT32_MAX;
+  uint32_t orig_min_interval;
+  uint32_t orig_min_latency;
   int ret = 0;
 
   if (interval == user->state.interval)
@@ -259,6 +271,8 @@ static int sensor_update_interval(FAR struct file *filep,
       return 0;
     }
 
+  nxrmutex_lock(&upper->lock);
+again:
   list_for_every_entry(&upper->userlist, tmp, struct sensor_user_s, node)
     {
       if (tmp == user || tmp->state.interval == UINT32_MAX)
@@ -283,6 +297,8 @@ static int sensor_update_interval(FAR struct file *filep,
           min_interval != upper->state.min_interval)
         {
           uint32_t expected_interval = min_interval;
+          orig_min_interval = upper->state.min_interval;
+          nxrmutex_unlock(&upper->lock);
           ret = lower->ops->set_interval(lower, filep, &min_interval);
           if (ret < 0)
             {
@@ -291,6 +307,18 @@ static int sensor_update_interval(FAR struct file *filep,
           else if (min_interval > expected_interval)
             {
               return -EINVAL;
+            }
+
+          nxrmutex_lock(&upper->lock);
+          sminfo(upper->name, "update interval %" PRIu32, min_interval);
+
+          /* The upper min_interval is updated by other threads, set to
+           * driver again to avoid race condition.
+           */
+
+          if (orig_min_interval != upper->state.min_interval)
+            {
+              goto again;
             }
         }
 
@@ -303,9 +331,23 @@ static int sensor_update_interval(FAR struct file *filep,
           (min_latency != upper->state.min_latency ||
           (min_interval != upper->state.min_interval && min_latency)))
         {
+          orig_min_latency = upper->state.min_latency;
+          nxrmutex_unlock(&upper->lock);
           ret = lower->ops->batch(lower, filep, &min_latency);
+          nxrmutex_lock(&upper->lock);
+
+          /* The upper min_latency is updated by other threads, set to
+           * driver again to avoid race condition.
+           */
+
+          if (orig_min_latency != upper->state.min_latency)
+            {
+              goto again;
+            }
+
           if (ret >= 0)
             {
+              sminfo(upper->name, "update batch %" PRIu32, min_latency);
               upper->state.min_latency = min_latency;
             }
         }
@@ -314,6 +356,7 @@ static int sensor_update_interval(FAR struct file *filep,
   upper->state.min_interval = min_interval;
   user->state.interval = interval;
   sensor_pollnotify(upper, POLLPRI, SENSOR_ROLE_WR);
+  nxrmutex_unlock(&upper->lock);
   return ret;
 }
 
@@ -325,6 +368,7 @@ static int sensor_update_latency(FAR struct file *filep,
   FAR struct sensor_lowerhalf_s *lower = upper->lower;
   FAR struct sensor_user_s *tmp;
   uint32_t min_latency = latency;
+  uint32_t orig_min_latency;
   int ret = 0;
 
   if (latency == user->state.latency)
@@ -338,6 +382,8 @@ static int sensor_update_latency(FAR struct file *filep,
       return 0;
     }
 
+  nxrmutex_lock(&upper->lock);
+again:
   if (latency <= upper->state.min_latency)
     {
       goto update;
@@ -365,22 +411,78 @@ update:
   if (min_latency == upper->state.min_latency)
     {
       user->state.latency = latency;
+      nxrmutex_unlock(&upper->lock);
       return ret;
     }
 
   if (lower->ops->batch)
     {
+      orig_min_latency = upper->state.min_latency;
+      nxrmutex_unlock(&upper->lock);
       ret = lower->ops->batch(lower, filep, &min_latency);
       if (ret < 0)
         {
           return ret;
+        }
+
+      sminfo(upper->name, "update batch %" PRIu32, min_latency);
+      nxrmutex_lock(&upper->lock);
+
+      /* The upper min_latency is updated by other threads, set to
+       * driver again to avoid race condition.
+       */
+
+      if (orig_min_latency != upper->state.min_latency)
+        {
+          goto again;
         }
     }
 
   upper->state.min_latency = min_latency;
   user->state.latency = latency;
   sensor_pollnotify(upper, POLLPRI, SENSOR_ROLE_WR);
+  nxrmutex_unlock(&upper->lock);
   return ret;
+}
+
+static void sensor_update_nonwakeup(FAR struct file *filep,
+                                    FAR struct sensor_upperhalf_s *upper,
+                                    FAR struct sensor_user_s *user,
+                                    bool nonwakeup)
+{
+  FAR struct sensor_lowerhalf_s *lower = upper->lower;
+
+  if (nonwakeup == user->state.nonwakeup)
+    {
+      return;
+    }
+
+  user->state.nonwakeup = nonwakeup;
+  nxrmutex_lock(&upper->lock);
+  list_for_every_entry(&upper->userlist, user, struct sensor_user_s,
+                       node)
+    {
+      if (!user->state.nonwakeup)
+        {
+          nonwakeup = false;
+          break;
+        }
+    }
+
+  if (nonwakeup != upper->state.nonwakeup)
+    {
+      upper->state.nonwakeup = nonwakeup;
+      sminfo(upper->name, "update nonwakeup %d", nonwakeup);
+      nxrmutex_unlock(&upper->lock);
+      if (lower->ops->set_nonwakeup)
+        {
+          lower->ops->set_nonwakeup(lower, filep, nonwakeup);
+        }
+    }
+  else
+    {
+      nxrmutex_unlock(&upper->lock);
+    }
 }
 
 static void sensor_generate_timing(FAR struct sensor_upperhalf_s *upper,
@@ -486,6 +588,9 @@ static ssize_t sensor_do_samples(FAR struct sensor_upperhalf_s *upper,
       circbuf_peekat(&upper->timing,
                      (user->bufferpos - 1) * TIMING_BUF_ESIZE,
                      &user->state.generation, TIMING_BUF_ESIZE);
+      smdebug(upper->name, "do sample interval:%" PRIu32 ", "
+              "user.generation:%" PRIu32 ", ret:%zd",
+              upper->state.generation, user->state.generation, ret);
       return ret;
     }
 
@@ -527,6 +632,10 @@ static ssize_t sensor_do_samples(FAR struct sensor_upperhalf_s *upper,
 
       delta = next_generation + generation -
               ((user->state.generation + user->state.interval) << 1);
+      smdebug(upper->name, "do sample interval:%" PRIu32 ", "
+              "generation:%" PRIu32 ", user generation:% "PRIu32 ", "
+              "next generation:%" PRIu32, user->state.interval,
+              generation, user->state.generation, next_generation);
       if (delta >= 0)
         {
           if (buffer != NULL)
@@ -606,7 +715,7 @@ static int sensor_open(FAR struct file *filep)
       goto errout_with_lock;
     }
 
-  if (lower->ops->open)
+  if ((filep->f_oflags & O_DIRECT) == 0 && lower->ops->open)
     {
       ret = lower->ops->open(lower, filep);
       if (ret < 0)
@@ -615,31 +724,32 @@ static int sensor_open(FAR struct file *filep)
         }
     }
 
-  if ((filep->f_oflags & O_DIRECT) == 0)
-    {
-      if (filep->f_oflags & O_RDOK)
-        {
-          if (upper->state.nsubscribers == 0 && lower->ops->activate)
-            {
-              ret = lower->ops->activate(lower, filep, true);
-              if (ret < 0)
-                {
-                  goto errout_with_open;
-                }
-            }
+  /* Using the O_DIRECT flag will prevent cross-core operations,
+   * allowing for direct I/O operations.
+   */
 
-          user->role |= SENSOR_ROLE_RD;
-          upper->state.nsubscribers++;
+  if (filep->f_oflags & O_RDOK)
+    {
+      if (upper->state.nsubscribers == 0 && lower->ops->activate)
+        {
+          ret = lower->ops->activate(lower, filep, true);
+          if (ret < 0)
+            {
+              goto errout_with_open;
+            }
         }
 
-      if (filep->f_oflags & O_WROK)
+      user->role |= SENSOR_ROLE_RD;
+      upper->state.nsubscribers++;
+    }
+
+  if (filep->f_oflags & O_WROK)
+    {
+      user->role |= SENSOR_ROLE_WR;
+      upper->state.nadvertisers++;
+      if (filep->f_oflags & SENSOR_PERSIST)
         {
-          user->role |= SENSOR_ROLE_WR;
-          upper->state.nadvertisers++;
-          if (filep->f_oflags & SENSOR_PERSIST)
-            {
-              lower->persist = true;
-            }
+          lower->persist = true;
         }
     }
 
@@ -654,8 +764,16 @@ static int sensor_open(FAR struct file *filep)
       user->bufferpos = upper->timing.head / TIMING_BUF_ESIZE;
     }
 
+  sminfo(upper->name, "user address: %p, role type: %d, "
+         "user generation: %" PRIu32 ", upper generation: %" PRIu32 ", "
+         "nsubscribers: %" PRIu32 ", nadvertisers: %" PRIu32 ", persist: %d",
+         user, user->role, user->state.generation,
+         upper->state.generation, upper->state.nsubscribers,
+         upper->state.nadvertisers, lower->persist);
+
   user->state.interval = UINT32_MAX;
   user->state.esize = upper->state.esize;
+  user->state.nonwakeup = true;
   nxsem_init(&user->buffersem, 0, 0);
   list_add_tail(&upper->userlist, &user->node);
 
@@ -687,41 +805,43 @@ static int sensor_close(FAR struct file *filep)
   FAR struct sensor_user_s *user = filep->f_priv;
   int ret = 0;
 
+  sensor_update_interval(filep, upper, user, UINT32_MAX);
+  sensor_update_latency(filep, upper, user, UINT32_MAX);
+  sensor_update_nonwakeup(filep, upper, user, true);
+
   nxrmutex_lock(&upper->lock);
-  if (lower->ops->close)
+
+  if ((filep->f_oflags & O_DIRECT) == 0 && lower->ops->close)
     {
-      ret = lower->ops->close(lower, filep);
-      if (ret < 0)
+      lower->ops->close(lower, filep);
+    }
+
+  /* Using the O_DIRECT flag will prevent cross-core operations,
+   * allowing for direct I/O operations.
+   */
+
+  if (filep->f_oflags & O_RDOK)
+    {
+      upper->state.nsubscribers--;
+      if (upper->state.nsubscribers == 0 && lower->ops->activate)
         {
-          nxrmutex_unlock(&upper->lock);
-          return ret;
+          lower->ops->activate(lower, filep, false);
         }
     }
 
-  if ((filep->f_oflags & O_DIRECT) == 0)
+  if (filep->f_oflags & O_WROK)
     {
-      if (filep->f_oflags & O_RDOK)
-        {
-          upper->state.nsubscribers--;
-          if (upper->state.nsubscribers == 0 && lower->ops->activate)
-            {
-              lower->ops->activate(lower, filep, false);
-            }
-        }
-
-      if (filep->f_oflags & O_WROK)
-        {
-          upper->state.nadvertisers--;
-        }
+      upper->state.nadvertisers--;
     }
 
   list_delete(&user->node);
-  sensor_update_latency(filep, upper, user, UINT32_MAX);
-  sensor_update_interval(filep, upper, user, UINT32_MAX);
   nxsem_destroy(&user->buffersem);
 
   /* The user is closed, notify to other users */
 
+  sminfo(upper->name, "user address: %p, "
+         "close subscriber: %" PRIu32 ", close advertiser:%" PRIu32,
+         user, upper->state.nsubscribers, upper->state.nadvertisers);
   sensor_pollnotify(upper, POLLPRI, SENSOR_ROLE_WR);
   nxrmutex_unlock(&upper->lock);
 
@@ -798,6 +918,12 @@ static ssize_t sensor_read(FAR struct file *filep, FAR char *buffer,
       ret = -ENODATA;
     }
 
+  if (ret > 0)
+    {
+      smdebug(upper->name, "the number of read event is:%zd",
+              ret / upper->state.esize);
+    }
+
 out:
   nxrmutex_unlock(&upper->lock);
   return ret;
@@ -822,6 +948,7 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
   uint32_t arg1 = (uint32_t)arg;
   int ret = 0;
 
+  smdebug(upper->name, "sensor ioctl start, cmd:%d", cmd);
   switch (cmd)
     {
       case SNIOC_GET_STATE:
@@ -845,18 +972,14 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 
       case SNIOC_SET_INTERVAL:
         {
-          nxrmutex_lock(&upper->lock);
           ret = sensor_update_interval(filep, upper, user,
                                        arg1 ? arg1 : UINT32_MAX);
-          nxrmutex_unlock(&upper->lock);
         }
         break;
 
       case SNIOC_BATCH:
         {
-          nxrmutex_lock(&upper->lock);
           ret = sensor_update_latency(filep, upper, user, arg1);
-          nxrmutex_unlock(&upper->lock);
         }
         break;
 
@@ -901,6 +1024,12 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
           nxrmutex_lock(&upper->lock);
           upper->state.priv = (uint64_t)arg;
           nxrmutex_unlock(&upper->lock);
+        }
+        break;
+
+      case SNIOC_SET_NONWAKEUP:
+        {
+          sensor_update_nonwakeup(filep, upper, user, (bool)arg);
         }
         break;
 
@@ -961,16 +1090,15 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 
      case SNIOC_FLUSH:
         {
-          nxrmutex_lock(&upper->lock);
-
           /* If the sensor is not activated, return -EINVAL. */
 
           if (upper->state.nsubscribers == 0)
             {
-              nxrmutex_unlock(&upper->lock);
+              sminfo(upper->name, "sensor not activated");
               return -EINVAL;
             }
 
+          ret = -ENOTSUP;
           if (lower->ops->flush != NULL)
             {
               /* Lower half driver will do flush in asynchronous mode,
@@ -981,18 +1109,32 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
               ret = lower->ops->flush(lower, filep);
               if (ret >= 0)
                 {
+                  sminfo(upper->name, "flushing start");
                   user->flushing = true;
                 }
             }
-          else
+
+          if (ret == -ENOTSUP)
             {
               /* If flush is not supported, complete immediately */
 
+              user->flushing = false;
               user->event |= SENSOR_EVENT_FLUSH_COMPLETE;
               sensor_pollnotify_one(user, POLLPRI, user->role);
-            }
 
-          nxrmutex_unlock(&upper->lock);
+              /* If caller isn't from remote core, convert ENOTSUP
+               * to zero return, indicating the flush is completed.
+               * If it's from remote core, need to inform the remote
+               * core the flush is not supported for driver.
+               */
+
+              if ((filep->f_oflags & SENSOR_REMOTE) == 0)
+                {
+                  ret = 0;
+                }
+
+              sminfo(upper->name, "flush complete with result:%d", ret);
+            }
         }
         break;
 
@@ -1012,6 +1154,7 @@ static int sensor_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
         break;
     }
 
+  smdebug(upper->name, "sensor ioctl end, ret:%d", ret);
   return ret;
 }
 
@@ -1100,6 +1243,7 @@ static ssize_t sensor_push_event(FAR void *priv, FAR const void *data,
               user->flushing = false;
               user->event |= SENSOR_EVENT_FLUSH_COMPLETE;
               sensor_pollnotify_one(user, POLLPRI, user->role);
+              sminfo(upper->name, "flush complete, poll notify");
             }
         }
 
@@ -1136,6 +1280,7 @@ static ssize_t sensor_push_event(FAR void *priv, FAR const void *data,
         }
     }
 
+  smdebug(upper->name, "the number of write event is:%lu", envcount);
   circbuf_overwrite(&upper->buffer, data, bytes);
   sensor_generate_timing(upper, envcount);
   list_for_every_entry(&upper->userlist, user, struct sensor_user_s, node)
@@ -1228,7 +1373,7 @@ void sensor_remap_vector_raw16(FAR const int16_t *in, FAR int16_t *out,
  *           instance is bound to the sensor driver and must persists as long
  *           as the driver persists.
  *   devno - The user specifies which device of this type, from 0. If the
- *           devno alerady exists, -EEXIST will be returned.
+ *           devno already exists, -EEXIST will be returned.
  *
  * Returned Value:
  *   OK if the driver was successfully register; A negated errno value is
@@ -1238,16 +1383,24 @@ void sensor_remap_vector_raw16(FAR const int16_t *in, FAR int16_t *out,
 
 int sensor_register(FAR struct sensor_lowerhalf_s *lower, int devno)
 {
-  char path[PATH_MAX];
+  FAR char *path;
+  int ret;
 
   DEBUGASSERT(lower != NULL);
 
+  path = lib_get_pathbuffer();
+  if (path == NULL)
+    {
+      return -ENOMEM;
+    }
+
   snprintf(path, PATH_MAX, DEVNAME_FMT,
            g_sensor_meta[lower->type].name,
-           lower->uncalibrated ? DEVNAME_UNCAL : "",
            devno);
-  return sensor_custom_register(lower, path,
-                                g_sensor_meta[lower->type].esize);
+  ret = sensor_custom_register(lower, path,
+                               g_sensor_meta[lower->type].esize);
+  lib_put_pathbuffer(path);
+  return ret;
 }
 
 /****************************************************************************
@@ -1302,6 +1455,7 @@ int sensor_custom_register(FAR struct sensor_lowerhalf_s *lower,
   list_initialize(&upper->userlist);
   upper->state.esize = esize;
   upper->state.min_interval = UINT32_MAX;
+  upper->state.nonwakeup = true;
   if (lower->ops->activate)
     {
       upper->state.nadvertisers = 1;
@@ -1339,9 +1493,10 @@ int sensor_custom_register(FAR struct sensor_lowerhalf_s *lower,
     }
 #endif
 
+  strlcpy(upper->name, basename((char *)path), sizeof(upper->name));
   upper->state.nbuffer = lower->nbuffer;
   upper->lower = lower;
-  sninfo("Registering %s\n", path);
+  sminfo(upper->name, "Registering %s", path);
   ret = register_driver(path, &g_sensor_fops, 0666, upper);
   if (ret)
     {
@@ -1375,17 +1530,24 @@ rpmsg_err:
  *           instance is bound to the sensor driver and must persists as long
  *           as the driver persists.
  *   devno - The user specifies which device of this type, from 0.
+ *
  ****************************************************************************/
 
 void sensor_unregister(FAR struct sensor_lowerhalf_s *lower, int devno)
 {
-  char path[PATH_MAX];
+  FAR char *path;
+
+  path = lib_get_pathbuffer();
+  if (path == NULL)
+    {
+      return;
+    }
 
   snprintf(path, PATH_MAX, DEVNAME_FMT,
            g_sensor_meta[lower->type].name,
-           lower->uncalibrated ? DEVNAME_UNCAL : "",
            devno);
   sensor_custom_unregister(lower, path);
+  lib_put_pathbuffer(path);
 }
 
 /****************************************************************************
@@ -1400,6 +1562,7 @@ void sensor_unregister(FAR struct sensor_lowerhalf_s *lower, int devno)
  *           instance is bound to the sensor driver and must persists as long
  *           as the driver persists.
  *   path  - The user specifies path of device, ex: /dev/uorb/xxx
+ *
  ****************************************************************************/
 
 void sensor_custom_unregister(FAR struct sensor_lowerhalf_s *lower,
@@ -1412,7 +1575,7 @@ void sensor_custom_unregister(FAR struct sensor_lowerhalf_s *lower,
 
   upper = lower->priv;
 
-  sninfo("UnRegistering %s\n", path);
+  sminfo(upper->name, "UnRegistering");
   unregister_driver(path);
 
 #ifdef CONFIG_SENSORS_RPMSG

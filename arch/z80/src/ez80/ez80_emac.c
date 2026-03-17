@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/z80/src/ez80/ez80_emac.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -1988,6 +1990,8 @@ static int ez80emac_ifup(FAR struct net_driver_s *dev)
       priv->bifup = true;
       outp(EZ80_EMAC_IEN, EMAC_EIN_HANDLED); /* Enable all interrupts */
       ret = OK;
+
+      netdev_carrier_on(dev);
     }
 
   return ret;
@@ -2037,6 +2041,9 @@ static int ez80emac_ifdown(FAR struct net_driver_s *dev)
 
   priv->bifup = false;
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
+
   return OK;
 }
 

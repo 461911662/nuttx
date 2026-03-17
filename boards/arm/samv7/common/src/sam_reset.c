@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/samv7/common/src/sam_reset.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -45,7 +47,7 @@
  *      reason (and potentially subreason) is saved.
  *
  * Returned Value:
- *   This functions should always return succesfully with 0. We save
+ *   This functions should always return successfully with 0. We save
  *   BOARDIOC_RESETCAUSE_UNKOWN in cause structure if we are
  *   not able to get last reset cause from HW (which is unlikely).
  *

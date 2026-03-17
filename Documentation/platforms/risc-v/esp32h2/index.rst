@@ -71,6 +71,22 @@ You can edit your shell's rc files if you don't use bash.
 Building and flashing NuttX
 ===========================
 
+Installing esptool
+------------------
+
+First, make sure that ``esptool.py`` is installed and up-to-date.
+This tool is used to convert the ELF to a compatible ESP32-H2 image and to flash the image into the board.
+
+It can be installed with: ``pip install esptool>=4.8.1``.
+
+.. warning::
+    Installing ``esptool.py`` may required a Python virtual environment on newer systems.
+    This will be the case if the ``pip install`` command throws an error such as:
+    ``error: externally-managed-environment``.
+
+    If you are not familiar with virtual environments, refer to `Managing esptool on virtual environment`_ for instructions on how to install ``esptool.py``.
+
+
 Bootloader and partitions
 -------------------------
 
@@ -82,8 +98,8 @@ require any specific configuration (it is selectable by default if no other
 of 2nd stage bootloaders, the commands ``make bootloader`` and the ``ESPTOOL_BINDIR``
 option (for the ``make flash``) are kept (and ignored if Simple Boot is used).
 
-If other features are required, an externally-built 2nd stage bootloader is needed.
-The bootloader is built using the ``make bootloader`` command. This command generates
+If features like `Flash Encryption`_ are required, an externally-built 2nd stage bootloader is needed.
+The MCUBoot bootloader is built using the ``make bootloader`` command. This command generates
 the firmware in the ``nuttx`` folder. The ``ESPTOOL_BINDIR`` is used in the
 ``make flash`` command to specify the path to the bootloader. For compatibility
 among other SoCs and future options of 2nd stage bootloaders, the commands
@@ -103,21 +119,65 @@ is being built (they will be ignored if Simple Boot is used, for instance)::
 Building and flashing
 ---------------------
 
-First, make sure that ``esptool.py`` is installed.  This tool is used to convert
-the ELF to a compatible ESP32-H2 image and to flash the image into the board.
-It can be installed with: ``pip install esptool==4.8.dev4``.
+This is a two-step process where the first step converts the ELF file into an ESP32-H2 compatible binary
+and the second step flashes it to the board. These steps are included in the build system and it is
+possible to build and flash the NuttX firmware simply by running::
 
-Configure the NuttX project: ``./tools/configure.sh esp32h2-devkit:nsh``
-Run ``make`` to build the project.  Note that the conversion mentioned above is
-included in the build process.
-The ``esptool.py`` is used to flash all the binaries. However, this is also
-included in the build process and we can build and flash with::
+    $ make flash ESPTOOL_PORT=<port> ESPTOOL_BINDIR=./
 
-  make flash ESPTOOL_PORT=<port> ESPTOOL_BINDIR=./
+where:
 
-Where ``<port>`` is typically ``/dev/ttyUSB0`` or similar and ``./`` is
-the path to the folder containing the externally-built 2nd stage bootloader for
-the ESP32-H2 as explained above.
+* ``ESPTOOL_PORT`` is typically ``/dev/ttyUSB0`` or similar.
+* ``ESPTOOL_BINDIR=./`` is the path of the externally-built 2nd stage bootloader and the partition table (if applicable): when built using the ``make bootloader``, these files are placed into ``nuttx`` folder.
+* ``ESPTOOL_BAUD`` is able to change the flash baud rate if desired.
+
+Flashing NSH Example
+--------------------
+
+This example shows how to build and flash the ``nsh`` defconfig for the ESP32-H2-DevKitM-1 board::
+
+    $ cd nuttx
+    $ make distclean
+    $ ./tools/configure.sh esp32h2-devkitc:nsh
+    $ make -j$(nproc)
+
+When the build is complete, the firmware can be flashed to the board using the command::
+
+    $ make -j$(nproc) flash ESPTOOL_PORT=<port> ESPTOOL_BINDIR=./
+
+where ``<port>`` is the serial port where the board is connected::
+
+  $ make flash ESPTOOL_PORT=/dev/ttyUSB0 ESPTOOL_BINDIR=./
+  CP: nuttx.hex
+  MKIMAGE: NuttX binary
+  esptool.py -c esp32h2 elf2image --ram-only-header -fs 4MB -fm dio -ff 48m -o nuttx.bin nuttx
+  esptool.py v4.8.1
+  Creating esp32h2 image...
+  Image has only RAM segments visible. ROM segments are hidden and SHA256 digest is not appended.
+  Merged 1 ELF section
+  Successfully created esp32h2 image.
+  Generated: nuttx.bin
+  esptool.py -c esp32h2 -p /dev/ttyUSB0 -b 921600 --no-stub write_flash -fs 4MB -fm dio -ff 48m 0x0000 nuttx.bin
+  esptool.py v4.8.1
+  Serial port /dev/ttyUSB0
+  Connecting....
+  Chip is ESP32-H2 (revision v0.0)
+  [...]
+  Flash will be erased from 0x00000000 to 0x0003cfff...
+  Erasing flash...
+  Took 0.27s to erase flash block
+  Wrote 249856 bytes at 0x00000000 in 5.0 seconds (401.4 kbit/s)...
+  Hash of data verified.
+
+  Leaving...
+  Hard resetting via RTS pin...
+
+Now opening the serial port with a terminal emulator should show the NuttX console::
+
+  $ picocom -b 115200 /dev/ttyUSB0
+  NuttShell (NSH) NuttX-12.8.0
+  nsh> uname -a
+  NuttX 12.8.0 759d37b97c-dirty Mar  5 2025 20:16:34 risc-v esp32h2-devkit
 
 Debugging
 =========
@@ -141,7 +201,13 @@ USB-to-JTAG adapter.
 
 OpenOCD can then be used::
 
-  openocd -c 'set ESP_RTOS hwthread; set ESP_FLASH_SIZE 0' -f board/esp32h2-builtin.cfg
+  openocd -s <tcl_scripts_path> -c 'set ESP_RTOS hwthread' -f board/esp32c3-builtin.cfg -c 'init; reset halt; esp appimage_offset 0x0'
+
+.. note::
+  - ``appimage_offset`` should be set to ``0x0`` when ``Simple Boot`` is used. For MCUboot, this value should be set to
+    ``CONFIG_ESPRESSIF_OTA_PRIMARY_SLOT_OFFSET`` value (``0x10000`` by default).
+  - ``-s <tcl_scripts_path>`` defines the path to the OpenOCD scripts. Usually set to `tcl` if running openocd from its source directory.
+    It can be omitted if `openocd-esp32` were installed in the system with `sudo make install`.
 
 If you want to debug with an external JTAG adapter it can
 be connected as follows:
@@ -269,40 +335,357 @@ Peripheral Support
 
 The following list indicates the state of peripherals' support in NuttX:
 
-==============  =======
-Peripheral      Support
-==============  =======
-ADC              No
+==============  ======= ====================
+Peripheral      Support NOTES
+==============  ======= ====================
+ADC              Yes     Oneshot and internal temperature sensor
 AES              No
 Bluetooth        No
 CAN/TWAI         Yes
 DMA              Yes
+DS               No
 ECC              No
-eFuse            No
-GPIO             Yes
+eFuse            Yes
+GPIO             Yes    Dedicated GPIO supported
 HMAC             No
-I2C              Yes
-I2S              No
-Int. Temp.       No
-LED              No
-LED_PWM          Yes
+I2C              Yes    Master and Slave mode supported
+I2S              Yes
+LED/PWM          Yes
 MCPWM            No
-Pulse Counter    No
-RMT              No
-RNG              No
+Pulse Counter    Yes
+RMT              Yes
+RNG              Yes
 RSA              No
 RTC              Yes
-SD/MMC           No
-SDIO             No
-SHA              No
+SHA              Yes
 SPI              Yes
 SPIFLASH         Yes
+SPIRAM           No
 Timers           Yes
 UART             Yes
+USB Serial       Yes
 Watchdog         Yes
 Wifi             No
 XTS              No
-==============  =======
+==============  ======= ====================
+
+Analog-to-digital converter (ADC)
+---------------------------------
+
+One ADC unit is available for the ESP32-H2, with 5 channels.
+
+During bringup, GPIOs for selected channels are configured automatically to be used as ADC inputs.
+If available, ADC calibration is automatically applied (see
+`this page <https://docs.espressif.com/projects/esp-idf/en/v5.1/esp32h2/api-reference/peripherals/adc_calibration.html>`__ for more details).
+Otherwise, a simple conversion is applied based on the attenuation and resolution.
+
+The ADC unit is accessible using the ADC character driver, which returns data for the enabled channels.
+
+The ADC unit can be enabled in the menu :menuselection:`System Type --> Peripheral Support --> Analog-to-digital converter (ADC)`.
+
+Then, it can be customized in the menu :menuselection:`System Type --> ADC Configuration`, which includes operating mode, gain and channels.
+
+========== ===========
+ Channel    ADC1 GPIO
+========== ===========
+0           1
+1           2
+2           3
+3           4
+4           5
+========== ===========
+
+.. _MCUBoot H2:
+
+MCUBoot
+=======
+
+The ESP32-H2 supports MCUBoot.
+
+Read more about the MCUBoot for Espressif devices `here <https://docs.mcuboot.com/readme-espressif.html>`__.
+
+Flash Encryption
+----------------
+
+Flash encryption is intended for encrypting the contents of the ESP32-H2's off-chip flash memory. Once this feature is enabled,
+firmware is flashed as plaintext, and then the data is encrypted in place on the first boot. As a result, physical readout
+of flash will not be sufficient to recover most flash contents.
+
+The current state of flash encryption for ESP32-H2 allows the use of Virtual E-Fuses and development mode, which permit users to evaluate and test the firmware before making definitive changes such as burning E-Fuses.
+
+Flash encryption supports the following features:
+
+  .. list-table::
+    :header-rows: 1
+
+    * - Feature
+      - Description
+    * - **Flash Encryption with Virtual E-Fuses**
+      - Use flash encryption without burning E-Fuses. Default selection when flash encryption is enabled.
+    * - **Flash Encryption in Development mode**
+      - Allows reflashing an encrypted device by appending the ``--encrypt`` argument to the ``esptool.py write_flash`` command. This is done automatically if ``ESPRESSIF_SECURE_FLASH_ENC_FLASH_DEVICE_ENCRYPTED`` is set.
+    * - **Flash Encryption in Release mode**
+      - Does not allow reflashing the device. This is a permanent setting.
+    * - **Flash Encryption key**
+      - A user-generated key is required by default. Alternatively, a device-generated key is possible, but it will not be recoverable by the user (not recommended). See ``ESPRESSIF_SECURE_FLASH_ENC_USE_HOST_KEY``.
+    * - **Encrypted MTD Partition**
+      - If SPI Flash is enabled, an empty user MTD partition will be automatically encrypted on first flash.
+
+.. note::
+
+   It is **strongly suggested** to read the following before working on flash encryption:
+
+   - `MCUBoot Flash Encryption <https://docs.mcuboot.com/readme-espressif.html#flash-encryption>`_
+   - `General E-Fuse documentation <https://docs.espressif.com/projects/esp-idf/en/latest/esp32h2/api-reference/system/efuse.html>`_
+   - `Flash Encryption Relevant E-Fuses <https://docs.espressif.com/projects/esp-idf/en/latest/esp32h2/security/flash-encryption.html#relevant-efuses>`_
+
+Flash Encryption Requirements
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Flash encryption requires burning E-Fuses to enable it on chip. This is not a reversible operation and should be done with caution.
+There is, however, a way to test the flash encryption by simulating them on flash. Both paths are described below.
+
+Build System Features
+'''''''''''''''''''''
+
+The build system contains some safeguards to avoid accidentally burning E-Fuses and automations for convenience. Those are summarized below:
+
+  1. A yellow warning will show up during build alerting that flash encryption is enabled (same for Virtual E-Fuses).
+  2. If ``ESPRESSIF_SECURE_FLASH_ENC_USE_HOST_KEY`` is set, build will fail if the flash encryption key is not found.
+  3. If SPI Flash is enabled, the user MTD partition is automatically encrypted with the provided encryption key.
+  4. ``make flash`` command will prompt the user for confirmation before burning the E-Fuse, if Virtual E-Fuses are disabled.
+
+
+Simulating Flash Encryption with Virtual E-Fuses
+'''''''''''''''''''''''''''''''''''''''''''''''''
+
+It is highly recommended to use this method for testing the flash encryption before actually burning the E-Fuses.
+The E-Fuses are stored in flash and persist between reboots. No real E-Fuses are changed.
+
+To enable virtual E-Fuses for flash encryption testing, open ``menuconfig`` and:
+  1. Enable flash encryption on boot on: :menuselection:`System Type --> Bootloader and Image Configuration`
+  2. Verify Virtual E-Fuses are enabled (this is done by default): :menuselection:`System Type --> Peripheral Support --> E-Fuse support`
+
+Now build the bootloader and the firmware. Flashing the device (or opening on QEMU) will trigger the following:
+  1. On the first boot, the bootloader will encrypt the flash::
+
+      ...
+      [esp32h2] [WRN] eFuse virtual mode is enabled. If Secure boot or Flash encryption is enabled then it does not provide any security. FOR TESTING ONLY!
+      [esp32h2] [WRN] [efuse] [Virtual] try loading efuses from flash: 0x10000 (offset)
+      ...
+      [esp32h2] [INF] [flash_encrypt] Encrypting bootloader...
+      [esp32h2] [INF] [flash_encrypt] Bootloader encrypted successfully
+      [esp32h2] [INF] [flash_encrypt] Encrypting primary slot...
+      [esp32h2] [INF] [flash_encrypt] Encrypting remaining flash...
+      [esp32h2] [INF] [flash_encrypt] Flash encryption completed
+      ...
+      [esp32h2] [INF] Resetting with flash encryption enabled...
+
+  2. Device will reset and it should be now operating similar to an actual encrypted device::
+
+      ...
+      [esp32h2] [INF] Checking flash encryption...
+      [esp32h2] [INF] [flash_encrypt] flash encryption is enabled (1 plaintext flashes left)
+      [esp32h2] [INF] Disabling RNG early entropy source...
+      [esp32h2] [INF] br_image_off = 0x20000
+      [esp32h2] [INF] ih_hdr_size = 0x20
+      [esp32h2] [INF] Loading image 0 - slot 0 from flash, area id: 1
+      ...
+      NuttShell (NSH) NuttX-12.8.0
+      nsh>
+
+Actual encryption and burning E-Fuses
+'''''''''''''''''''''''''''''''''''''
+
+E-Fuses are burned by esptool and the bootloader on the first boot after flashing with encryption enabled.
+This process is automated on NuttX build system.
+
+.. warning::  Burning E-Fuses is NOT a reversible operation and should be done with caution.
+
+To build a firmware with E-Fuse support and flash encryption enabled, open ``menuconfig`` and:
+  1. Enable flash encryption on boot on: :menuselection:`System Type --> Bootloader and Image Configuration`
+  2. Disable Virtual E-Fuses :menuselection:`System Type --> Peripheral Support --> E-Fuse support`
+  3. Check usage mode is Development (this allows reflashing, while Release mode does not).
+
+.. note::  If using development mode of flash encryption (see menuconfig and documentation above), it is still possible to re-flash the device with esptool by
+  setting ``ESPRESSIF_SECURE_FLASH_ENC_FLASH_DEVICE_ENCRYPTED`` which adds ``--encrypt`` argument to the ``esptool.py write_flash`` command.
+  This will apply the burned encryption key to the image while flashing.
+
+Flash Allocation for MCUBoot
+----------------------------
+
+When MCUBoot is enabled on ESP32-H2, the flash memory is organized as follows
+based on the default KConfig values:
+
+.. note:: Even though OTA is not available on ESP32-H2 (no Wi-Fi), firmware
+  binaries can still be uploaded to flash using other means, such as an SD card.
+
+**Flash Layout (MCUBoot Enabled)**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 20 20
+   :align: left
+
+   * - Region
+     - Offset
+     - Size
+   * - Bootloader
+     - 0x000000
+     - 64KB
+   * - E-Fuse Virtual (see Note)
+     - 0x010000
+     - 64KB
+   * - Primary Application Slot (/dev/ota0)
+     - 0x020000
+     - 1MB
+   * - Secondary Application Slot (/dev/ota1)
+     - 0x120000
+     - 1MB
+   * - Scratch Partition (/dev/otascratch)
+     - 0x220000
+     - 256KB
+   * - Storage MTD (optional)
+     - 0x260000
+     - 1MB
+   * - Available Flash
+     - 0x360000+
+     - Remaining
+
+.. raw:: html
+
+   <div style="clear: both"></div>
+
+
+**Note**: The E-Fuse Virtual region is optional and only used when
+``ESPRESSIF_EFUSE_VIRTUAL_KEEP_IN_FLASH`` is enabled. However, this 64KB
+location is always allocated in the memory layout to prevent accidental
+erasure during board flashing operations, ensuring data preservation if
+virtual E-Fuses are later enabled.
+
+.. code-block:: text
+
+    Memory Map (Addresses in hex):
+
+    0x000000  ┌─────────────────────────────┐
+              │                             │
+              │      MCUBoot Bootloader     │
+              │           (64KB)            │
+              │                             │
+    0x010000  ├─────────────────────────────┤
+              │       E-Fuse Virtual        │
+              │           (64KB)            │
+    0x020000  ├─────────────────────────────┤
+              │                             │
+              │      Primary App Slot       │
+              │            (1MB)            │
+              │          /dev/ota0          │
+              │                             │
+    0x120000  ├─────────────────────────────┤
+              │                             │
+              │     Secondary App Slot      │
+              │            (1MB)            │
+              │          /dev/ota1          │
+              │                             │
+    0x220000  ├─────────────────────────────┤
+              │                             │
+              │      Scratch Partition      │
+              │           (256KB)           │
+              │       /dev/otascratch       │
+              │                             │
+    0x260000  ├─────────────────────────────┤
+              │                             │
+              │    Storage MTD (optional)   │
+              │            (1MB)            │
+              │                             │
+    0x360000  ├─────────────────────────────┤
+              │                             │
+              │       Available Flash       │
+              │         (Remaining)         │
+              │                             │
+              └─────────────────────────────┘
+
+The key KConfig options that control this layout:
+
+- ``ESPRESSIF_OTA_PRIMARY_SLOT_OFFSET`` (default: 0x20000)
+- ``ESPRESSIF_OTA_SECONDARY_SLOT_OFFSET`` (default: 0x120000)
+- ``ESPRESSIF_OTA_SLOT_SIZE`` (default: 0x100000)
+- ``ESPRESSIF_OTA_SCRATCH_OFFSET`` (default: 0x220000)
+- ``ESPRESSIF_OTA_SCRATCH_SIZE`` (default: 0x40000)
+- ``ESPRESSIF_STORAGE_MTD_OFFSET`` (default: 0x260000 when MCUBoot enabled)
+- ``ESPRESSIF_STORAGE_MTD_SIZE`` (default: 0x100000)
+
+For MCUBoot operation:
+
+- The **Primary Slot** contains the currently running application
+- The **Secondary Slot** receives OTA updates
+- The **Scratch Partition** is used by MCUBoot for image swapping during updates
+- MCUBoot manages image validation, confirmation, and rollback functionality
+
+_`Managing esptool on virtual environment`
+==========================================
+
+This section describes how to install ``esptool``, ``imgtool`` or any other Python packages in a
+proper environment.
+
+Normally, a Linux-based OS would already have Python 3 installed by default. Up to a few years ago,
+you could simply call ``pip install`` to install packages globally. However, this is no longer recommended
+as it can lead to conflicts between packages and versions. The recommended way to install Python packages
+is to use a virtual environment.
+
+A virtual environment is a self-contained directory that contains a Python installation for a particular
+version of Python, plus a number of additional packages. You can create a virtual environment for each
+project you are working on, and install the required packages in that environment.
+
+Two alternatives are explained below, you can select any one of those.
+
+Using pipx (recommended)
+------------------------
+
+``pipx`` is a tool that makes it easy to install Python packages in a virtual environment. To install
+``pipx``, you can run the following command (using apt as example)::
+
+    $ apt install pipx
+
+Once you have installed ``pipx``, you can use it to install Python packages in a virtual environment. For
+example, to install the ``esptool`` package, you can run the following command::
+
+    $ pipx install esptool
+
+This will create a new virtual environment in the ``~/.local/pipx/venvs`` directory, which contains the
+``esptool`` package. You can now use the ``esptool`` command as normal, and so will the build system.
+
+Make sure to run ``pipx ensurepath`` to add the ``~/.local/bin`` directory to your ``PATH``. This will
+allow you to run the ``esptool`` command from any directory.
+
+Using venv (alternative)
+------------------------
+To create a virtual environment, you can use the ``venv`` module, which is included in the Python standard
+library. To create a virtual environment, you can run the following command::
+
+    $ python3 -m venv myenv
+
+This will create a new directory called ``myenv`` in the current directory, which contains a Python
+installation and a copy of the Python standard library. To activate the virtual environment, you can run
+the following command::
+
+    $ source myenv/bin/activate
+
+This will change your shell prompt to indicate that you are now working in the virtual environment. You can
+now install packages using ``pip``. For example, to install the ``esptool`` package, you can run the following
+command::
+
+    $ pip install esptool
+
+This will install the ``esptool`` package in the virtual environment. You can now use the ``esptool`` command as
+normal. When you are finished working in the virtual environment, you can deactivate it by running the following
+command::
+
+    $ deactivate
+
+This will return your shell prompt to its normal state. You can reactivate the virtual environment at any time by
+running the ``source myenv/bin/activate`` command again. You can also delete the virtual environment by deleting
+the directory that contains it.
 
 Supported Boards
 ================

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/mps/mps_start.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -23,18 +25,39 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
-#include <nuttx/init.h>
 
 #include <nuttx/cache.h>
 #include <nuttx/init.h>
+#include <arch/barriers.h>
 #include <arch/board/board.h>
 
 #include "arm_internal.h"
-#include "barriers.h"
 #include "nvic.h"
 #include "mps_irq.h"
 #include "mps_userspace.h"
 #include "mpu.h"
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+#define HEAP_BASE ((uintptr_t)_ebss + CONFIG_IDLETHREAD_STACKSIZE)
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+/* g_idle_topstack: _sbss is the start of the BSS region as defined by the
+ * linker script. _ebss lies at the end of the BSS region. The idle task
+ * stack starts at the end of BSS and is of size CONFIG_IDLETHREAD_STACKSIZE.
+ * The IDLE thread is the thread that the system boots on and, eventually,
+ * becomes the IDLE, do nothing task that runs only when there is nothing
+ * else to run.  The heap continues from there until the end of memory.
+ * g_idle_topstack is a read-only variable the provides this computed
+ * address.
+ */
+
+const uintptr_t g_idle_topstack = HEAP_BASE;
 
 /****************************************************************************
  * Private Functions
@@ -53,8 +76,7 @@ static inline void mps_tcmenable(void)
 {
   uint32_t regval;
 
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 
   /* Enabled/disabled ITCM */
 
@@ -76,8 +98,7 @@ static inline void mps_tcmenable(void)
 #endif
   putreg32(regval, NVIC_DTCMCR);
 
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 
 /****************************************************************************
@@ -94,8 +115,10 @@ static inline void mps_tcmenable(void)
 
 void __start(void)
 {
+#ifndef CONFIG_BUILD_PIC
   const uint32_t *src;
   uint32_t *dest;
+#endif
 
   /* If enabled reset the MPU */
 
@@ -104,6 +127,10 @@ void __start(void)
   mpu_showtype();
 #endif
   arm_fpuconfig();
+
+  /* If used the PIC, then the PIC will have already been configured */
+
+#ifndef CONFIG_BUILD_PIC
 
   /* Set bss to zero */
 
@@ -120,6 +147,7 @@ void __start(void)
     {
       *dest++ = *src++;
     }
+#endif
 
   /* Perform early serial initialization */
 
@@ -134,7 +162,7 @@ void __start(void)
 #ifdef CONFIG_ARMV7M_DCACHE
   /* Memory barrier */
 
-  ARM_DMB();
+  UP_DMB();
 
 #endif
 

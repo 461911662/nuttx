@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv8-r/sctlr.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -32,9 +34,8 @@
  * Included Files
  ****************************************************************************/
 
+#include <arch/barriers.h>
 #include <arch/irq.h>
-
-#include "barriers.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -156,6 +157,29 @@
 #define SCTLR_NMFI         (1 << 27) /* Bit 27: Non-maskable FIQ (NMFI) support */
                                      /* Bits 28-29: Reserved */
 #define SCTLR_TE           (1 << 30) /* Bit 30: Thumb exception enable */
+
+/* Hyp Auxiliary Control Register */
+
+#define HACTLR_CPUACTLR         (1 << 0)  /* Bit 0: Enable write access IMP_CPUACTLR from EL1 */
+#define HACTLR_CDBGDCI          (1 << 1)  /* Bit 1: Enable access CDBGDCI from EL1 */
+                                          /* Bits 2-6: Reserved */
+#define HACTLR_FLASHIFREGIONR   (1 << 7)  /* Bit 7: Enable access IMP_FLASHIFREGIONR from EL1 */
+#define HACTLR_PERIPHPREGIONR   (1 << 8)  /* Bit 8: Enable access IMP_PERIPHPREGIONR from EL1 */
+#define HACTLR_QOSR_BIT         (1 << 9)  /* Bit 9: Enable access QOSR from EL1 */
+#define HACTLR_BUSTIMEOUTR_BIT  (1 << 10) /* Bit 10: Enable access IMP_BUSTIMEOUTR from EL1 */
+                                          /* Bit 11: Reserved */
+#define HACTLR_INTMONR_BIT      (1 << 12) /* Bit 12: Enable access IMP_INTMONR from EL1 */
+#define HACTLR_ERR_BIT          (1 << 13) /* Bit 13: Enable access IMP_*ERR registers from EL1 */
+                                          /* Bit 14: Reserved */
+#define HACTLR_TESTR1_BIT       (1 << 15) /* Bit 15: Enable access IMP_TESTR1 registers from EL0 and EL1 */
+                                          /* Bits 16-31: Reserved */
+
+/* Enable all IMP DEF registers access from EL1 except for TESTR1 */
+
+#define HACTLR_INIT             (HACTLR_ERR_BIT | HACTLR_INTMONR_BIT | \
+                                 HACTLR_BUSTIMEOUTR_BIT | HACTLR_QOSR_BIT | \
+                                 HACTLR_PERIPHPREGIONR | HACTLR_FLASHIFREGIONR | \
+                                 HACTLR_CDBGDCI | HACTLR_CPUACTLR)
 
 /* Auxiliary Control Register (ACTLR): CRn=c1, opc1=0, CRm=c0, opc2=1 */
 
@@ -472,6 +496,29 @@
 
 /* Get the device ID */
 
+#ifdef __ghs__
+.macro cp15_rdid id
+  mrc p15, 0, id, c0, c0, 0
+.endm
+
+/* Read/write the system control register (SCTLR) */
+
+.macro cp15_rdsctlr sctlr
+  mrc p15, 0, sctlr, c1, c0, 0
+.endm
+
+.macro cp15_wrsctlr sctlr
+  mcr p15, 0, sctlr, c1, c0, 0
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+.endm
+#else
 .macro cp15_rdid, id
   mrc p15, 0, \id, c0, c0, 0
 .endm
@@ -493,6 +540,7 @@
   nop
   nop
 .endm
+#endif
 #endif /* __ASSEMBLY__ */
 
 /****************************************************************************
@@ -518,14 +566,14 @@ static inline unsigned int cp15_rdsctlr(void)
 static inline void cp15_wrsctlr(unsigned int sctlr)
 {
   CP15_SET(SCTLR, sctlr);
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
-  ARM_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
+  UP_NOP();
 }
 
 /* Read/write the vector base address register (VBAR) */

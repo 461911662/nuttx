@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/sht3x.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -47,10 +62,6 @@
 #  define sht3x_dbg(x, ...)    _info(x, ##__VA_ARGS__)
 #else
 #  define sht3x_dbg(x, ...)    sninfo(x, ##__VA_ARGS__)
-#endif
-
-#ifndef CONFIG_SHT3X_I2C_FREQUENCY
-#  define CONFIG_SHT3X_I2C_FREQUENCY 400000
 #endif
 
 /* Commands */
@@ -96,7 +107,7 @@
 #define SHT3X_DEFAULT_MEAS_MODE SHT3X_MEAS_PERI_1_H
 
 /****************************************************************************
- * Private
+ * Private Types
  ****************************************************************************/
 
 struct sht3x_dev_s
@@ -172,7 +183,9 @@ static const struct file_operations g_sht3xfops =
   sht3x_ioctl,    /* ioctl */
   NULL,           /* mmap */
   NULL,           /* truncate */
-  NULL            /* poll */
+  NULL,           /* poll */
+  NULL,           /* readv */
+  NULL            /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , sht3x_unlink  /* unlink */
 #endif

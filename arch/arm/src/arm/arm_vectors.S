@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/arm/arm_vectors.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -180,7 +182,7 @@ arm_vectorirq:
 	/* Call arm_decodeirq() on the interrupt stack */
 
 	ldr	sp, .Lirqstacktop	/* SP = interrupt stack top */
-#else
+#elif defined(CONFIG_ENABLE_ALL_SIGNALS)
 	/* Call arm_decodeirq() on the user stack */
 
 	/* If the interrupt stack is disabled, reserve xcpcontext to ensure

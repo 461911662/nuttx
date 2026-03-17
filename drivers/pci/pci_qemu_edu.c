@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/pci/pci_qemu_edu.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -30,8 +32,9 @@
 #include <nuttx/irq.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/pci/pci.h>
-#include <nuttx/pci/pci_qemu_edu.h>
 #include <nuttx/semaphore.h>
+
+#include "pci_drivers.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -45,13 +48,13 @@
 #define PCI_QEMU_EDU_REG_LIVE       0x04  /* Liveness Check */
 #define PCI_QEMU_EDU_REG_FAC        0x08  /* Factorial Computation */
 #define PCI_QEMU_EDU_REG_STATUS     0x20  /* Status */
-#define PCI_QEMU_EDU_REG_INT_STATUS 0x24  /* Interupt Status */
+#define PCI_QEMU_EDU_REG_INT_STATUS 0x24  /* Interrupt Status */
 #define PCI_QEMU_EDU_REG_INT_RAISE  0x60  /* Raise an interrupt */
 #define PCI_QEMU_EDU_REG_INT_ACK    0x64  /* Acknowledge interrupt */
 #define PCI_QEMU_EDU_REG_DMA_SOURCE 0x80  /* Source address for DMA transfer */
 #define PCI_QEMU_EDU_REG_DMA_DEST   0x88  /* Destination address for DMA transfer */
 #define PCI_QEMU_EDU_REG_DMA_COUNT  0x90  /* Size of area to transfer with DMA */
-#define PCI_QEMU_EDU_REG_DMA_CMD    0x98  /* Control DMA tranfer */
+#define PCI_QEMU_EDU_REG_DMA_CMD    0x98  /* Control DMA transfer */
 
 /* One 4096 bytes long buffer at offset 0x40000 is available in the
  * EDU device
@@ -302,7 +305,7 @@ static void pci_qemu_edu_test_dma(FAR struct pci_qemu_edu_priv_s *priv)
 
   pciinfo("Test block checksum 0x%08" PRIx32 "\n", tx_checksum);
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_SOURCE,
-                           (uint64_t)test_block);
+                           (uint64_t)(uintptr_t)test_block);
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_DEST, dev_addr);
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_COUNT,
                            (uint64_t)block_size);
@@ -313,7 +316,7 @@ static void pci_qemu_edu_test_dma(FAR struct pci_qemu_edu_priv_s *priv)
   pciinfo("DMA transfer to device complete.\n");
 
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_DEST,
-                           (uint64_t)test_block);
+                           (uint64_t)(uintptr_t)test_block);
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_SOURCE, dev_addr);
   pci_qemu_edu_write_reg64(priv, PCI_QEMU_EDU_REG_DMA_COUNT,
                            (uint64_t)block_size);
@@ -447,10 +450,12 @@ static int pci_qemu_edu_probe(FAR struct pci_device_s *dev)
 
   irq_attach(irq, pci_qemu_edu_interrupt, &priv);
   up_enable_irq(irq);
+  pci_enable_irq(dev, irq);
 
   pci_qemu_edu_test_intx(&priv);
   pci_qemu_edu_test_dma(&priv);
 
+  pci_disable_irq(dev);
   up_disable_irq(irq);
   irq_detach(irq);
 

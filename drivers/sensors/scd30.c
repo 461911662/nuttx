@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/scd30.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -53,10 +68,6 @@
 #  define scd30_dbg(x, ...)    sninfo(x, ##__VA_ARGS__)
 #endif
 
-#ifndef CONFIG_SCD30_I2C_FREQUENCY
-#  define CONFIG_SCD30_I2C_FREQUENCY 100000
-#endif
-
 #define SCD30_I2C_RETRIES 3
 
 /* SCD30 command words */
@@ -78,7 +89,7 @@
 #define SCD30_DEFAULT_TEMPERATURE_OFFSET    0
 
 /****************************************************************************
- * Private
+ * Private Types
  ****************************************************************************/
 
 struct scd30_dev_s
@@ -184,7 +195,9 @@ static const struct file_operations g_scd30fops =
   scd30_ioctl,    /* ioctl */
   NULL,           /* mmap */
   NULL,           /* truncate */
-  NULL            /* poll */
+  NULL,           /* poll */
+  NULL,           /* readv */
+  NULL            /* writev */
 #ifndef CONFIG_DISABLE_PSEUDOFS_OPERATIONS
   , scd30_unlink /* unlink */
 #endif
@@ -486,11 +499,7 @@ static int scd30_read_values(FAR struct scd30_dev_s *priv, FAR float *temp,
                   return ret;
                 }
 
-              ret = nxsig_usleep(500 * 1000);
-              if (ret == -EINTR)
-                {
-                  return ret;
-                }
+              nxsched_usleep(500 * 1000);
             }
           else
             {

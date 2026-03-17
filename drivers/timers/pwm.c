@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/timers/pwm.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,7 +50,7 @@
 #ifdef CONFIG_PWM
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 /* This structure describes the state of the upper half driver */
@@ -314,10 +316,6 @@ static int pwm_start(FAR struct pwm_upperhalf_s *upper, unsigned int oflags)
 
   if (!upper->started)
     {
-      /* Disable interrupts to avoid race conditions */
-
-      flags = enter_critical_section();
-
       /* Indicate that if will be waiting for the pulse count to complete.
        * Note that we will only wait if a non-zero pulse count is specified
        * and if the PWM driver was opened in normal, blocking mode.  Also
@@ -367,8 +365,6 @@ static int pwm_start(FAR struct pwm_upperhalf_s *upper, unsigned int oflags)
           upper->started = false;
           upper->waiting = false;
         }
-
-      leave_critical_section(flags);
     }
 
   return ret;

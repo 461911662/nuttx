@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/usbhost/usbhost_bthci.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -23,6 +25,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <nuttx/spinlock.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -217,6 +220,8 @@ static struct usbhost_registry_s g_bthci =
 
 static uint32_t g_devinuse;
 
+static spinlock_t g_lock = SP_UNLOCKED;
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -292,7 +297,7 @@ static int usbhost_allocdevno(FAR struct usbhost_state_s *priv)
   irqstate_t flags;
   int devno;
 
-  flags = enter_critical_section();
+  flags = spin_lock_irqsave(&g_lock);
   for (devno = 0; devno < 26; devno++)
     {
       uint32_t bitno = 1 << devno;
@@ -300,12 +305,12 @@ static int usbhost_allocdevno(FAR struct usbhost_state_s *priv)
         {
           g_devinuse |= bitno;
           priv->devchar = 'a' + devno;
-          leave_critical_section(flags);
+          spin_unlock_irqrestore(&g_lock, flags);
           return OK;
         }
     }
 
-  leave_critical_section(flags);
+  spin_unlock_irqrestore(&g_lock, flags);
   return -EMFILE;
 }
 
@@ -317,9 +322,9 @@ static void usbhost_freedevno(FAR struct usbhost_state_s *priv)
 
       if (devno >= 0 && devno < 26)
         {
-          irqstate_t flags = enter_critical_section();
+          irqstate_t flags = spin_lock_irqsave(&g_lock);
           g_devinuse &= ~(1 << devno);
-          leave_critical_section(flags);
+          spin_unlock_irqrestore(&g_lock, flags);
         }
     }
 }
@@ -461,7 +466,7 @@ static inline int usbhci_cfgdesc(FAR struct usbhost_state_s *priv,
   configdesc += cfgdesc->len;
   remaining  -= cfgdesc->len;
 
-  /* Loop where there are more dscriptors to examine */
+  /* Loop where there are more descriptors to examine */
 
   while (remaining >= sizeof(struct usb_desc_s))
     {
@@ -681,7 +686,7 @@ static inline int usbhci_cfgdesc(FAR struct usbhost_state_s *priv,
 
 static int usbhost_ctrl_cmd(FAR struct usbhost_state_s *priv,
                             uint8_t type, uint8_t req, uint16_t value,
-                            uint16_t indx, FAR uint8_t *payload,
+                            uint16_t index, FAR uint8_t *payload,
                             uint16_t len)
 {
   FAR struct usbhost_hubport_s *hport;
@@ -695,7 +700,7 @@ static int usbhost_ctrl_cmd(FAR struct usbhost_state_s *priv,
   ctrlreq->req  = req;
 
   usbhost_putle16(ctrlreq->value, value);
-  usbhost_putle16(ctrlreq->index, indx);
+  usbhost_putle16(ctrlreq->index, index);
   usbhost_putle16(ctrlreq->len,   len);
 
   if (type & USB_REQ_DIR_IN)
@@ -1438,15 +1443,12 @@ static int usbhci_connect(FAR struct usbhost_class_s *usbclass,
 static int usbhost_disconnected(FAR struct usbhost_class_s *usbclass)
 {
   FAR struct usbhost_state_s *priv = (FAR struct usbhost_state_s *)usbclass;
-  irqstate_t flags;
 
   DEBUGASSERT(priv != NULL);
 
   /* Set an indication to any users of the device that the device is no
    * longer available.
    */
-
-  flags              = enter_critical_section();
 
   priv->disconnected = true;
 
@@ -1479,7 +1481,6 @@ static int usbhost_disconnected(FAR struct usbhost_class_s *usbclass)
       usbhost_destroy(priv);
     }
 
-  leave_critical_section(flags);
   return OK;
 }
 

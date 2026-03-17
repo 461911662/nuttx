@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm64/src/common/arm64_sigdeliver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,7 +56,7 @@
 
 void arm64_sigdeliver(void)
 {
-  struct tcb_s  *rtcb = this_task();
+  struct tcb_s *rtcb = this_task();
 
 #ifdef CONFIG_SMP
   /* In the SMP case, we must terminate the critical section while the signal
@@ -64,9 +66,7 @@ void arm64_sigdeliver(void)
 
   irqstate_t  flags;
   int16_t saved_irqcount;
-  struct regs_context  *pctx =
-                (struct regs_context *)rtcb->xcp.saved_reg;
-  flags = (pctx->spsr & SPSR_DAIF_MASK);
+  flags = (rtcb->xcp.saved_regs[REG_SPSR] & SPSR_DAIF_MASK);
 #endif
 
   sinfo("rtcb=%p sigdeliver=%p sigpendactionq.head=%p\n",
@@ -151,16 +151,15 @@ retry:
    */
 
   rtcb->sigdeliver = NULL;  /* Allows next handler to be scheduled */
-  rtcb->xcp.regs = rtcb->xcp.saved_reg;
+  rtcb->xcp.regs = rtcb->xcp.saved_regs;
 
   /* Then restore the correct state for this thread of execution. */
 
 #ifdef CONFIG_SMP
   /* We need to keep the IRQ lock until task switching */
 
-  rtcb->irqcount++;
-  leave_critical_section(flags);
-  rtcb->irqcount--;
+  leave_critical_section(up_irq_save());
 #endif
-  arm64_fullcontextrestore(rtcb->xcp.regs);
+
+  arm64_fullcontextrestore();
 }

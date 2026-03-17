@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/tricore/src/cmake/platform.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -38,38 +40,28 @@ endforeach()
 separate_arguments(CMAKE_C_FLAG_ARGS NATIVE_COMMAND ${CMAKE_C_FLAGS})
 
 if(CONFIG_TRICORE_TOOLCHAIN_GNU)
-  execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} ${NUTTX_EXTRA_FLAGS}
-            --print-libgcc-file-name
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_VARIABLE extra_library)
-  list(APPEND EXTRA_LIB ${extra_library})
-  if(NOT CONFIG_LIBM)
-    execute_process(
-      COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} ${NUTTX_EXTRA_FLAGS}
-              --print-file-name=libm.a
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE extra_library)
-    list(APPEND EXTRA_LIB ${extra_library})
+  nuttx_find_toolchain_lib()
+  if(CONFIG_LIBM_TOOLCHAIN)
+    nuttx_find_toolchain_lib(libm.a)
   endif()
   if(CONFIG_LIBSUPCXX)
-    execute_process(
-      COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} ${NUTTX_EXTRA_FLAGS}
-              --print-file-name=libsupc++.a
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE extra_library)
-    list(APPEND EXTRA_LIB ${extra_library})
+    nuttx_find_toolchain_lib(libsupc++.a)
   endif()
-  if(CONFIG_ARCH_COVERAGE)
-    execute_process(
-      COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} ${NUTTX_EXTRA_FLAGS}
-              --print-file-name=libgcov.a
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      OUTPUT_VARIABLE extra_library)
-    list(APPEND EXTRA_LIB ${extra_library})
+  if(CONFIG_LIBCXXTOOLCHAIN)
+    nuttx_find_toolchain_lib(libstdc++.a)
+    list(APPEND CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${NUTTX_DIR}/include/cxx)
   endif()
-
-  nuttx_add_extra_library(${EXTRA_LIB})
+  if(CONFIG_COVERAGE_TOOLCHAIN)
+    nuttx_find_toolchain_lib(libgcov.a)
+  endif()
 
   set(PREPROCESS ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} -E -P -x c)
+endif()
+
+if(CONFIG_TRICORE_TOOLCHAIN_TASKING)
+  find_program(TASKING_COMPILER_PATH ctc)
+  get_filename_component(C_COMPILER_DIR ${TASKING_COMPILER_PATH} DIRECTORY)
+  set(PREPROCESS
+      ${TOOLCHAIN_PREFIX}ctc ${CMAKE_C_FLAG_ARGS} -E
+      -I${TOOLCHAIN_PREFIX}/../include.lsl -I${C_COMPILER_DIR}/../include.lsl)
 endif()

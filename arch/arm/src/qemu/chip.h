@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/qemu/chip.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,6 +28,8 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include "hardware/qemu_memorymap.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -64,7 +68,7 @@
  * Name: cpuindex
  *
  * Description:
- *   Return an index idenifying the current CPU.
+ *   Return an index identifying the current CPU.
  *
  ****************************************************************************/
 

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/arm/arm_undefinedinsn.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,6 +31,7 @@
 #include <debug.h>
 
 #include <nuttx/arch.h>
+#include <sched/sched.h>
 
 #include "arm_internal.h"
 
@@ -42,6 +45,11 @@
 
 void arm_undefinedinsn(uint32_t *regs)
 {
+  struct tcb_s *tcb = this_task();
+
+  tcb->xcp.regs = regs;
+  up_set_interrupt_context(true);
+
   if (regs[REG_PC] >= (uint32_t)_stext && regs[REG_PC] < (uint32_t)_etext)
     {
       _alert("Undefined instruction at 0x%" PRIx32 ": 0x%" PRIx32 "\n",
@@ -51,8 +59,6 @@ void arm_undefinedinsn(uint32_t *regs)
     {
       _alert("Undefined instruction at 0x%" PRIx32 "\n", regs[REG_PC]);
     }
-
-  up_set_current_regs(regs);
 
   PANIC_WITH_REGS("panic", regs);
 }

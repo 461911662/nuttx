@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-m/arm_schedulesigaction.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,6 +40,7 @@
 #include "sched/sched.h"
 #include "arm_internal.h"
 #include "irq/irq.h"
+#include "nvic.h"
 
 /****************************************************************************
  * Public Functions
@@ -81,23 +84,22 @@
 
 void up_schedule_sigaction(struct tcb_s *tcb)
 {
-  sinfo("tcb=%p, rtcb=%p current_regs=%p\n", tcb, this_task(),
-        this_task()->xcp.regs);
+  struct tcb_s *rtcb = running_task();
+  uint32_t      ipsr = getipsr();
 
   /* First, handle some special cases when the signal is
    * being delivered to the currently executing task.
    */
 
-  if (tcb == this_task() && !up_interrupt_context())
+  if (tcb == rtcb && ipsr != NVIC_IRQ_PENDSV)
     {
-      /* In this case just deliver the signal now.
-       * REVISIT:  Signal handle will run in a critical section!
+      /* Context switch should be done in pendsv, for exception directly
+       * last regs is not saved tcb->xcp.regs.
        */
 
-      (tcb->sigdeliver)(tcb);
-      tcb->sigdeliver = NULL;
+      up_trigger_irq(NVIC_IRQ_PENDSV, 0);
     }
-  else
+  else /* ipsr == NVIC_IRQ_PENDSV || tcb != rtcb */
     {
       /* Save the return PC, CPSR and either the BASEPRI or PRIMASK
        * registers (and perhaps also the LR).  These will be restored
@@ -127,11 +129,7 @@ void up_schedule_sigaction(struct tcb_s *tcb)
        */
 
       tcb->xcp.regs[REG_PC]         = (uint32_t)arm_sigdeliver;
-#ifdef CONFIG_ARMV7M_USEBASEPRI
       tcb->xcp.regs[REG_BASEPRI]    = NVIC_SYSH_DISABLE_PRIORITY;
-#else
-      tcb->xcp.regs[REG_PRIMASK]    = 1;
-#endif
       tcb->xcp.regs[REG_XPSR]       = ARMV7M_XPSR_T;
 #ifdef CONFIG_BUILD_PROTECTED
       tcb->xcp.regs[REG_LR]         = EXC_RETURN_THREAD;

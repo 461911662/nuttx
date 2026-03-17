@@ -406,7 +406,7 @@ struct usbtrace_s
 struct trace_msg_t
 {
   uint16_t        id;   /* 8-bit ID value */
-  FAR const char *str;  /* String assoiciated with the ID */
+  FAR const char *str;  /* String associated with the ID */
 };
 #endif
 
@@ -510,7 +510,7 @@ void usbtrace(uint16_t event, uint16_t value);
 #ifdef CONFIG_USBDEV_TRACE
 int usbtrace_enumerate(trace_callback_t callback, void *arg);
 #else
-#  define usbtrace_enumerate(event)
+#  define usbtrace_enumerate(callback, arg) (0)
 #endif
 
 /****************************************************************************

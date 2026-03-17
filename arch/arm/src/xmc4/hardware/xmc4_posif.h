@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/xmc4/hardware/xmc4_posif.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -16,19 +18,22 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  *
+ ****************************************************************************/
+
+/****************************************************************************
  * May include some logic from sample code provided by Infineon:
  *
- * Copyright (C) 2011-2015 Infineon Technologies AG. All rights reserved.
+ *   Copyright (C) 2011-2015 Infineon Technologies AG. All rights reserved.
  *
  * Infineon Technologies AG (Infineon) is supplying this software for use
  * with Infineon's microcontrollers.  This file can be freely distributed
  * within development tools that are supporting such microcontrollers.
  *
- * THIS SOFTWARE IS PROVIDED AS IS. NO WARRANTIES, WHETHER EXPRESS,
- * IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY TO THIS
- * SOFTWARE. INFINEON SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR
- * SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
+ * THIS SOFTWARE IS PROVIDED AS IS. NO WARRANTIES, WHETHER EXPRESS, IMPLIED
+ * OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY TO THIS
+ * SOFTWARE. INFINEON SHALL NOT, IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL,
+ * INCIDENTAL, OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
  *
  ****************************************************************************/
 
@@ -63,12 +68,12 @@
 /* Hall Sensor Mode Registers */
 
 #define XMC4_POSIF_HALP_OFFSET  0x0030  /* Hall Current and Expected patterns */
-#define XMC4_POSIF_HALPS_OFFSET 0x0034  /* Hall Current and Expected Shadow paterns */
+#define XMC4_POSIF_HALPS_OFFSET 0x0034  /* Hall Current and Expected Shadow patterns */
 
 /* Multi-Channel Mode Registers */
 
-#define XMC4_POSIF_MCM_OFFSET  0x0040  /* Multi-Channel Mode Patern */
-#define XMC4_POSIF_MCSM_OFFSET 0x0044  /* Multi-Channel Mode Shadow Patern */
+#define XMC4_POSIF_MCM_OFFSET  0x0040  /* Multi-Channel Mode Pattern */
+#define XMC4_POSIF_MCSM_OFFSET 0x0044  /* Multi-Channel Mode Shadow Pattern */
 #define XMC4_POSIF_MCMS_OFFSET 0x0048  /* Multi-Channel Mode Control Set */
 #define XMC4_POSIF_MCMC_OFFSET 0x004C  /* Multi-Channel Mode Control Clear */
 #define XMC4_POSIF_MCMF_OFFSET 0x0050  /* Multi-Channel Mode Flag Status */
@@ -95,10 +100,10 @@
 #define XMC4_POSIF0_MIDR  (XMC4_POSIF0_BASE + XMC4_POSIF_MIDR_OFFSET)   /* Module identification register */
 
 #define XMC4_POSIF0_HALP  (XMC4_POSIF0_BASE + XMC4_POSIF_HALP_OFFSET)   /* Hall Current and Expected patterns */
-#define XMC4_POSIF0_HALPS (XMC4_POSIF0_BASE + XMC4_POSIF_HALPS_OFFSET)  /* Hall Current and Expected Shadow paterns */
+#define XMC4_POSIF0_HALPS (XMC4_POSIF0_BASE + XMC4_POSIF_HALPS_OFFSET)  /* Hall Current and Expected Shadow patterns */
 
-#define XMC4_POSIF0_MCM  (XMC4_POSIF0_BASE + XMC4_POSIF_MCM_OFFSET)   /* Multi-Channel Mode Patern */
-#define XMC4_POSIF0_MCSM (XMC4_POSIF0_BASE + XMC4_POSIF_MCSM_OFFSET)  /* Multi-Channel Mode Shadow Patern */
+#define XMC4_POSIF0_MCM  (XMC4_POSIF0_BASE + XMC4_POSIF_MCM_OFFSET)   /* Multi-Channel Mode Pattern */
+#define XMC4_POSIF0_MCSM (XMC4_POSIF0_BASE + XMC4_POSIF_MCSM_OFFSET)  /* Multi-Channel Mode Shadow Pattern */
 #define XMC4_POSIF0_MCMS (XMC4_POSIF0_BASE + XMC4_POSIF_MCMS_OFFSET)  /* Multi-Channel Mode Control Set */
 #define XMC4_POSIF0_MCMC (XMC4_POSIF0_BASE + XMC4_POSIF_MCMC_OFFSET)  /* Multi-Channel Mode Control Clear */
 #define XMC4_POSIF0_MCMF (XMC4_POSIF0_BASE + XMC4_POSIF_MCMF_OFFSET)  /* Multi-Channel Mode Flag Status */
@@ -121,10 +126,10 @@
 #define XMC4_POSIF1_MIDR  (XMC4_POSIF1_BASE + XMC4_POSIF_MIDR_OFFSET)   /* Module identification register */
 
 #define XMC4_POSIF1_HALP  (XMC4_POSIF1_BASE + XMC4_POSIF_HALP_OFFSET)   /* Hall Current and Expected patterns */
-#define XMC4_POSIF1_HALPS (XMC4_POSIF1_BASE + XMC4_POSIF_HALPS_OFFSET)  /* Hall Current and Expected Shadow paterns */
+#define XMC4_POSIF1_HALPS (XMC4_POSIF1_BASE + XMC4_POSIF_HALPS_OFFSET)  /* Hall Current and Expected Shadow patterns */
 
-#define XMC4_POSIF1_MCM  (XMC4_POSIF1_BASE + XMC4_POSIF_MCM_OFFSET)   /* Multi-Channel Mode Patern */
-#define XMC4_POSIF1_MCSM (XMC4_POSIF1_BASE + XMC4_POSIF_MCSM_OFFSET)  /* Multi-Channel Mode Shadow Patern */
+#define XMC4_POSIF1_MCM  (XMC4_POSIF1_BASE + XMC4_POSIF_MCM_OFFSET)   /* Multi-Channel Mode Pattern */
+#define XMC4_POSIF1_MCSM (XMC4_POSIF1_BASE + XMC4_POSIF_MCSM_OFFSET)  /* Multi-Channel Mode Shadow Pattern */
 #define XMC4_POSIF1_MCMS (XMC4_POSIF1_BASE + XMC4_POSIF_MCMS_OFFSET)  /* Multi-Channel Mode Control Set */
 #define XMC4_POSIF1_MCMC (XMC4_POSIF1_BASE + XMC4_POSIF_MCMC_OFFSET)  /* Multi-Channel Mode Control Clear */
 #define XMC4_POSIF1_MCMF (XMC4_POSIF1_BASE + XMC4_POSIF_MCMF_OFFSET)  /* Multi-Channel Mode Flag Status */

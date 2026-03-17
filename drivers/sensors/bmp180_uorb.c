@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/bmp180_uorb.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -38,7 +40,7 @@
 #define BMP180_MIN_INTERVAL 30000
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Type
  ****************************************************************************/
 
 struct bmp180_dev_uorb_s
@@ -50,6 +52,7 @@ struct bmp180_dev_uorb_s
   uint32_t interval;               /* Sensor acquisition interval. */
   struct bmp180_dev_s dev;
 };
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/

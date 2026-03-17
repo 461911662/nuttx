@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/x86_64/src/cmake/platform.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -33,42 +35,60 @@ foreach(FLAG ${TOOLCHAIN_DIR_FLAGS})
   endif()
 endforeach()
 
-execute_process(
-  COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} ${NUTTX_EXTRA_FLAGS}
-          --print-libgcc-file-name
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  OUTPUT_VARIABLE extra_library)
+separate_arguments(CMAKE_C_FLAG_ARGS NATIVE_COMMAND ${CMAKE_C_FLAGS})
 
-list(APPEND EXTRA_LIB ${extra_library})
+nuttx_find_toolchain_lib()
 
 if(CONFIG_LIBM_TOOLCHAIN)
-  execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} ${NUTTX_EXTRA_FLAGS}
-            --print-file-name=libm.a
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_VARIABLE extra_library)
-  list(APPEND EXTRA_LIB ${extra_library})
+  nuttx_find_toolchain_lib(libm.a)
 endif()
 
-if(CONFIG_LIBSUPCXX)
-  execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} ${NUTTX_EXTRA_FLAGS}
-            --print-file-name=libsupc++.a
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_VARIABLE extra_library)
-  list(APPEND EXTRA_LIB ${extra_library})
+if(CONFIG_LIBSUPCXX_TOOLCHAIN)
+  nuttx_find_toolchain_lib(libsupc++.a)
 endif()
 
-if(CONFIG_ARCH_COVERAGE)
-  execute_process(
-    COMMAND ${CMAKE_C_COMPILER} ${CMAKE_C_FLAGS} ${NUTTX_EXTRA_FLAGS}
-            --print-file-name=libgcov.a
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    OUTPUT_VARIABLE extra_library)
-  list(APPEND EXTRA_LIB ${extra_library})
+if(CONFIG_LIBCXXTOOLCHAIN)
+  nuttx_find_toolchain_lib(libstdc++.a)
+  list(APPEND CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES ${NUTTX_DIR}/include/cxx)
 endif()
 
-nuttx_add_extra_library(${EXTRA_LIB})
+if(CONFIG_COVERAGE_TOOLCHAIN)
+  nuttx_find_toolchain_lib(libgcov.a)
+endif()
 
-separate_arguments(CMAKE_C_FLAG_ARGS NATIVE_COMMAND ${CMAKE_C_FLAGS})
+if(CONFIG_CXX_EXCEPTION)
+  nuttx_find_toolchain_lib(libgcc_eh.a)
+endif()
+
 set(PREPROCESS ${CMAKE_C_COMPILER} ${CMAKE_C_FLAG_ARGS} -E -P -x c)
+
+if(CONFIG_ARCH_MULTIBOOT1)
+  message(STATUS "Generating: nuttx.mb1 in ELF32/multiboot1")
+  if(CONFIG_ALLSYMS)
+    set(FINAL_NUTTX_ELF "${CMAKE_BINARY_DIR}/final_nuttx")
+  else()
+    set(FINAL_NUTTX_ELF "${CMAKE_BINARY_DIR}/nuttx")
+  endif()
+  set(NUTTX_ELF "${CMAKE_BINARY_DIR}/nuttx")
+  set(NUTTX_BIN "${NUTTX_ELF}.bin")
+  set(NUTTX_REALMODE_BIN "${NUTTX_ELF}_realmode.bin")
+  set(NUTTX_MB1 "${NUTTX_ELF}.mb1")
+  add_custom_command(
+    OUTPUT ${NUTTX_BIN} ${NUTTX_REALMODE_BIN}
+    COMMAND ${CMAKE_OBJCOPY} -R .realmode -R .note.* -O binary
+            ${FINAL_NUTTX_ELF} ${NUTTX_BIN}
+    COMMAND ${CMAKE_OBJCOPY} -j .realmode -O binary ${FINAL_NUTTX_ELF}
+            ${NUTTX_REALMODE_BIN}
+    DEPENDS ${FINAL_NUTTX_ELF}
+    COMMENT "Generating binary and realmode segments from nuttx ELF")
+  add_custom_command(
+    OUTPUT ${NUTTX_MB1}
+    COMMAND
+      ${CMAKE_C_COMPILER} -m32 -no-pie -nostdlib -DNUTTX_BIN='"${NUTTX_BIN}"'
+      -DNUTTX_REALMODE_BIN='"${NUTTX_REALMODE_BIN}"'
+      ${CMAKE_SOURCE_DIR}/arch/x86_64/src/common/multiboot1.S -T
+      ${CMAKE_SOURCE_DIR}/arch/x86_64/src/common/multiboot1.ld -o ${NUTTX_MB1}
+    DEPENDS ${NUTTX_BIN} ${NUTTX_REALMODE_BIN}
+    COMMENT "Building nuttx.mb1 multiboot1 image")
+  add_custom_target(multiboot1 ALL DEPENDS ${NUTTX_MB1})
+endif()

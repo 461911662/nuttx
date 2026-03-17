@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/riscv_exit.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,31 +56,17 @@
 
 void up_exit(int status)
 {
-  struct tcb_s *tcb = this_task();
-
   /* Destroy the task at the head of the ready to run list. */
 
   nxtask_exit();
 
-  /* Now, perform the context switch to the new ready-to-run task at the
-   * head of the list.
-   */
+  /* Scheduler parameters will update inside syscall */
 
-  tcb = this_task();
-
-  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases
-   * NOTE: the API also adjusts the global IRQ control for SMP
-   */
-
-  nxsched_resume_scheduler(tcb);
-
-  /* g_running_tasks is not valid now */
-
-  g_running_tasks[this_cpu()] = NULL;
+  g_running_tasks[this_cpu()] = this_task();
 
   /* Then switch contexts */
 
-  riscv_fullcontextrestore(tcb);
+  riscv_fullcontextrestore();
 
   /* riscv_fullcontextrestore() should not return but could if the software
    * interrupts are disabled.

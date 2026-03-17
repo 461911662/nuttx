@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_rename.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,9 +37,9 @@
 #include <nuttx/fs/fs.h>
 #include <nuttx/lib/lib.h>
 
-#include "notify/notify.h"
 #include "inode/inode.h"
 #include "fs_heap.h"
+#include "vfs.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -78,7 +80,6 @@ static int pseudorename(FAR const char *oldpath, FAR struct inode *oldinode,
    * first, provided that it is not a directory.
    */
 
-next_subdir:
   SETUP_SEARCH(&newdesc, newpath, true);
   ret = inode_find(&newdesc);
   if (ret >= 0)
@@ -118,23 +119,13 @@ next_subdir:
         {
           FAR char *subdirname;
 
-          inode_release(newinode);
-
-          /* Free memory may be allocated in previous loop */
-
-          if (subdir != NULL)
-            {
-              lib_free(subdir);
-              subdir = NULL;
-            }
-
           /* Yes.. In this case, the target of the rename must be a
            * subdirectory of newinode, not the newinode itself.  For
            * example: mv b a/ must move b to a/b.
            */
 
           subdirname = basename((FAR char *)oldpath);
-          ret = asprintf(&subdir, "%s/%s", newpath, subdirname);
+          ret = fs_heap_asprintf(&subdir, "%s/%s", newpath, subdirname);
           if (ret < 0)
             {
               subdir = NULL;
@@ -143,14 +134,6 @@ next_subdir:
             }
 
           newpath = subdir;
-
-          /* This can be a recursive case, another inode may already exist
-           * at oldpth/subdirname.  In that case, we need to do this all
-           * over again.  A nasty goto is used because I am lazy.
-           */
-
-          RELEASE_SEARCH(&newdesc);
-          goto next_subdir;
         }
       else
         {
@@ -256,7 +239,7 @@ errout:
   RELEASE_SEARCH(&newdesc);
   if (subdir != NULL)
     {
-      lib_free(subdir);
+      fs_heap_free(subdir);
     }
 
   return ret;
@@ -352,15 +335,6 @@ static int mountptrename(FAR const char *oldpath, FAR struct inode *oldinode,
     {
       struct stat buf;
 
-#ifdef CONFIG_FS_NOTIFY
-      ret = oldinode->u.i_mops->stat(oldinode, oldpath, &buf);
-      if (ret >= 0)
-        {
-          oldisdir = S_ISDIR(buf.st_mode);
-        }
-#endif
-
-next_subdir:
       ret = oldinode->u.i_mops->stat(oldinode, newrelpath, &buf);
       if (ret >= 0)
         {
@@ -390,19 +364,8 @@ next_subdir:
                 }
               else
                 {
-                  /* Save subdir to free memory may be allocated in
-                   * previous loop.
-                   */
-
-                  FAR void *tmp = subdir;
-
-                  ret = asprintf(&subdir, "%s/%s", newrelpath,
+                  ret = fs_heap_asprintf(&subdir, "%s/%s", newrelpath,
                                  subdirname);
-                  if (tmp != NULL)
-                    {
-                      lib_free(tmp);
-                    }
-
                   if (ret < 0)
                     {
                       subdir = NULL;
@@ -412,14 +375,6 @@ next_subdir:
 
                   newrelpath = subdir;
                 }
-
-              /* This can be a recursive, another directory may already
-               * exist at the newrelpath.  In that case, we need to
-               * do this all over again.  A nasty goto is used because
-               * I am lazy.
-               */
-
-              goto next_subdir;
             }
           else
             {
@@ -434,6 +389,9 @@ next_subdir:
                   goto errout_with_newinode;
                 }
 
+#ifdef CONFIG_FS_NOTIFY
+              oldisdir = S_ISDIR(buf.st_mode);
+#endif
               if (oldinode->u.i_mops->unlink)
                 {
                   /* Attempt to remove the file before doing the rename.
@@ -450,6 +408,18 @@ next_subdir:
                 }
             }
         }
+#ifdef CONFIG_FS_NOTIFY
+      else
+        {
+          ret = oldinode->u.i_mops->stat(oldinode, oldrelpath, &buf);
+          if (ret < 0)
+            {
+              goto errout_with_newinode;
+            }
+
+          oldisdir = S_ISDIR(buf.st_mode);
+        }
+#endif
     }
 
   /* Perform the rename operation using the relative paths at the common
@@ -472,7 +442,7 @@ errout_with_newsearch:
   RELEASE_SEARCH(&newdesc);
   if (subdir != NULL)
     {
-      lib_free(subdir);
+      fs_heap_free(subdir);
     }
 
   return ret;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/tricore/include/inttypes.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -67,14 +69,14 @@
 #define PRIx32      "lx"
 #define PRIx64      "llx"
 
-#define PRIxPTR     "x"
+#define PRIxPTR     "lx"
 
 #define PRIX8       "X"
 #define PRIX16      "X"
 #define PRIX32      "lX"
 #define PRIX64      "llX"
 
-#define PRIXPTR     "X"
+#define PRIXPTR     "lX"
 
 #define SCNd8       "hhd"
 #define SCNd16      "hd"

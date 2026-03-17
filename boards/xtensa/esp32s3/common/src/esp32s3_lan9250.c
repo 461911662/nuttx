@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/xtensa/esp32s3/common/src/esp32s3_lan9250.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -26,16 +28,18 @@
 
 #include <debug.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
+#include <nuttx/efuse/efuse.h>
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
-#include <nuttx/irq.h>
 #include <nuttx/net/lan9250.h>
 #include <arch/board/board.h>
 
 #include "xtensa.h"
-#include "esp32s3_efuse.h"
+#include "espressif/esp_efuse.h"
 #include "esp32s3_gpio.h"
 #ifdef CONFIG_LAN9250_SPI
 #include "esp32s3_spi.h"
@@ -46,6 +50,11 @@
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
+
+#define ESP_EFUSE_MAC_START   0
+#define ESP_EFUSE_MAC_OFFSET  (ESP_EFUSE_BLK1 * ESP_EFUSE_BLK_LEN) + \
+                              ESP_EFUSE_MAC_START
+#define ESP_EFUSE_MAC_BITLEN  48
 
 /****************************************************************************
  * Private Function Protototypes
@@ -171,29 +180,63 @@ static void lan9250_disable(const struct lan9250_lower_s *lower)
  *   mac   - A pointer to a buffer where the MAC address will be stored.
  *
  * Returned Value:
- *   None
+ *   Zero (OK) on success; a negated errno value on failure.
  *
  ****************************************************************************/
 
 static int lan9250_getmac(const struct lan9250_lower_s *lower, uint8_t *mac)
 {
-  uint32_t regval[2];
-  uint8_t *data = (uint8_t *)regval;
+  int fd;
+  int ret;
   int i;
+#ifndef CONFIG_ESP32S3_UNIVERSAL_MAC_ADDRESSES_FOUR
+  uint8_t tmp;
+#endif
 
-  regval[0] = esp32s3_efuse_read_reg(EFUSE_BLK1, 0);
-  regval[1] = esp32s3_efuse_read_reg(EFUSE_BLK1, 1);
+  struct efuse_param_s param;
+  struct efuse_desc_s mac_addr =
+  {
+    .bit_offset = ESP_EFUSE_MAC_OFFSET,
+    .bit_count  = ESP_EFUSE_MAC_BITLEN
+  };
+
+  const efuse_desc_t *desc[] = {
+      &mac_addr,
+      NULL
+  };
+
+  fd = open("/dev/efuse", O_RDWR);
+  if (fd < 0)
+    {
+      printf("Failed to open /dev/efuse, error = %d!\n", errno);
+      return -EINVAL;
+    }
+
+  param.field = desc;
+  param.size  = ESP_EFUSE_MAC_BITLEN;
+  param.data  = mac;
+
+  ret = ioctl(fd, EFUSEIOC_READ_FIELD, &param);
+  if (ret < 0)
+    {
+      printf("Failed to run ioctl EFUSEIOC_READ_FIELD_BIT, error = %d!\n",
+             errno);
+      close(fd);
+      return -EINVAL;
+    }
+
+  close(fd);
 
   for (i = 0; i < 6; i++)
     {
-      mac[i] = data[5 - i];
+      mac[i] = mac[5 - i];
     }
 
 #ifdef CONFIG_ESP32S3_UNIVERSAL_MAC_ADDRESSES_FOUR
   mac[5] += 3;
 #else
   mac[5] += 1;
-  uint8_t tmp = mac[0];
+  tmp = mac[0];
   for (i = 0; i < 64; i++)
     {
       mac[0] = tmp | 0x02;
@@ -318,4 +361,3 @@ int esp32s3_lan9250_uninitialize(int port)
 
   return 0;
 }
-

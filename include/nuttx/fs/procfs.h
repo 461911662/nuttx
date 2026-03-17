@@ -130,12 +130,18 @@ struct procfs_dir_priv_s
 
 /* An entry for procfs_register_meminfo */
 
+struct mallinfo;
 struct mm_heap_s;
+struct mm_memdump_s;
+
 struct procfs_meminfo_entry_s
 {
   FAR const char *name;
   FAR struct mm_heap_s *heap;
   FAR struct procfs_meminfo_entry_s *next;
+  struct mallinfo (*mallinfo)(FAR struct mm_heap_s *);
+  void (*memdump)(FAR struct mm_heap_s *,
+                  FAR const struct mm_memdump_s *);
 #if CONFIG_MM_BACKTRACE >= 0
 
   /* This is dynamic control flag whether to turn on backtrace in the heap,
@@ -228,7 +234,7 @@ int procfs_snprintf(FAR char *buf, size_t size,
  * Name: procfs_sprintf
  *
  * Description:
- *   This function used to continous format string and copy it to buffer.
+ *   This function used to continuous format string and copy it to buffer.
  *   Every single string length must be smaller then LINEBUF_SIZE.
  *
  * Input Parameters:

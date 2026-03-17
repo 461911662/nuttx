@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/thermal/thermal_procfs.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -144,15 +146,26 @@ static ssize_t thermal_procfs_read(FAR struct file *filep,
     {
       ins->cdev->ops->get_state(ins->cdev, &current);
       procfs_sprintf(buffer, buflen, &offset,
-                     "z:%s t:%d t:%d h:%u l:%u c:%s s:%u|%u\n",
+                     "z:%s t:%d t:%d h:%u l:%u c:%s ",
                      ins->zdev->name,
                      ins->zdev->temperature,
                      ins->trip,
                      ins->upper,
                      ins->lower,
-                     ins->cdev->name,
-                     current,
-                     ins->target);
+                     ins->cdev->name);
+
+      if (ins->target == THERMAL_NO_TARGET)
+        {
+          procfs_sprintf(buffer, buflen, &offset, "s:%u|%s",
+                         current, "(invalid)");
+        }
+      else
+        {
+          procfs_sprintf(buffer, buflen, &offset, "s:%u|%u",
+                         current, ins->target);
+        }
+
+      procfs_sprintf(buffer, buflen, &offset, "\n");
     }
 
   if (offset < 0)

@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_sendfile.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -29,6 +31,7 @@
 #include <errno.h>
 #include <debug.h>
 
+#include <nuttx/fs/fs.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/net/net.h>
 #include "fs_heap.h"
@@ -334,22 +337,22 @@ ssize_t sendfile(int outfd, int infd, FAR off_t *offset, size_t count)
   FAR struct file *infile;
   int ret;
 
-  ret = fs_getfilep(outfd, &outfile);
+  ret = file_get(outfd, &outfile);
   if (ret < 0)
     {
       goto errout;
     }
 
-  ret = fs_getfilep(infd, &infile);
+  ret = file_get(infd, &infile);
   if (ret < 0)
     {
-      fs_putfilep(outfile);
+      file_put(outfile);
       goto errout;
     }
 
   ret = file_sendfile(outfile, infile, offset, count);
-  fs_putfilep(outfile);
-  fs_putfilep(infile);
+  file_put(outfile);
+  file_put(infile);
   if (ret < 0)
     {
       goto errout;

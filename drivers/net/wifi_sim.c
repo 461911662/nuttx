@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/net/wifi_sim.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -144,6 +146,7 @@ enum WLAN_STA_STATE_E
   WLAN_STA_STATE_INIT,
   WLAN_STA_STATE_CONNECTING,
   WLAN_STA_STATE_CONNECTED,
+  WLAN_STA_STATE_DISCONNECTED,
 };
 
 enum WLAN_STA_CONNERR_E
@@ -216,6 +219,7 @@ struct wifi_sim_s
   int      key_mgmt;
   int      proto;
   int      auth_alg;
+  int      auth_type;
   int      pairwise_chiper;
   int      group_cipher;
 
@@ -776,7 +780,7 @@ redo:
       p = realloc(*rbuf, size);
       if (p == NULL)
         {
-          nerr("read bss faied in realloc!\n");
+          nerr("read bss failed in realloc!\n");
           free(*rbuf);
           *rbuf = NULL;
           return -ENOMEM;
@@ -811,7 +815,7 @@ static int wifidriver_start_connect(FAR struct wifi_sim_s *wifidev)
     {
       case IW_MODE_INFRA:
         {
-          /* If wlan is connected, should be disconnect before connectting. */
+          /* If wlan is connected, should be disconnect before connecting. */
 
           /* 1. check and disconnect */
 
@@ -912,6 +916,8 @@ static int wifidriver_start_disconnect(FAR struct wifi_sim_s *wifidev)
         {
           if (wifidev->state == WLAN_STA_STATE_CONNECTED)
             {
+              wifidev->state = WLAN_STA_STATE_DISCONNECTED;
+
               /* free the connected_ap */
 
               free(wifidev->connected_ap);
@@ -1626,8 +1632,9 @@ static int wifidriver_set_auth(FAR struct wifi_sim_s *wifidev,
           /* record the value */
 
           wifidev->proto = value >> 1;
+          wifidev->auth_type = value;
 
-          ninfo("proto=%s\n", get_authstr(value));
+          ninfo("auth_type=%s\n", get_authstr(value));
         }
         break;
 
@@ -1652,14 +1659,19 @@ static int wifidriver_set_auth(FAR struct wifi_sim_s *wifidev,
 static int wifidriver_get_auth(FAR struct wifi_sim_s *wifidev,
                                FAR struct iwreq *pwrq)
 {
-  switch (wifidev->mode)
+  int flag = pwrq->u.param.flags & IW_AUTH_INDEX;
+
+  switch (flag)
     {
-      case IW_MODE_INFRA:
+      case IW_AUTH_WPA_VERSION:
+        pwrq->u.param.value = wifidev->auth_type;
         break;
-      case IW_MODE_MASTER:
+      case IW_AUTH_CIPHER_PAIRWISE:
+        pwrq->u.param.value = wifidev->pairwise_chiper;
         break;
       default:
-        break;
+        nerr("ERROR: Unknown cmd %d\n", flag);
+        return -ENOSYS;
     }
 
   return OK;
@@ -1965,6 +1977,8 @@ int wifi_sim_init(FAR struct wifi_sim_lowerhalf_s *netdev)
   priv->lower          = &netdev->lower;
   netdev->wifi         = priv;
 
+  priv->mode           = IW_MODE_AUTO;
+
   return OK;
 }
 
@@ -1982,5 +1996,25 @@ void wifi_sim_remove(FAR struct wifi_sim_lowerhalf_s *netdev)
     }
 
   kmm_free(netdev->wifi);
+}
+
+/****************************************************************************
+ * Name: wifi_sim_connected
+ ****************************************************************************/
+
+bool wifi_sim_connected(FAR struct wifi_sim_lowerhalf_s *dev)
+{
+  FAR struct wifi_sim_s *wifidev = (FAR struct wifi_sim_s *)dev->wifi;
+
+  if (wifidev->mode == IW_MODE_MASTER)
+    {
+      return true;
+    }
+  else if (wifidev->mode == IW_MODE_INFRA)
+    {
+      return wifidev->state == WLAN_STA_STATE_CONNECTED;
+    }
+
+  return false;
 }
 

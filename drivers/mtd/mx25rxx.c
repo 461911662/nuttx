@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/mtd/mx25rxx.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -36,7 +38,6 @@
 #endif
 
 #include <nuttx/kmalloc.h>
-#include <nuttx/signal.h>
 #include <nuttx/signal.h>
 #include <nuttx/fs/ioctl.h>
 #include <nuttx/spi/qspi.h>
@@ -466,7 +467,7 @@ int mx25rxx_erase_sector(FAR struct mx25rxx_dev_s *priv, off_t sector)
 
   do
     {
-      nxsig_usleep(50 * 1000);
+      nxsched_usleep(50 * 1000);
       mx25rxx_read_status(priv);
       status = priv->cmdbuf[0];
     }
@@ -491,7 +492,7 @@ int mx25rxx_erase_block(FAR struct mx25rxx_dev_s *priv, off_t block)
 
   do
     {
-      nxsig_usleep(300 * 1000);
+      nxsched_usleep(300 * 1000);
       mx25rxx_read_status(priv);
       status = priv->cmdbuf[0];
     }
@@ -517,7 +518,7 @@ int mx25rxx_erase_chip(FAR struct mx25rxx_dev_s *priv)
 
   while ((status & MX25R_SR_WIP) != 0)
     {
-      nxsig_sleep(2);
+      nxsched_sleep(2);
       mx25rxx_read_status(priv);
       status = priv->cmdbuf[0];
     }

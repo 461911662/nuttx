@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/nrf53/nrf53_gpio.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -35,6 +37,12 @@
 #include "arm_internal.h"
 #include "hardware/nrf53_gpio.h"
 #include "nrf53_gpio.h"
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static spinlock_t g_nrf53_gpio_lock = SP_UNLOCKED;
 
 /****************************************************************************
  * Private Functions
@@ -328,7 +336,7 @@ int nrf53_gpio_config(nrf53_pinset_t cfgset)
 
       pin = GPIO_PIN_DECODE(cfgset);
 
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&g_nrf53_gpio_lock);
 
       /* First, configure the port as a generic input so that we have a
        * known starting point and consistent behavior during the re-
@@ -363,7 +371,7 @@ int nrf53_gpio_config(nrf53_pinset_t cfgset)
           nrf53_gpio_sense(cfgset, port, pin);
           break;
 
-        case GPIO_OUTPUT:  /* GPIO outpout pin */
+        case GPIO_OUTPUT:  /* GPIO output pin */
           nrf53_gpio_output(cfgset, port, pin);
           break;
 
@@ -371,7 +379,7 @@ int nrf53_gpio_config(nrf53_pinset_t cfgset)
           ret = -EINVAL;
         }
 
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&g_nrf53_gpio_lock, flags);
     }
   else
     {
@@ -507,7 +515,7 @@ void nrf53_gpio_detectmode(int port, enum nrf53_gpio_detectmode_e mode)
  *
  * Description:
  *  Allow GPIO to be used by the net core.
- *  Can be used only with te app core.
+ *  Can be used only with the app core.
  *
  ****************************************************************************/
 

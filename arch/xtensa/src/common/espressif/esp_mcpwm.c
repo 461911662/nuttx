@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/xtensa/src/common/espressif/esp_mcpwm.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -190,9 +192,10 @@ struct mcpwm_motor_lowerhalf_s
 
 struct mcpwm_capture_event_data_s
 {
-  uint32_t pos_edge_count;
-  uint32_t neg_edge_count;
-  uint32_t last_pos_edge_count;
+  uint32_t pos_edge_count;         /* Counter value on positive edge */
+  uint32_t neg_edge_count;         /* Counter value on negative edge */
+  uint32_t last_pos_edge_count;    /* Last counter value on positive edge */
+  uint32_t pos_edge_square_count;  /* Number of positive edges */
 };
 
 struct mcpwm_cap_channel_lowerhalf_s
@@ -238,6 +241,8 @@ static int esp_capture_getduty(struct cap_lowerhalf_s *lower,
                                uint8_t *duty);
 static int esp_capture_getfreq(struct cap_lowerhalf_s *lower,
                                uint32_t *freq);
+static int esp_capture_getedges(struct cap_lowerhalf_s *lower,
+                                uint32_t *edges);
 #endif
 
 /* MCPWM Motor Control */
@@ -351,6 +356,7 @@ static const struct cap_ops_s mcpwm_cap_ops =
   .stop        = esp_capture_stop,
   .getduty     = esp_capture_getduty,
   .getfreq     = esp_capture_getfreq,
+  .getedges    = esp_capture_getedges,
 };
 
 /* Data structures for the available capture channels */
@@ -452,6 +458,7 @@ static int esp_motor_setup(struct motor_lowerhalf_s *dev)
   if ((priv->state.state == MOTOR_STATE_FAULT) ||
       (priv->state.state == MOTOR_STATE_CRITICAL))
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Motor is in fault state. Clear faults first\n");
       return ERROR;
     }
@@ -577,6 +584,7 @@ static int esp_motor_stop(struct motor_lowerhalf_s *dev)
   flags = spin_lock_irqsave(&g_mcpwm_common.mcpwm_spinlock);
   if (priv->state.state == MOTOR_STATE_IDLE)
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Motor already stopped\n");
       return -EPERM;
     }
@@ -593,6 +601,7 @@ static int esp_motor_stop(struct motor_lowerhalf_s *dev)
   ret = esp_motor_set_duty_cycle(priv, 0.0);
   if (ret < 0)
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Failed setting duty cycle to 0 on stop: %d\n", ret);
       return ret;
     }
@@ -647,6 +656,7 @@ static int esp_motor_start(struct motor_lowerhalf_s *dev)
   flags = spin_lock_irqsave(&g_mcpwm_common.mcpwm_spinlock);
   if (priv->state.state == MOTOR_STATE_RUN)
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Motor already running\n");
       return -EINVAL;
     }
@@ -654,6 +664,7 @@ static int esp_motor_start(struct motor_lowerhalf_s *dev)
   if ((priv->state.state == MOTOR_STATE_CRITICAL) ||
        (priv->state.state == MOTOR_STATE_FAULT))
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Motor is in fault state\n");
       return -EINVAL;
     }
@@ -661,6 +672,7 @@ static int esp_motor_start(struct motor_lowerhalf_s *dev)
   ret = esp_motor_pwm_config(priv);
   if (ret < 0)
     {
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       mtrerr("Failed setting PWM configuration\n");
       return ret;
     }
@@ -680,6 +692,7 @@ static int esp_motor_start(struct motor_lowerhalf_s *dev)
       ret = esp_motor_set_duty_cycle(priv, duty);
       if (ret < 0)
         {
+          spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
           mtrerr("Failed starting motor\n");
           return ret;
         }
@@ -1054,6 +1067,7 @@ static int esp_motor_fault_configure(struct mcpwm_motor_lowerhalf_s *lower,
       mcpwm_ll_intr_enable(hal->dev,
                            MCPWM_LL_EVENT_FAULT_EXIT(lower->fault_id),
                            false);
+      spin_unlock_irqrestore(&g_mcpwm_common.mcpwm_spinlock, flags);
       return OK;
     }
 
@@ -1133,7 +1147,7 @@ static int esp_motor_fault_configure(struct mcpwm_motor_lowerhalf_s *lower,
 
 #ifdef CONFIG_ESP_MCPWM_MOTOR
 static int esp_motor_set_duty_cycle(struct mcpwm_motor_lowerhalf_s *lower,
-  float duty)
+                                    float duty)
 {
   DEBUGASSERT(lower != NULL);
 
@@ -1148,7 +1162,7 @@ static int esp_motor_set_duty_cycle(struct mcpwm_motor_lowerhalf_s *lower,
   uint32_t pwm_count = -1 * lower->counter_peak * (duty - 1.0);
   mcpwm_ll_operator_set_compare_value(hal->dev, lower->operator_id,
                                       MCPWM_GENERATOR_0, pwm_count);
-  mtrinfo("Duty %f compare value set: %u\n", duty, pwm_count);
+  mtrinfo("Duty %f compare value set: %" PRIu32 "\n", duty, pwm_count);
 
   return OK;
 }
@@ -1446,7 +1460,7 @@ static int esp_capture_start(struct cap_lowerhalf_s *lower)
     struct mcpwm_cap_channel_lowerhalf_s *)lower;
   mcpwm_hal_context_t *hal = &priv->common->hal;
   irqstate_t flags;
-  flags = spin_lock_irqsave(priv->common->mcpwm_spinlock);
+  flags = spin_lock_irqsave(&priv->common->mcpwm_spinlock);
 
   DEBUGASSERT(priv->common->initialized);
 
@@ -1469,9 +1483,10 @@ static int esp_capture_start(struct cap_lowerhalf_s *lower)
   priv->isr_count = 0;
   priv->enabled = true;
   priv->ready = false;
+  priv->data->pos_edge_square_count = 0;
 
   cpinfo("Channel enabled: %d\n", priv->channel_id);
-  spin_unlock_irqrestore(priv->common->mcpwm_spinlock, flags);
+  spin_unlock_irqrestore(&priv->common->mcpwm_spinlock, flags);
 
   return OK;
 }
@@ -1499,7 +1514,7 @@ static int esp_capture_stop(struct cap_lowerhalf_s *lower)
     struct mcpwm_cap_channel_lowerhalf_s *)lower;
   mcpwm_hal_context_t *hal = &priv->common->hal;
   irqstate_t flags;
-  flags = spin_lock_irqsave(priv->common->mcpwm_spinlock);
+  flags = spin_lock_irqsave(&priv->common->mcpwm_spinlock);
 
   /* Disable channel and interrupts */
 
@@ -1511,7 +1526,7 @@ static int esp_capture_stop(struct cap_lowerhalf_s *lower)
   priv->enabled = false;
 
   cpinfo("Channel disabled: %d\n", priv->channel_id);
-  spin_unlock_irqrestore(priv->common->mcpwm_spinlock, flags);
+  spin_unlock_irqrestore(&priv->common->mcpwm_spinlock, flags);
 
   return OK;
 }
@@ -1569,6 +1584,37 @@ static int esp_capture_getfreq(struct cap_lowerhalf_s *lower,
     struct mcpwm_cap_channel_lowerhalf_s *)lower;
   *freq = priv->freq;
   cpinfo("Get freq called from channel %d\n", priv->channel_id);
+  return OK;
+}
+#endif
+
+/****************************************************************************
+ * Name: esp_capture_getedges
+ *
+ * Description:
+ *   This function is a requirement of the upper-half driver. Returns
+ *   the last edges count value.
+ *
+ * Input Parameters:
+ *   lower - Pointer to the capture channel lower-half data structure.
+ *   edges - uint32_t pointer where the edges count value is written.
+ *
+ * Returned Value:
+ *   Returns OK on success.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ESP_MCPWM_CAPTURE
+static int esp_capture_getedges(struct cap_lowerhalf_s *lower,
+                                uint32_t *edges)
+{
+  struct mcpwm_cap_channel_lowerhalf_s *priv = (
+    struct mcpwm_cap_channel_lowerhalf_s *)lower;
+
+  DEBUGASSERT(priv != NULL);
+
+  *edges = priv->data->pos_edge_square_count;
+  cpinfo("Get edges called from channel %d\n", priv->channel_id);
   return OK;
 }
 #endif
@@ -1701,7 +1747,7 @@ static int IRAM_ATTR mcpwm_driver_isr_default(int irq, void *context,
   struct mcpwm_motor_lowerhalf_s *priv = NULL;
 #endif
 
-  flags = spin_lock_irqsave(common->mcpwm_spinlock);
+  flags = spin_lock_irqsave(&common->mcpwm_spinlock);
   status = mcpwm_ll_intr_get_status(common->hal.dev);
 
   /* Evaluate capture interrupt for all 3 cap channels */
@@ -1758,7 +1804,7 @@ static int IRAM_ATTR mcpwm_driver_isr_default(int irq, void *context,
 #ifdef CONFIG_ESP_MCPWM_CAPTURE
   if (lower == NULL)
     {
-      spin_unlock_irqrestore(common->mcpwm_spinlock, flags);
+      spin_unlock_irqrestore(&common->mcpwm_spinlock, flags);
       return OK;
     }
 
@@ -1791,6 +1837,7 @@ static int IRAM_ATTR mcpwm_driver_isr_default(int irq, void *context,
       data->last_pos_edge_count = data->pos_edge_count;
       data->pos_edge_count = cap_value;
       data->neg_edge_count = data->pos_edge_count;
+      data->pos_edge_square_count++;
       mcpwm_ll_capture_enable_negedge(common->hal.dev,
                                       lower->channel_id,
                                       true);
@@ -1823,7 +1870,7 @@ static int IRAM_ATTR mcpwm_driver_isr_default(int irq, void *context,
     }
 #endif
 
-  spin_unlock_irqrestore(common->mcpwm_spinlock, flags);
+  spin_unlock_irqrestore(&common->mcpwm_spinlock, flags);
   return OK;
 }
 #endif
@@ -1914,7 +1961,7 @@ struct motor_lowerhalf_s *esp_motor_bdc_initialize(int channel,
       return NULL;
     }
 
-  mtrinfo("Channel %d initialized. GPIO: PWM_A: %d | PWM_B: %d | Freq: %d\n",
+  mtrinfo("Ch %d initialized GPIO: PWM_A %d | PWM_B %d | Freq %" PRIu32 "\n",
           lower->channel_id, lower->generator_pins[MCPWM_GENERATOR_0],
           lower->generator_pins[MCPWM_GENERATOR_1], lower->pwm_frequency);
   return (struct motor_lowerhalf_s *) lower;

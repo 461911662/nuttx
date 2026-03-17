@@ -859,7 +859,7 @@ static inline int userfs_destroy_dispatch(FAR struct userfs_info_s *info,
       return ret;
     }
 
-  /* Speical case of resp.ret indicates an error, the destruction was
+  /* Special case of resp.ret indicates an error, the destruction was
    * refused.  So we need to return success in this case so that we
    * continue processing requests.
    */
@@ -987,7 +987,7 @@ int userfs_run(FAR const char *mountpt,
                FAR void *volinfo, size_t mxwrite)
 {
   FAR struct userfs_info_s *info;
-  FAR struct userfs_config_s config;
+  struct userfs_config_s config;
   struct sockaddr_in server;
   unsigned int iolen;
   socklen_t addrlen;

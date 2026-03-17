@@ -31,7 +31,6 @@
 #include <errno.h>
 #include <debug.h>
 
-#include <nuttx/nuttx.h>
 #include <nuttx/irq.h>
 #include <nuttx/fs/fs.h>
 #include <nuttx/net/net.h>
@@ -71,9 +70,12 @@
  *
  ****************************************************************************/
 
-static inline void
-group_release(FAR struct task_group_s *group, uint8_t ttype)
+static inline void group_release(FAR struct task_group_s *group)
 {
+  /* Destroy the mutex */
+
+  nxrmutex_destroy(&group->tg_mutex);
+
   task_uninit_info(group);
 
 #if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_SCHED_CHILD_STATUS)
@@ -84,7 +86,9 @@ group_release(FAR struct task_group_s *group, uint8_t ttype)
 
   /* Release pending signals */
 
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   nxsig_release(group);
+#endif
 
 #ifndef CONFIG_DISABLE_PTHREAD
   /* Release pthread resources */
@@ -98,13 +102,11 @@ group_release(FAR struct task_group_s *group, uint8_t ttype)
 
   /* Free resources held by the file descriptor list */
 
-  files_putlist(&group->tg_filelist);
+  fdlist_free(&group->tg_fdlist);
 
-#ifndef CONFIG_DISABLE_ENVIRON
   /* Release all shared environment variables */
 
   env_release(group);
-#endif
 
   /* Destroy the mm_map list */
 
@@ -123,18 +125,13 @@ group_release(FAR struct task_group_s *group, uint8_t ttype)
     }
 #endif
 
+  /* Mark the group as deleted now */
+
+  group->tg_flags |= GROUP_FLAG_DELETED;
+
   /* Then drop the group freeing the allocated memory */
 
-#ifndef CONFIG_DISABLE_PTHREAD
-  if (ttype == TCB_FLAG_TTYPE_PTHREAD)
-    {
-      /* Mark the group as deleted now */
-
-      group->tg_flags |= GROUP_FLAG_DELETED;
-
-      group_drop(group);
-    }
-#endif
+  group_drop(group);
 }
 
 /****************************************************************************
@@ -176,18 +173,12 @@ void group_leave(FAR struct tcb_s *tcb)
   group = tcb->group;
   if (group)
     {
-      /* In any event, we can detach the group from the TCB so that we won't
-       * do this again.
-       */
-
-      tcb->group = NULL;
-
       /* Remove the member from group. */
 
 #ifdef HAVE_GROUP_MEMBERS
-      flags = spin_lock_irqsave(NULL);
+      flags = spin_lock_irqsave(&group->tg_lock);
       sq_rem(&tcb->member, &group->tg_members);
-      spin_unlock_irqrestore(NULL, flags);
+      spin_unlock_irqrestore(&group->tg_lock, flags);
 
       /* Have all of the members left the group? */
 
@@ -196,8 +187,14 @@ void group_leave(FAR struct tcb_s *tcb)
         {
           /* Yes.. Release all of the resource held by the task group */
 
-          group_release(group, tcb->flags & TCB_FLAG_TTYPE_MASK);
+          group_release(group);
         }
+
+      /* In any event, we can detach the group from the TCB so that we won't
+       * do this again.
+       */
+
+      tcb->group = NULL;
     }
 }
 
@@ -224,8 +221,6 @@ void group_leave(FAR struct tcb_s *tcb)
 
 void group_drop(FAR struct task_group_s *group)
 {
-  FAR struct task_tcb_s *tcb;
-
 #if defined(CONFIG_SCHED_WAITPID) && !defined(CONFIG_SCHED_HAVE_PARENT)
   /* If there are threads waiting for this group to be freed, then we cannot
    * yet free the memory resources.  Instead just mark the group deleted
@@ -240,17 +235,13 @@ void group_drop(FAR struct task_group_s *group)
     }
   else
 #endif
+
   /* Finally, if no one needs the group and it has been deleted, remove it */
 
   if (group->tg_flags & GROUP_FLAG_DELETED)
     {
-      tcb = container_of(group, struct task_tcb_s, group);
-
       /* Release the group container itself */
 
-      if (tcb->cmn.flags & TCB_FLAG_FREE_TCB)
-        {
-          kmm_free(tcb);
-        }
+      kmm_free(group);
     }
 }

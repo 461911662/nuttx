@@ -1,6 +1,8 @@
 # ##############################################################################
 # boards/arm/stm32h7/nucleo-h743zi/src/CMakeLists.txt
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -114,9 +116,23 @@ target_sources(board PRIVATE ${SRCS})
 
 if(CONFIG_STM32_APP_FORMAT_MCUBOOT)
   if(CONFIG_MCUBOOT_BOOTLOADER)
-    set_property(GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/flash-mcuboot-loader.ld")
+    set_property(
+      GLOBAL PROPERTY LD_SCRIPT
+                      "${NUTTX_BOARD_DIR}/scripts/flash-mcuboot-loader.ld")
   else()
-    set_property(GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/flash-mcuboot-app.ld")
+    set_property(
+      GLOBAL PROPERTY LD_SCRIPT
+                      "${NUTTX_BOARD_DIR}/scripts/flash-mcuboot-app.ld")
+  endif()
+elseif(CONFIG_STM32_APP_FORMAT_NXBOOT)
+  if(CONFIG_NXBOOT_BOOTLOADER)
+    set_property(
+      GLOBAL PROPERTY LD_SCRIPT
+                      "${NUTTX_BOARD_DIR}/scripts/flash-nxboot-loader.ld")
+  else()
+    set_property(
+      GLOBAL PROPERTY LD_SCRIPT
+                      "${NUTTX_BOARD_DIR}/scripts/flash-nxboot-app.ld")
   endif()
 else()
   set_property(GLOBAL PROPERTY LD_SCRIPT "${NUTTX_BOARD_DIR}/scripts/flash.ld")
@@ -126,5 +142,5 @@ if(NOT CONFIG_BUILD_FLAT)
   add_subdirectory(${NUTTX_BOARD_DIR}/kernel)
   set_property(
     GLOBAL PROPERTY LD_SCRIPT_USER ${NUTTX_BOARD_DIR}/scripts/memory.ld
-    ${NUTTX_BOARD_DIR}/scripts/user-space.ld)
+                    ${NUTTX_BOARD_DIR}/scripts/user-space.ld)
 endif()

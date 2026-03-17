@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/virtio/virtio-serial.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,11 +50,11 @@
 
 struct virtio_serial_priv_s
 {
-  /* Virtio device informations */
+  /* Virtio device information */
 
   FAR struct virtio_device *vdev;
 
-  /* Nuttx uart device informations */
+  /* Nuttx uart device information */
 
   FAR struct uart_dev_s     udev;
   char                      name[NAME_MAX];
@@ -411,7 +413,7 @@ static void virtio_serial_dmarxfree(FAR struct uart_dev_s *dev)
  * Name: virtio_serial_rxready
  *
  * Description:
- *   The virt serial receive virtqueue callback funtion
+ *   The virt serial receive virtqueue callback function
  *
  ****************************************************************************/
 
@@ -438,7 +440,7 @@ static void virtio_serial_rxready(FAR struct virtqueue *vq)
  * Name: virtio_serial_txdone
  *
  * Description:
- *   The virt serial transimit virtqueue callback funtion
+ *   The virt serial transimit virtqueue callback function
  *
  ****************************************************************************/
 
@@ -505,7 +507,7 @@ static int virtio_serial_init(FAR struct virtio_serial_priv_s *priv,
   callbacks[VIRTIO_SERIAL_RX] = virtio_serial_rxready;
   callbacks[VIRTIO_SERIAL_TX] = virtio_serial_txdone;
   ret = virtio_create_virtqueues(vdev, 0, VIRTIO_SERIAL_NUM, vqnames,
-                                 callbacks);
+                                 callbacks, NULL);
   if (ret < 0)
     {
       vrterr("virtio_device_create_virtqueue failed, ret=%d\n", ret);
@@ -668,20 +670,11 @@ int virtio_register_serial_driver(void)
  * Name: up_putc
  ****************************************************************************/
 
-int up_putc(int ch)
+void up_putc(int ch)
 {
   if (g_virtio_console != NULL)
     {
-      if (ch == '\n')
-        {
-          /* Add CR */
-
-          virtio_serial_send(g_virtio_console, '\r');
-        }
-
       virtio_serial_send(g_virtio_console, ch);
     }
-
-  return ch;
 }
 #endif

@@ -163,19 +163,6 @@ EXTERN const struct sock_intf_s g_icmp_sockif;
 void icmp_input(FAR struct net_driver_s *dev);
 
 /****************************************************************************
- * Name: icmp_sock_initialize
- *
- * Description:
- *   Initialize the IPPROTO_ICMP socket connection structures.  Called once
- *   and only from the network initialization layer.
- *
- ****************************************************************************/
-
-#ifdef CONFIG_NET_ICMP_SOCKET
-void icmp_sock_initialize(void);
-#endif
-
-/****************************************************************************
  * Name: icmp_alloc
  *
  * Description:
@@ -232,6 +219,22 @@ FAR struct icmp_conn_s *icmp_active(uint16_t id);
 #ifdef CONFIG_NET_ICMP_SOCKET
 FAR struct icmp_conn_s *icmp_nextconn(FAR struct icmp_conn_s *conn);
 #endif
+
+/****************************************************************************
+ * Name: icmp_conn_list_lock
+ *       icmp_conn_list_unlock
+ *
+ * Description:
+ *   Lock and unlock the ICMP connection list.  This is used to protect the
+ *   list of active connections.
+ *
+ * Assumptions:
+ *   This function is called from driver.
+ *
+ ****************************************************************************/
+
+void icmp_conn_list_lock(void);
+void icmp_conn_list_unlock(void);
 
 /****************************************************************************
  * Name: icmp_findconn
@@ -312,7 +315,7 @@ void icmp_poll(FAR struct net_driver_s *dev, FAR struct icmp_conn_s *conn);
  ****************************************************************************/
 
 #ifdef CONFIG_NET_ICMP_SOCKET
-ssize_t icmp_sendmsg(FAR struct socket *psock, FAR struct msghdr *msg,
+ssize_t icmp_sendmsg(FAR struct socket *psock, FAR const struct msghdr *msg,
                      int flags);
 #endif
 

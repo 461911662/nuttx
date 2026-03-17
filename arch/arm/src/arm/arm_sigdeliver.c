@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/arm/arm_sigdeliver.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -54,7 +56,6 @@
 void arm_sigdeliver(void)
 {
   struct tcb_s *rtcb = this_task();
-  uint32_t *regs = rtcb->xcp.saved_regs;
 
   board_autoled_on(LED_SIGNAL);
 
@@ -97,5 +98,7 @@ void arm_sigdeliver(void)
   /* Then restore the correct state for this thread of execution. */
 
   board_autoled_off(LED_SIGNAL);
-  arm_fullcontextrestore(regs);
+
+  rtcb->xcp.regs = rtcb->xcp.saved_regs;
+  arm_fullcontextrestore();
 }

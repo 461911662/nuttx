@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/z80/src/common/z80_exit.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -65,11 +67,6 @@ void up_exit(int status)
    */
 
   tcb = this_task();
-  sinfo("New Active Task TCB=%p\n", tcb);
-
-  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases */
-
-  nxsched_resume_scheduler(tcb);
 
 #ifdef CONFIG_ARCH_ADDRENV
   /* Make sure that the address environment for the previously running
@@ -79,7 +76,14 @@ void up_exit(int status)
    */
 
   addrenv_switch(tcb);
+  tcb = this_task();
 #endif
+
+  sinfo("New Active Task TCB=%p\n", tcb);
+
+  /* Adjusts time slice for SCHED_RR & SCHED_SPORADIC cases */
+
+  g_running_tasks[this_cpu()] = tcb;
 
   /* Then switch contexts */
 

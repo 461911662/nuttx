@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/hc/include/irq.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -56,6 +58,12 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+/* The CPU12 stack should be aligned at half-word (2 byte) boundaries. If
+ * necessary frame_size must be rounded up to the next boundary
+ */
+
+#define STACKFRAME_ALIGN 2
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
@@ -75,7 +83,7 @@ extern "C"
 
 /* Return the current value of the stack pointer */
 
-static inline uint16_t up_getsp(void)
+static inline_function uint16_t up_getsp(void)
 {
   uint16_t ret;
   __asm__
@@ -101,24 +109,6 @@ EXTERN volatile uint8_t *g_current_regs;
  ****************************************************************************/
 
 /****************************************************************************
- * Name: up_cpu_index
- *
- * Description:
- *   Return an index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- * Input Parameters:
- *   None
- *
- * Returned Value:
- *   An integer index in the range of 0 through (CONFIG_SMP_NCPUS-1) that
- *   corresponds to the currently executing CPU.
- *
- ****************************************************************************/
-
-#define up_cpu_index() (0)
-
-/****************************************************************************
  * Inline functions
  ****************************************************************************/
 
@@ -142,6 +132,16 @@ static inline_function void up_set_current_regs(FAR uint8_t *regs)
  ****************************************************************************/
 
 #define up_interrupt_context() (up_current_regs() != NULL)
+
+/****************************************************************************
+ * Name: up_getusrsp
+ ****************************************************************************/
+
+static inline_function uintptr_t up_getusrsp(void *regs)
+{
+  uint8_t *ptr = regs;
+  return (uintptr_t)(ptr[REG_SPH] << 8 | ptr[REG_SPL]);
+}
 
 /****************************************************************************
  * Public Function Prototypes

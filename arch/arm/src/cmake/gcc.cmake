@@ -1,6 +1,8 @@
 # ##############################################################################
 # arch/arm/src/cmake/gcc.cmake
 #
+# SPDX-License-Identifier: Apache-2.0
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more contributor
 # license agreements.  See the NOTICE file distributed with this work for
 # additional information regarding copyright ownership.  The ASF licenses this
@@ -53,26 +55,32 @@ endif()
 
 set(NO_LTO "-fno-lto")
 
-if(CMAKE_C_COMPILER_VERSION VERSION_GREATER 4.9)
-  # force color for gcc > 4.9
-  add_compile_options(-fdiagnostics-color=always)
-endif()
-
 # Workaround to skip -Warray-bounds check due to bug of GCC-12: Wrong warning
 # array subscript [0] is outside array bounds:
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 
-execute_process(COMMAND ${CMAKE_C_COMPILER} --version
-                OUTPUT_VARIABLE GCC_VERSION_OUTPUT)
-string(REGEX MATCH "\\+\\+.* ([0-9]+)\\.[0-9]+" GCC_VERSION_REGEX
-             "${GCC_VERSION_OUTPUT}")
-set(GCCVER ${CMAKE_MATCH_1})
+if(CONFIG_ARCH_TOOLCHAIN_GNU AND NOT CONFIG_ARCH_TOOLCHAIN_CLANG)
+  execute_process(COMMAND ${CMAKE_C_COMPILER} --version
+                  OUTPUT_VARIABLE GCC_VERSION_OUTPUT)
+  string(REGEX MATCH "([0-9]+)\\.[0-9]+" GCC_VERSION_REGEX
+               "${GCC_VERSION_OUTPUT}")
+  set(GCCVER ${CMAKE_MATCH_1})
 
-if(GCCVER EQUAL 12)
-  add_compile_options(--param=min-pagesize=0)
-  if(CONFIG_ARCH_RAMFUNCS)
-    add_link_options(-Wl,--no-warn-rwx-segments)
+  if(GCCVER GREATER_EQUAL 12)
+    add_link_options(-Wl,--print-memory-usage)
+    add_compile_options(--param=min-pagesize=0)
+    if(CONFIG_ARCH_RAMFUNCS OR NOT CONFIG_BOOT_RUNFROMFLASH)
+      add_link_options(-Wl,--no-warn-rwx-segments)
+    endif()
   endif()
+endif()
+
+# override the responsible file flag
+
+if(CMAKE_GENERATOR MATCHES "Ninja")
+  set(CMAKE_C_RESPONSE_FILE_FLAG "$DEFINES $INCLUDES $FLAGS @")
+  set(CMAKE_CXX_RESPONSE_FILE_FLAG "$DEFINES $INCLUDES $FLAGS @")
+  set(CMAKE_ASM_RESPONSE_FILE_FLAG "$DEFINES $INCLUDES $FLAGS @")
 endif()
 
 # override the ARCHIVE command
@@ -118,7 +126,7 @@ else()
 endif()
 
 if(CONFIG_STACK_CANARIES)
-  add_compile_options(-fstack-protector-all)
+  add_compile_options(${CONFIG_STACK_CANARIES_LEVEL})
 endif()
 
 if(CONFIG_STACK_USAGE)
@@ -129,12 +137,8 @@ if(CONFIG_STACK_USAGE_WARNING AND NOT "${CONFIG_STACK_USAGE_WARNING}" STREQUAL
   add_compile_options(-Wstack-usage=${CONFIG_STACK_USAGE_WARNING})
 endif()
 
-if(CONFIG_SCHED_GCOV)
-  add_compile_options(-fprofile-generate -ftest-coverage)
-endif()
-
-if(CONFIG_SCHED_GPROF_ALL)
-  add_compile_options(-pg)
+if(CONFIG_COVERAGE_ALL)
+  add_compile_options(-fprofile-arcs -ftest-coverage -fno-inline)
 endif()
 
 if(CONFIG_MM_UBSAN_ALL)
@@ -145,7 +149,7 @@ if(CONFIG_MM_UBSAN_TRAP_ON_ERROR)
   add_compile_options(-fsanitize-undefined-trap-on-error)
 endif()
 
-if(CONFIG_MM_KASAN_ALL)
+if(CONFIG_MM_KASAN_INSTRUMENT_ALL)
   add_compile_options(-fsanitize=kernel-address)
 endif()
 
@@ -165,6 +169,10 @@ endif()
 
 if(CONFIG_ARCH_INSTRUMENT_ALL)
   add_compile_options(-finstrument-functions)
+endif()
+
+if(CONFIG_PROFILE_ALL)
+  add_compile_options(-pg)
 endif()
 
 if(CONFIG_UNWINDER_ARM)
@@ -232,10 +240,15 @@ if(CONFIG_DEBUG_SYMBOLS)
   add_compile_options(${CONFIG_DEBUG_SYMBOLS_LEVEL})
 endif()
 
-add_compile_options(
-  -Wno-attributes -Wno-unknown-pragmas
-  $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
-  $<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+set(PICFLAGS -fpic -fPIE -mno-pic-data-is-text-relative -msingle-pic-base)
+
+if(CONFIG_BUILD_PIC)
+  add_compile_options(${PICFLAGS} -mpic-register=r9)
+  add_link_options(-Wl,--emit-relocs)
+endif()
+
+add_compile_options(-Wno-attributes -Wno-unknown-pragmas
+                    $<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>)
 
 # When all C++ code is built using GCC 7.1 or a higher version, we can safely
 # disregard warnings of the type "parameter passing for X changed in GCC 7.1."
@@ -243,6 +256,10 @@ add_compile_options(
 # https://stackoverflow.com/questions/48149323/what-does-the-gcc-warning-project-parameter-passing-for-x-changed-in-gcc-7-1-m
 
 add_compile_options(-Wno-psabi)
+
+if(NOT CONFIG_LIBCXXTOOLCHAIN)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-nostdinc++>)
+endif()
 
 if(CONFIG_CXX_STANDARD)
   add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-std=${CONFIG_CXX_STANDARD}>)

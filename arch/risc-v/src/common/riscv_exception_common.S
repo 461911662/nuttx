@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/common/riscv_exception_common.S
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -24,6 +26,7 @@
 
 #include <nuttx/config.h>
 
+#include <nuttx/irq.h>
 #include <arch/arch.h>
 #include <arch/irq.h>
 #include <arch/mode.h>
@@ -78,11 +81,15 @@
 #  endif
 #endif
 
-/* Provide a default section for the exeception handler. */
+/* Provide a default section for the exception handler. */
 
 #ifndef EXCEPTION_SECTION
 #  define EXCEPTION_SECTION .text
 #endif
+
+/* Valid exceptions causes range is from 0 to 63 */
+
+#define CAUSE_EXCEPTION   63
 
 /****************************************************************************
  * Public Symbols
@@ -104,6 +111,8 @@
   .align  8
 
 exception_common:
+  .cfi_sections .debug_frame
+  .cfi_startproc
 
 #ifdef CONFIG_ARCH_KERNEL_STACK
   /* Take the kernel stack into use */
@@ -149,9 +158,17 @@ exception_common:
   REGSTORE   s3, REG_SP(sp)
 
 #ifdef CONFIG_LIB_SYSCALL
+  csrr       tp, CSR_SCRATCH      /* Load kernel TP */
+  REGLOAD    tp, RISCV_PERCPU_TCB(tp)
+
   /* Check whether it is an exception or interrupt */
 
   blt        s2, x0, handle_irq   /* If cause < 0 it is interrupt */
+
+  /* Adjust exception cause range from 0 to 63 */
+
+  li         s3, CAUSE_EXCEPTION
+  and        s2, s2, s3
 
   /* Is it a system call ? */
 
@@ -172,9 +189,6 @@ exception_common:
 1:
   addi       s1, s1, 0x4          /* Must move EPC forward by +4 */
   REGSTORE   s1, REG_EPC(sp)      /* Updated EPC to user context */
-
-  csrr       tp, CSR_SCRATCH      /* Load kernel TP */
-  REGLOAD    tp, RISCV_PERCPU_TCB(tp)
 
   mv         a7, sp               /* a7 = context */
   call       x1, dispatch_syscall /* Dispatch the system call */
@@ -198,6 +212,15 @@ handle_irq:
 
   mv         a0, s2               /* exception cause */
   mv         a1, sp               /* context = sp */
+  mv         fp, a1               /* Use fp to debug frame */
+  .cfi_def_cfa fp, 0              /* Register in fp, so we just set fp as frame */
+  .cfi_offset x2, 8               /* Toolchain not support macro, is REG_X2 * 4 */
+  .cfi_offset ra, 0               /* Toolchain not support macro, is REG_EPC * 4 */
+
+#ifdef CONFIG_SCHED_BACKTRACE
+  REGLOAD    ra, REG_EPC(sp)
+  REGLOAD    s0, REG_X8(sp)
+#endif
 
 #if CONFIG_ARCH_INTERRUPTSTACK > 15
 
@@ -205,22 +228,44 @@ handle_irq:
 
   setintstack t0, t1
 
+  addi       sp, sp, -(INT_REG_SIZE * 2)
+  REGSTORE   ra, INT_REG_SIZE(sp)
+  REGSTORE   s0, 0(sp)
+  add        s0, sp, (INT_REG_SIZE * 2)
+
   /* Call interrupt handler in C */
 
   jal        x1, riscv_dispatch_irq
+
+  REGLOAD    ra, INT_REG_SIZE(sp)
+  REGLOAD    s0, 0(sp)
+  add        sp, sp, (INT_REG_SIZE * 2)
 
 #else
   /* Reserve some space for current_regs if interrupt stack disabled */
 
+  addi       sp, sp, -(INT_REG_SIZE * 2)
+  REGSTORE   ra, INT_REG_SIZE(sp)
+  REGSTORE   s0, 0(sp)
+  add        s0, sp, (INT_REG_SIZE * 2)
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   addi       sp, sp, -XCPTCONTEXT_SIZE
+#endif
 
   /* Call interrupt handler in C */
 
   jal        x1, riscv_dispatch_irq
 
+  REGLOAD    ra, INT_REG_SIZE(sp)
+  REGLOAD    s0, 0(sp)
+  add        sp, sp, (INT_REG_SIZE * 2)
+
+#ifdef CONFIG_ENABLE_ALL_SIGNALS
   /* Restore sp */
 
   addi       sp, sp, XCPTCONTEXT_SIZE
+#endif
 #endif
 
 return_from_exception:
@@ -238,9 +283,8 @@ return_from_exception:
 #ifdef CONFIG_LIB_SYSCALL
   /* Store tcb to scratch register */
 
-  call       x1, nxsched_self
   csrr       s1, CSR_SCRATCH
-  REGSTORE   a0, RISCV_PERCPU_TCB(s1)
+  REGSTORE   tp, RISCV_PERCPU_TCB(s1)
 #endif
 
 #ifdef CONFIG_ARCH_KERNEL_STACK
@@ -272,6 +316,7 @@ return_from_exception:
   /* Return from exception */
 
   ERET
+  .cfi_endproc
 
 /****************************************************************************
  * Function: riscv_jump_to_user
@@ -325,8 +370,8 @@ riscv_jump_to_user:
   .type   g_intstackalloc, object
   .type   g_intstacktop, object
 g_intstackalloc:
-  .skip  STACK_ALIGN_UP(STACK_ALLOC_SIZE)
+  .skip  STACKFRAME_ALIGN_UP(STACK_ALLOC_SIZE)
 g_intstacktop:
   .size  g_intstacktop, 0
-  .size  g_intstackalloc, STACK_ALIGN_DOWN(STACK_ALLOC_SIZE)
+  .size  g_intstackalloc, STACKFRAME_ALIGN_DOWN(STACK_ALLOC_SIZE)
 #endif

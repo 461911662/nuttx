@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/rpmsg/rpmsg_router.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -25,9 +27,7 @@
  * Included Files
  ****************************************************************************/
 
-#include <nuttx/rpmsg/rpmsg.h>
-
-#ifdef CONFIG_RPMSG_ROUTER
+#include "rpmsg.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -41,6 +41,10 @@
 
 #define RPMSG_ROUTER_CREATE          1
 #define RPMSG_ROUTER_DESTROY         2
+#define RPMSG_ROUTER_SUSPEND         3
+#define RPMSG_ROUTER_RESUME          4
+
+#ifdef CONFIG_RPMSG_ROUTER
 
 /****************************************************************************
  * Public Types

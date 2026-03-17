@@ -22,7 +22,8 @@
 
 include $(TOPDIR)/Make.defs
 
-VERSION ?= 2022.10.0
+OPENAMP_VERSION ?= 2025.10.0
+LIBMETAL_VERSION ?= 2025.10.0
 
 include libmetal.defs
 include open-amp.defs
@@ -64,6 +65,7 @@ clean:
 	$(call CLEAN)
 
 distclean:: clean
+	$(call DELFILE, $(CSRCS:.c=.ddc) $(ASRCS:.S=.dds))
 	$(call DELFILE, Make.dep)
 	$(call DELFILE, .depend)
 

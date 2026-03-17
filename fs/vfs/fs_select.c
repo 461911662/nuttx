@@ -1,6 +1,8 @@
 /****************************************************************************
  * fs/vfs/fs_select.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -202,7 +204,7 @@ int select(int nfds, FAR fd_set *readfds, FAR fd_set *writefds,
     {
       /* Calculate the timeout in milliseconds */
 
-      msec = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
+      msec = timeout->tv_sec * 1000 + (timeout->tv_usec + 999) / 1000;
     }
   else
     {

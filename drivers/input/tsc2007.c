@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/input/tsc2007.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -475,7 +477,7 @@ static int tsc2007_transfer(FAR struct tsc2007_dev_s *priv, uint8_t cmd)
    *  least 10ms before attempting to read data from the TSC2007...
    */
 
-  nxsig_usleep(10 * 1000);
+  nxsched_usleep(10 * 1000);
 
   /* "Data access begins with the master issuing a START condition followed
    *  by the address byte ... with R/W = 1.

@@ -1,6 +1,7 @@
 /****************************************************************************
  * fs/mnemofs/mnemofs_master.c
- * Master node of mnemofs.
+ *
+ * SPDX-License-Identifier: Apache-2.0 or BSD-3-Clause
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -57,7 +58,7 @@
  *
  * Master nodes sit at the very end of the journal. The last two blocks of
  * the journal are called master blocks, and they are filled with a new
- * entry for a master node everytime it is updated. They are filled in a
+ * entry for a master node every time it is updated. They are filled in a
  * sequential manner, and thus, the latest master node can be found easily.
  * The two master blocks contain identical information, and exist to be as a
  * backup.
@@ -340,11 +341,19 @@ int mfs_mn_fmt(FAR struct mfs_sb_s * const sb, const mfs_t mblk1,
     {
       goto errout;
     }
+  else
+    {
+      ret = OK;
+    }
 
   ret = mfs_write_page(sb, buf, sz, MFS_BLK2PG(sb, mblk2), 0);
   if (predict_false(ret < 0))
     {
       goto errout;
+    }
+  else
+    {
+      ret = OK;
     }
 
   mn.mblk_idx = 1;

@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/x86_64/src/intel64/intel64_cpustart.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -31,12 +33,16 @@
 #include <arch/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/spinlock.h>
+#include <nuttx/tls.h>
 
 #include "sched/sched.h"
 #include "init/init.h"
 
+#include "x86_64_internal.h"
+
 #include "intel64_lowsetup.h"
 #include "intel64_cpu.h"
+#include "x86_64_hwdebug.h"
 
 /****************************************************************************
  * Private Types
@@ -49,6 +55,7 @@
 extern void __ap_entry(void);
 extern int x86_64_smp_call_handler(int irq, void *c, void *arg);
 extern int x86_64_smp_sched_handler(int irq, void *c, void *arg);
+extern uint64_t get_tsc_adjust(void);
 
 /****************************************************************************
  * Private Functions
@@ -80,13 +87,14 @@ static int x86_64_ap_startup(int cpu)
 
   /* Send an INIT IPI to the CPU */
 
-  regval = MSR_X2APIC_ICR_INIT | dest;
+  regval = MSR_X2APIC_ICR_INIT | MSR_X2APIC_ICR_ASSERT
+           | MSR_X2APIC_ICR_LEVEL | dest;
   write_msr(MSR_X2APIC_ICR, regval);
 
   /* Wait for 10 ms */
 
   up_mdelay(10);
-  SP_DMB();
+  UP_DMB();
 
   /* Send an STARTUP IPI to the CPU */
 
@@ -95,16 +103,13 @@ static int x86_64_ap_startup(int cpu)
 
   /* Wait for AP ready */
 
-  up_udelay(300);
-  SP_DMB();
-
-  /* Check CPU ready flag */
-
-  if (x86_64_cpu_ready_get(cpu) == false)
+  do
     {
-      sinfo("failed to startup cpu=%d\n", cpu);
-      return -EBUSY;
+      up_udelay(300);
+      UP_DMB();
+      sinfo("wait for startup cpu=%d...\n", cpu);
     }
+  while (x86_64_cpu_ready_get(cpu) == false);
 
   return OK;
 }
@@ -129,10 +134,8 @@ static int x86_64_ap_startup(int cpu)
 
 void x86_64_ap_boot(void)
 {
-  struct tcb_s *tcb = this_task();
+  struct tcb_s *tcb;
   uint8_t cpu = 0;
-
-  UNUSED(tcb);
 
   /* Do some checking on CPU compatibilities at the top of this function */
 
@@ -150,6 +153,18 @@ void x86_64_ap_boot(void)
 
   x86_64_cpu_priv_set(cpu);
 
+  tcb = current_task(cpu);
+  UNUSED(tcb);
+  up_update_task(tcb);
+
+#ifdef CONFIG_SCHED_THREAD_LOCAL
+  /* Make sure that FS_BASE is not null */
+
+  write_fsbase((uintptr_t)tcb->stack_alloc_ptr +
+               sizeof(struct tls_info_s) +
+               (_END_TBSS - _START_TDATA));
+#endif
+
   /* Configure interrupts */
 
   up_irqinitialize();
@@ -166,8 +181,10 @@ void x86_64_ap_boot(void)
 
   irq_attach(SMP_IPI_CALL_IRQ, x86_64_smp_call_handler, NULL);
   irq_attach(SMP_IPI_SCHED_IRQ, x86_64_smp_sched_handler, NULL);
-  up_enable_irq(SMP_IPI_CALL_IRQ);
-  up_enable_irq(SMP_IPI_SCHED_IRQ);
+
+  /* NOTE: IPC interrupts don't use IOAPIC but interrupts are sent
+   * directly to CPU, so we don't use up_enable_irq() API here.
+   */
 
 #ifdef CONFIG_STACK_COLORATION
   /* If stack debug is enabled, then fill the stack with a
@@ -177,6 +194,8 @@ void x86_64_ap_boot(void)
 
   x86_64_stack_color(tcb->stack_alloc_ptr, 0);
 #endif
+
+  intel64_timer_secondary_init();
 
   /* CPU ready */
 
@@ -188,6 +207,12 @@ void x86_64_ap_boot(void)
     {
       __revoke_low_memory();
     }
+
+#ifdef CONFIG_ARCH_HAVE_DEBUG
+  /* Initialize hardware debug interface */
+
+  x86_64_hwdebug_init();
+#endif
 
   /* Then transfer control to the IDLE task */
 

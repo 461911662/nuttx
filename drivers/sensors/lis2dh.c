@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/sensors/lis2dh.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -17,6 +19,19 @@
  * under the License.
  *
  ****************************************************************************/
+
+/* WARNING for developers:
+ *
+ * This driver uses the legacy style of writing sensor drivers for NuttX. The
+ * project has since decided to adopt a new sensor framework in order to
+ * have a consistent API and feature-set.
+ *
+ * Sensors which use the uORB framework are typically suffixed "_uorb". You
+ * can also visit the documentation about the new sensor framework to learn
+ * more.
+ */
+
+#warning "This is a deprecated legacy sensor driver."
 
 /****************************************************************************
  * Included Files
@@ -49,10 +64,6 @@
 #  define lis2dh_dbg(x, ...)        sninfo(x, ##__VA_ARGS__)
 #endif
 
-#ifndef CONFIG_LIS2DH_I2C_FREQUENCY
-#  define CONFIG_LIS2DH_I2C_FREQUENCY   400000
-#endif
-
 #ifdef CONFIG_LIS2DH_DRIVER_SELFTEST
 #  define LSB_AT_10BIT_RESOLUTION       4
 #  define LSB_AT_12BIT_RESOLUTION       1
@@ -72,7 +83,7 @@
 #define LIS2DH_COUNT_INTS
 
 /****************************************************************************
- * Private Data Types
+ * Private Types
  ****************************************************************************/
 
 enum interrupts
@@ -1084,7 +1095,7 @@ static int lis2dh_handle_selftest(FAR struct lis2dh_dev_s *priv)
       goto out;
     }
 
-  nxsig_usleep(20000);
+  nxsched_usleep(20000);
 
   /* Now INT1 should have been latched high and INT2 should be still low */
 
@@ -1116,7 +1127,7 @@ static int lis2dh_handle_selftest(FAR struct lis2dh_dev_s *priv)
           goto out;
         }
 
-      nxsig_usleep(20000);
+      nxsched_usleep(20000);
 
       if (priv->config->read_int2_pin() != 1)
         {
@@ -1223,7 +1234,7 @@ static FAR const struct lis2dh_vector_s *
 
   while (--retries_left > 0)
     {
-      nxsig_usleep(20000);
+      nxsched_usleep(20000);
       if (lis2dh_data_available(dev))
         {
           if (lis2dh_access(dev, ST_LIS2DH_OUT_X_L_REG, retval,
@@ -1678,7 +1689,7 @@ static int lis2dh_reboot(FAR struct lis2dh_dev_s *dev)
           return -ETIMEDOUT;
         }
 
-       nxsig_usleep(1);
+       nxsched_usleep(1);
     }
   while (true);
 

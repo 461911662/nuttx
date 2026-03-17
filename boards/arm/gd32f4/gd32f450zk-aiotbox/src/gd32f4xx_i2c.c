@@ -1,6 +1,8 @@
 /****************************************************************************
  * boards/arm/gd32f4/gd32f450zk-aiotbox/src/gd32f4xx_i2c.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -48,7 +50,7 @@ void gd32_i2c_initialize(void)
 
   if (i2c == NULL)
     {
-      i2cerr("init i2c0 faild.\n");
+      i2cerr("init i2c0 failed.\n");
       return;
     }
   else
@@ -57,11 +59,11 @@ void gd32_i2c_initialize(void)
 
       if (ret < 0)
         {
-          i2cerr("registering i2c0 faild.\n");
+          i2cerr("registering i2c0 failed.\n");
         }
       else
         {
-          i2cinfo("registering i2c0 successed.\n");
+          i2cinfo("registering i2c0 succeeded.\n");
         }
     }
 
@@ -72,7 +74,7 @@ void gd32_i2c_initialize(void)
 
   if (i2c == NULL)
     {
-      i2cerr("init i2c1 faild.\n");
+      i2cerr("init i2c1 failed.\n");
       return;
     }
   else
@@ -81,11 +83,11 @@ void gd32_i2c_initialize(void)
 
       if (ret < 0)
         {
-          i2cerr("registering i2c1 faild.\n");
+          i2cerr("registering i2c1 failed.\n");
         }
       else
         {
-          i2cinfo("registering i2c1 successed.\n");
+          i2cinfo("registering i2c1 succeeded.\n");
         }
     }
 

@@ -33,6 +33,7 @@
 #include <nuttx/irq.h>
 #include <nuttx/arch.h>
 #include <nuttx/wdog.h>
+#include <nuttx/sched_note.h>
 
 #include "sched/sched.h"
 #include "wdog/wdog.h"
@@ -59,70 +60,56 @@
 
 int wd_cancel(FAR struct wdog_s *wdog)
 {
-  irqstate_t flags;
-  int ret;
+  FAR struct wdog_s *first;
+  irqstate_t         flags;
+  int                  ret = -EINVAL;
 
-  flags = enter_critical_section();
+  if (wdog != NULL)
+    {
+      /* Prohibit timer interactions with the timer queue until the
+       * cancellation is complete
+       */
 
-  ret = wd_cancel_irq(wdog);
+      flags = enter_critical_section();
 
-  leave_critical_section(flags);
+      /* Make sure that the watchdog is valid and still active. */
+
+      if (WDOG_ISACTIVE(wdog))
+        {
+          first = list_first_entry(&g_wdactivelist, struct wdog_s, node);
+
+          /* Now, remove the watchdog from the timer queue */
+
+          list_delete_fast(&wdog->node);
+
+          /* Mark the watchdog inactive */
+
+          wdog->func = NULL;
+
+          if (first == wdog && !wd_in_callback())
+            {
+              /* If the watchdog is at the head of the timer queue, then
+               * we will need to re-adjust the interval timer that will
+               * generate the next interval event.
+               */
+
+              if (!list_is_empty(&g_wdactivelist))
+                {
+                  wd_timer_start(wd_next_expire(), false);
+                }
+              else
+                {
+                  wd_timer_cancel();
+                }
+            }
+
+          ret = OK;
+        }
+
+      leave_critical_section(flags);
+      sched_note_wdog(NOTE_WDOG_CANCEL, (FAR void *)wdog->func,
+                      (FAR void *)(uintptr_t)wdog->expired);
+    }
 
   return ret;
-}
-
-/****************************************************************************
- * Name: wd_cancel_irq
- *
- * Description:
- *   This function cancels a currently running watchdog timer. Watchdog
- *   timers may be cancelled from the interrupt level.  This function is
- *   intended to be called from critical sections.
- *
- * Input Parameters:
- *   wdog - ID of the watchdog to cancel.
- *
- * Returned Value:
- *   Zero (OK) is returned on success;  A negated errno value is returned to
- *   indicate the nature of any failure.
- *
- ****************************************************************************/
-
-int wd_cancel_irq(FAR struct wdog_s *wdog)
-{
-  if (wdog == NULL)
-    {
-      return -EINVAL;
-    }
-
-  /* Prohibit timer interactions with the timer queue until the
-   * cancellation is complete
-   */
-
-  /* Make sure that the watchdog is still active. */
-
-  if (WDOG_ISACTIVE(wdog))
-    {
-      bool head = list_is_head(&g_wdactivelist, &wdog->node);
-
-      /* Now, remove the watchdog from the timer queue */
-
-      list_delete(&wdog->node);
-
-      /* Mark the watchdog inactive */
-
-      wdog->func = NULL;
-
-      if (head)
-        {
-          /* If the watchdog is at the head of the timer queue, then
-           * we will need to re-adjust the interval timer that will
-           * generate the next interval event.
-           */
-
-          nxsched_reassess_timer();
-        }
-    }
-
-  return OK;
 }

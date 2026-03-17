@@ -809,7 +809,7 @@ static void emac_deinit_dma(struct esp32_emac_s *priv)
  *   0 is returned on success.  Otherwise, a negated errno value is
  *   returned indicating the nature of the failure:
  *
- *     -EBUSY is returned if no TX descrption is valid.
+ *     -EBUSY is returned if no TX description is valid.
  *
  ****************************************************************************/
 
@@ -1760,6 +1760,8 @@ static int emac_ifup(struct net_driver_s *dev)
 
   leave_critical_section(flags);
 
+  netdev_carrier_on(dev);
+
   return 0;
 }
 
@@ -1817,6 +1819,8 @@ static int emac_ifdown(struct net_driver_s *dev)
   priv->ifup = false;
 
   leave_critical_section(flags);
+
+  netdev_carrier_off(dev);
 
   return 0;
 }

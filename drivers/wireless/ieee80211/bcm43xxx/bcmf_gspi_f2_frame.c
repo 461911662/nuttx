@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/wireless/ieee80211/bcm43xxx/bcmf_gspi_f2_frame.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -327,7 +329,7 @@ int bcmf_gspi_send_f2_frame(FAR struct bcmf_dev_s *priv)
       /* TODO handle this case */
 
       wlwarn("No credit to send frame\n");
-      nxsig_usleep(10 * 1000);
+      nxsched_usleep(10 * 1000);
     }
 
   if (nxmutex_lock(&gbus->queue_lock) < 0)

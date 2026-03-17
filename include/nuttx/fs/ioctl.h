@@ -28,6 +28,8 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+
+#include <stdbool.h>
 #include <sys/types.h>
 
 /****************************************************************************
@@ -106,6 +108,11 @@
 #define _PINCTRLBASE    (0x4000) /* Pinctrl driver ioctl commands */
 #define _PCIBASE        (0x4100) /* Pci ioctl commands */
 #define _I3CBASE        (0x4200) /* I3C driver ioctl commands */
+#define _MSIOCBASE      (0x4300) /* Mouse ioctl commands */
+#define _I2SOCBASE      (0x4400) /* I2S driver ioctl commands */
+#define _1WIREBASE      (0x4500) /* 1WIRE ioctl commands */
+#define _EEPIOCBASE     (0x4600) /* EEPROM driver ioctl commands */
+#define _PTPBASE        (0x4700) /* PTP ioctl commands */
 #define _WLIOCBASE      (0x8b00) /* Wireless modules ioctl network commands */
 
 /* boardctl() commands share the same number space */
@@ -232,7 +239,17 @@
                                            * OUT: Current file xip base address
                                            */
 
-/* NuttX file system ioctl definitions **************************************/
+#define FIOC_GETFLAGS       _FIOC(0x0016) /* IN:  None
+                                           * OUT: None
+                                           */
+#define FIOC_SETFLAGS       _FIOC(0x0017) /* IN:  The flags that need to set to file
+                                           * OUT: None
+                                           */
+#define FIOGCLEX            _FIOC(0x0018) /* IN:  FAR int *
+                                           * OUT: None
+                                           */
+
+/* NuttX character driver ioctl definitions *********************************/
 
 #define _DIOCVALID(c)   (_IOC_TYPE(c)==_DIOCBASE)
 #define _DIOC(nr)       _IOC(_DIOCBASE,nr)
@@ -345,6 +362,10 @@
                                            *      to return sector numbers.
                                            * OUT: Data return in user-provided
                                            *      buffer. */
+#define BIOC_DISCARD    _BIOC(0x0011)     /* Discards the block device read buffer
+                                           * IN:  None
+                                           * OUT: None (ioctl return value provides
+                                           *      success/failure indication). */
 
 /* NuttX MTD driver ioctl definitions ***************************************/
 
@@ -367,6 +388,11 @@
 
 #define _TSIOCVALID(c)    (_IOC_TYPE(c)==_TSIOCBASE)
 #define _TSIOC(nr)        _IOC(_TSIOCBASE,nr)
+
+/* NuttX mouse ioctl definitions (see nuttx/input/mouse.h) ******************/
+
+#define _MSIOCVALID(c)    (_IOC_TYPE(c)==_MSIOCBASE)
+#define _MSIOC(nr)        _IOC(_MSIOCBASE,nr)
 
 /* NuttX sensor ioctl definitions (see nuttx/sensor/ioctl.h) ****************/
 
@@ -753,9 +779,64 @@
 #define _PINCTRLIOCVALID(c) (_IOC_TYPE(c)==_PINCTRLBASE)
 #define _PINCTRLIOC(nr)     _IOC(_PINCTRLBASE,nr)
 
+/* NuttX i2s driver ioctl definitions ***************************************/
+
+/* (see nuttx/audio/i2s.h) */
+
+#define _I2SOCVALID(c) (_IOC_TYPE(c)==_I2SOCBASE)
+#define _I2SOC(nr)     _IOC(_I2SOCBASE,nr)
+
+/* 1WIRE driver ioctl definitions *******************************************/
+
+/* see nuttx/1wire/1wire.h */
+
+#define _1WIREIOCVALID(c) (_IOC_TYPE(c)==_1WIREBASE)
+#define _1WIREIOC(nr)     _IOC(_1WIREBASE,nr)
+
+/* EEPROM driver ioctl definitions ******************************************/
+
+/* (see nuttx/include/eeprom/eeprom.h */
+
+#define _EEPIOCVALID(c)    (_IOC_TYPE(c)==_EEPIOCBASE)
+#define _EEPIOC(nr)        _IOC(_EEPIOCBASE,nr)
+
+/* PTP driver ioctl definitions *********************************************/
+
+/* see nuttx/include/ptp_clock.h */
+
+#define _PTPIOCVALID(c)       (_IOC_TYPE(c)==_PTPBASE)
+#define _PTPIOC(nr)           _IOC(_PTPBASE,nr)
+
 /****************************************************************************
  * Public Type Definitions
  ****************************************************************************/
+
+struct geometry
+{
+  bool      geo_available;    /* true: The device is available */
+  bool      geo_mediachanged; /* true: The media has changed since last query */
+  bool      geo_writeenabled; /* true: It is okay to write to this device */
+  blkcnt_t  geo_nsectors;     /* Number of sectors on the device */
+  blksize_t geo_sectorsize;   /* Size of one sector */
+
+  /* NULL-terminated string representing the device model */
+
+  char      geo_model[NAME_MAX + 1];
+};
+
+struct partition_info_s
+{
+  size_t    numsectors;   /* Number of sectors in the partition */
+  size_t    sectorsize;   /* Size in bytes of a single sector */
+  off_t     startsector;  /* Offset to the first section/block of the
+                           * managed sub-region */
+
+  /* NULL-terminated string representing the name of the parent node of the
+   * partition.
+   */
+
+  char      parent[NAME_MAX + 1];
+};
 
 struct pipe_peek_s
 {

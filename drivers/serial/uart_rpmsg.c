@@ -1,6 +1,8 @@
 /****************************************************************************
  * drivers/serial/uart_rpmsg.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -217,7 +219,10 @@ static void uart_rpmsg_dmasend(FAR struct uart_dev_s *dev)
   msg->header.result  = -ENXIO;
   msg->header.cookie  = (uintptr_t)dev;
 
-  rpmsg_send_nocopy(&priv->ept, msg, sizeof(*msg) + len);
+  if (rpmsg_send_nocopy(&priv->ept, msg, sizeof(*msg) + len) < 0)
+    {
+      rpmsg_release_tx_buffer(&priv->ept, msg);
+    }
 }
 
 static void uart_rpmsg_dmareceive(FAR struct uart_dev_s *dev)
@@ -412,43 +417,30 @@ int uart_rpmsg_init(FAR const char *cpuname, FAR const char *devname,
 {
   FAR struct uart_rpmsg_priv_s *priv;
   FAR struct uart_dev_s *dev;
-  char dev_name[32];
-  int ret = -ENOMEM;
+  char name[32];
+  int ret;
 
-  dev = kmm_zalloc(sizeof(struct uart_dev_s));
-  if (!dev)
+  dev = kmm_zalloc(sizeof(struct uart_dev_s) +
+                   sizeof(struct uart_rpmsg_priv_s) +
+                   buf_size * 2);
+  if (dev == NULL)
     {
-      return ret;
+      return -ENOMEM;
     }
 
-  dev->ops       = &g_uart_rpmsg_ops;
-  dev->isconsole = isconsole;
-  dev->recv.size = buf_size;
-  dev->xmit.size = buf_size;
-
-  dev->recv.buffer = kmm_malloc(dev->recv.size);
-  if (!dev->recv.buffer)
-    {
-      goto fail;
-    }
-
-  dev->xmit.buffer = kmm_malloc(dev->xmit.size);
-  if (!dev->xmit.buffer)
-    {
-      goto fail;
-    }
-
-  priv = kmm_zalloc(sizeof(struct uart_rpmsg_priv_s));
-  if (!priv)
-    {
-      goto fail;
-    }
+  dev->ops         = &g_uart_rpmsg_ops;
+  dev->isconsole   = isconsole;
+  dev->recv.size   = buf_size;
+  dev->xmit.size   = buf_size;
+  dev->priv        = dev + 1;
+  dev->recv.buffer = (FAR char *)dev->priv +
+                     sizeof(struct uart_rpmsg_priv_s);
+  dev->xmit.buffer = dev->recv.buffer + buf_size;
+  priv             = dev->priv;
+  priv->cpuname    = cpuname;
+  priv->devname    = devname;
 
   nxmutex_init(&priv->lock);
-  priv->cpuname = cpuname;
-  priv->devname = devname;
-
-  dev->priv = priv;
 
   ret = rpmsg_register_callback(dev,
                                 uart_rpmsg_device_created,
@@ -458,25 +450,18 @@ int uart_rpmsg_init(FAR const char *cpuname, FAR const char *devname,
   if (ret < 0)
     {
       nxmutex_destroy(&priv->lock);
-      goto fail;
+      kmm_free(dev);
+      return ret;
     }
 
-  snprintf(dev_name, sizeof(dev_name), "%s%s",
+  snprintf(name, sizeof(name), "%s%s",
            UART_RPMSG_DEV_PREFIX, devname);
-  uart_register(dev_name, dev);
+  uart_register(name, dev);
 
   if (dev->isconsole)
     {
       uart_register(UART_RPMSG_DEV_CONSOLE, dev);
     }
 
-  return OK;
-
-fail:
-  kmm_free(dev->recv.buffer);
-  kmm_free(dev->xmit.buffer);
-  kmm_free(dev->priv);
-  kmm_free(dev);
-
-  return ret;
+  return 0;
 }

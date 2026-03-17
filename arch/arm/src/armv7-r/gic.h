@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv7-r/gic.h
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -594,6 +596,8 @@
 #define GIC_IRQ_SGI14            14 /* Software Generated Interrupt (SGI) 14 */
 #define GIC_IRQ_SGI15            15 /* Software Generated Interrupt (SGI) 15 */
 
+#define GIC_IRQ_PPI0             16
+
 #define GIC_IRQ_VM               25 /* Virtual Maintenance Interrupt (VM) PPI(6) */
 #define GIC_IRQ_HTM              26 /* Hypervisor Timer (HTM) PPI(5) */
 #define GIC_IRQ_VTM              27 /* Virtual Timer (VTM) PPI(4) */
@@ -601,6 +605,9 @@
 #define GIC_IRQ_STM              29 /* Secure Physical Timer (STM) PPI(1) */
 #define GIC_IRQ_PTM              30 /* Non-secure Physical Timer (PTM) PPI(2) */
 #define GIC_IRQ_IRQ              31 /* Interrupt Request (nIRQ) PPI(3) */
+
+#define GIC_IS_SGI(intid)        ((intid) >= GIC_IRQ_SGI0 && \
+                                  (intid) < GIC_IRQ_PPI0)
 
 /* Shared Peripheral Interrupts (SPI) follow */
 
@@ -673,13 +680,8 @@ static inline void arm_cpu_sgi(int sgi, unsigned int cpuset)
 {
   uint32_t regval;
 
-#ifdef CONFIG_SMP
   regval = GIC_ICDSGIR_INTID(sgi) | GIC_ICDSGIR_CPUTARGET(cpuset) |
            GIC_ICDSGIR_TGTFILTER_LIST;
-#else
-  regval = GIC_ICDSGIR_INTID(sgi) | GIC_ICDSGIR_CPUTARGET(0) |
-           GIC_ICDSGIR_TGTFILTER_THIS;
-#endif
 
 #if defined(CONFIG_ARCH_TRUSTZONE_SECURE)
   if (sgi >= GIC_IRQ_SGI0 && sgi <= GIC_IRQ_SGI7)
@@ -694,7 +696,7 @@ static inline void arm_cpu_sgi(int sgi, unsigned int cpuset)
        * SMP scenario.
        */
 
-      regval |= GIC_ICDSGIR_NSATT_GRP1;
+      regval |= GIC_ICDSGIR_NSATT;
     }
 
   putreg32(regval, GIC_ICDSGIR);
@@ -747,26 +749,6 @@ void arm_gic0_initialize(void);
 void arm_gic_initialize(void);
 
 /****************************************************************************
- * Name: arm_gic_irq_trigger
- *
- * Description:
- *   Set the trigger type for the specificd IRQ source and the current CPU.
- *
- *   Since this API is not supported on all architectures, it should be
- *   avoided in common implementations where possible.
- *
- * Input Parameters:
- *   irq - The interrupt request to modify.
- *   edge - False: Active HIGH level sensitive, True: Rising edge sensitive
- *
- * Returned Value:
- *   Zero (OK) on success; a negated errno value is returned on any failure.
- *
- ****************************************************************************/
-
-int arm_gic_irq_trigger(int irq, bool edge);
-
-/****************************************************************************
  * Name: arm_decodeirq
  *
  * Description:
@@ -811,7 +793,7 @@ int arm_start_handler(int irq, void *context, void *arg);
  *
  *   1. It saves the current task state at the head of the current assigned
  *      task list.
- *   2. It porcess g_delivertasks
+ *   2. It processes g_delivertasks
  *   3. Returns from interrupt, restoring the state of the new task at the
  *      head of the ready to run list.
  *

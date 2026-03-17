@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/arm/src/armv8-m/arm_mpu.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -28,10 +30,10 @@
 #include <assert.h>
 #include <debug.h>
 #include <sys/param.h>
+#include <arch/barriers.h>
 
 #include "mpu.h"
 #include "arm_internal.h"
-#include "barriers.h"
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -86,8 +88,7 @@ static void mpu_reset_internal(void)
 
   putreg32(0, MPU_CTRL);
 
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 #endif
 
@@ -144,8 +145,7 @@ void mpu_freeregion(unsigned int region)
   putreg32(0, MPU_RLAR);
   putreg32(0, MPU_RBAR);
   g_mpu_region &= ~(1 << region);
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 
 /****************************************************************************
@@ -198,8 +198,7 @@ void mpu_control(bool enable, bool hfnmiena, bool privdefena)
 
   /* Ensure MPU setting take effects */
 
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 
 /****************************************************************************
@@ -252,8 +251,7 @@ void mpu_modify_region(unsigned int region, uintptr_t base, size_t size,
 
   /* Ensure MPU setting take effects */
 
-  ARM_DSB();
-  ARM_ISB();
+  UP_MB();
 }
 
 /****************************************************************************
@@ -315,6 +313,62 @@ void mpu_initialize(const struct mpu_region_s *table, size_t count,
     }
 
   mpu_control(true, hfnmiena, privdefena);
+}
+
+/****************************************************************************
+ * Name: mpu_log2regionceil
+ *
+ * Description:
+ *   Determine the smallest value of l2size (log base 2 size) such that the
+ *   following is true:
+ *
+ *   size <= (1 << l2size)
+ *
+ * Input Parameters:
+ *   size - The size of the region.
+ *
+ * Returned Value:
+ *   The logarithm base 2 of the ceiling value for the MPU region size.
+ *
+ ****************************************************************************/
+
+uint8_t mpu_log2regionceil(size_t size)
+{
+  uint8_t l2size;
+
+  /* The minimum permitted region size is 32 bytes (log2(32) = 5. */
+
+  for (l2size = 5; l2size < 32 && size > (1 << l2size); l2size++);
+  return l2size;
+}
+
+/****************************************************************************
+ * Name: mpu_log2regionfloor
+ *
+ * Description:
+ *   Determine the largest value of l2size (log base 2 size) such that the
+ *   following is true:
+ *
+ *   size >= (1 << l2size)
+ *
+ * Input Parameters:
+ *   size - The size of the region.
+ *
+ * Returned Value:
+ *   The logarithm base 2 of the floor value for the MPU region size.
+ *
+ ****************************************************************************/
+
+uint8_t mpu_log2regionfloor(size_t size)
+{
+  uint8_t l2size = mpu_log2regionceil(size);
+
+  if (l2size > 4 && size < (1 << l2size))
+    {
+      l2size--;
+    }
+
+  return l2size;
 }
 
 /****************************************************************************

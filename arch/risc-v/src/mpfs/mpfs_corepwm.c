@@ -1,6 +1,8 @@
 /****************************************************************************
  * arch/risc-v/src/mpfs/mpfs_corepwm.c
  *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.  The
@@ -42,7 +44,11 @@
 
 #include <arch/board/board.h>
 
+#include "mpfs_rcc.h"
+
+#include "hardware/mpfs_memorymap.h"
 #include "hardware/mpfs_corepwm.h"
+#include "hardware/mpfs_sysreg.h"
 #include "riscv_internal.h"
 
 /****************************************************************************
@@ -750,6 +756,25 @@ static int pwm_ioctl(struct pwm_lowerhalf_s *dev, int cmd,
   return -ENOTTY;
 }
 
+static int pwm_init(struct mpfs_pwmtimer_s *priv)
+{
+  /* Toggle peripheral reset */
+
+  mpfs_set_reset(MPFS_RCC_I2C, priv->pwmid, 1);
+  mpfs_set_reset(MPFS_RCC_I2C, priv->pwmid, 0);
+
+  /* Release FIC reset and enable clocks */
+
+  modifyreg32(MPFS_SYSREG_SOFT_RESET_CR,
+              SYSREG_SOFT_RESET_CR_FIC3 | SYSREG_SOFT_RESET_CR_FPGA,
+              0);
+
+  modifyreg32(MPFS_SYSREG_SUBBLK_CLOCK_CR, 0,
+              SYSREG_SUBBLK_CLOCK_CR_FIC3);
+
+  return OK;
+}
+
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
@@ -793,6 +818,7 @@ struct pwm_lowerhalf_s *mpfs_corepwm_init(int pwmid)
       return NULL;
   }
 
+  pwm_init(lower);
+
   return (struct pwm_lowerhalf_s *)lower;
 }
-

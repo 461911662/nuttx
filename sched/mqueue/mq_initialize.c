@@ -44,7 +44,7 @@
 #endif
 
 /****************************************************************************
- * Private Type Definitions
+ * Private Types
  ****************************************************************************/
 
 struct msgpool_s
@@ -77,6 +77,8 @@ struct list_node g_msgfree;
  */
 
 struct list_node g_msgfreeirq;
+
+spinlock_t g_msgfreelock = SP_UNLOCKED;
 
 #endif
 

@@ -201,7 +201,7 @@
   ((a)->s6_addr[0] == 0xff)
 
 #define IN6_IS_ADDR_LINKLOCAL(a) \
-  ((a)->s6_addr16[0] & HTONS(0xffc0) == HTONS(0xfe80))
+  (((a)->s6_addr16[0] & HTONS(0xffc0)) == HTONS(0xfe80))
 
 #define IN6_IS_ADDR_LOOPBACK(a) \
   ((a)->s6_addr32[0] == 0 && \
@@ -214,6 +214,12 @@
    (a)->s6_addr32[1] == 0 && \
    (a)->s6_addr32[2] == 0 && \
    (a)->s6_addr32[3] == 0)
+
+#define IN6_IS_ADDR_GLOBAL(a) \
+  (!IN6_IS_ADDR_MULTICAST(a) && \
+   !IN6_IS_ADDR_LINKLOCAL(a) && \
+   !IN6_IS_ADDR_LOOPBACK(a) && \
+   !IN6_IS_ADDR_UNSPECIFIED(a))
 
 #define IN6_IS_ADDR_V4COMPAT(a) \
   ((a)->s6_addr32[0] == 0 && \
@@ -281,7 +287,7 @@ struct ip_mreq
 struct ip_mreqn
 {
   struct in_addr  imr_multiaddr;    /* IPv4 multicast address of group */
-  struct in_addr  imr_interface;    /* Local IPv4 address of interface */
+  struct in_addr  imr_address;      /* Local IPv4 address of interface */
   unsigned int    imr_ifindex;      /* Local interface index */
 };
 
