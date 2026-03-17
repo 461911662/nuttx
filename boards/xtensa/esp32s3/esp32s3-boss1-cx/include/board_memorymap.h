@@ -267,8 +267,8 @@ extern uint8_t _image_drom_lma[];          /* DROM 加载地址 */
 extern uint8_t _image_drom_size[];         /* DROM 大小 */
 extern uint8_t _lit4_start[];               /* 4字节字面量起始 */
 extern uint8_t _lit4_end[];                 /* 4字节字面量结束 */
-extern uint8_t _sinit[];                    /* 初始化函数起始 */
-extern uint8_t _einit[];                    /* 初始化函数结束 */
+// extern uint8_t _sinit[];                    /* 初始化函数起始 */ 定义在 include/nuttx/arch.h中
+// extern uint8_t _einit[];                    /* 初始化函数结束 */
 
 /*============================================================================
  * C++ Initialization Symbols - Defined in: .flash.rodata
