@@ -39,4 +39,47 @@
 #  define BOARD_CLOCK_FREQUENCY 80000000
 #endif
 
+/* LED definitions **********************************************************/
+
+/* Define how many LEDs this board has (needed by userleds) */
+
+#define BOARD_NLEDS         1
+
+#define BOARD_LED1 /* LED1 - BOSS1-CX uses GPIO15 */
+
+/* LED GPIO - BOSS1-CX uses GPIO15 */
+
+#define GPIO_LED1  15
+
+/* LED bits for use with board_userled_all() */
+
+#define BOARD_LED_1_BIT   (1 << BOARD_LED1)
+
+
+/* These LEDs are not used by the board port unless CONFIG_ARCH_LEDS is
+ * defined.  In that case, the usage by the board port is defined in
+ * include/board.h and src/esp32s3_autoleds.c. The LEDs are used to encode
+ * OS-related events as follows:
+ *
+ *  SYMBOL                MEANING                         LED1 STATE
+ *  -----------------------  --------------------------  ----
+ *  LED_STARTED          NuttX has been started           OFF
+ *  LED_HEAPALLOCATE     Heap has been allocated          OFF
+ *  LED_IRQSENABLED     Interrupts enabled               OFF
+ *  LED_STACKCREATED    Idle stack created               ON
+ *  LED_INIRQ           In an interrupt                  N/C
+ *  LED_SIGNAL          In a signal handler              N/C
+ *  LED_ASSERTION       An assertion failed              N/C
+ *  LED_PANIC           The system has crashed        Blinking
+ */
+
+#define LED_STARTED       0
+#define LED_HEAPALLOCATE  0
+#define LED_IRQSENABLED   0
+#define LED_STACKCREATED  1
+#define LED_INIRQ         2
+#define LED_SIGNAL        2
+#define LED_ASSERTION     2
+#define LED_PANIC         3
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

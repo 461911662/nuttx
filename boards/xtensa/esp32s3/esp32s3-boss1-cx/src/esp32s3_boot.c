@@ -59,6 +59,9 @@
 
 void esp32s3_board_initialize(void)
 {
+#ifdef CONFIG_ARCH_LEDS
+  esp32s3_led_initialize();
+#endif
 }
 
 /****************************************************************************
