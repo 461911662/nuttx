@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <debug.h>
+#include <syslog.h>
 
 #include <nuttx/board.h>
 #include <arch/board/board.h>
@@ -57,9 +58,12 @@ uint32_t board_userled_initialize(void)
 {
   uint8_t i;
 
+  syslog(LOG_INFO, "board_userled_initialize: Initializing %d LEDs\n", BOARD_NLEDS);
+
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       esp32s3_configgpio(g_ledcfg[i], OUTPUT);
+      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%d as OUTPUT\n", g_ledcfg[i]);
     }
 
   return BOARD_NLEDS;
@@ -71,6 +75,8 @@ uint32_t board_userled_initialize(void)
 
 void board_userled(int led, bool ledon)
 {
+  syslog(LOG_INFO, "board_userled: led=%d, ledon=%d\n", led, ledon);
+
   if ((unsigned)led < BOARD_NLEDS)
     {
       esp32s3_gpiowrite(g_ledcfg[led], ledon);
@@ -86,9 +92,12 @@ void board_userled_all(uint32_t ledset)
   bool ledon;
   uint8_t i;
 
+  syslog(LOG_INFO, "board_userled_all: ledset=0x%x\n", ledset);
+
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       ledon = ((ledset & (1 << i)) != 0);
+      syslog(LOG_INFO, "board_userled_all: LED%d = %d\n", i, ledon);
       esp32s3_gpiowrite(g_ledcfg[i], ledon);
     }
 }
