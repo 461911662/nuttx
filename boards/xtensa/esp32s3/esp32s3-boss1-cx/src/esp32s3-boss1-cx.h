@@ -69,5 +69,17 @@ int esp32s3_bringup(void);
 void esp32s3_led_initialize(void);
 #endif
 
+/****************************************************************************
+ * Name: board_spiflash_init
+ *
+ * Description:
+ *   Initialize the SPIFLASH and register the MTD device.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_ESP32S3_SPIFLASH
+int board_spiflash_init(void);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */
