@@ -65,5 +65,9 @@
 
 int esp32s3_bringup(void);
 
+#ifdef CONFIG_ARCH_LEDS
+void esp32s3_led_initialize(void);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */
