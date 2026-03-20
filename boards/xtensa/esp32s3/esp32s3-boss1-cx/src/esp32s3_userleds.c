@@ -63,7 +63,7 @@ uint32_t board_userled_initialize(void)
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       esp32s3_configgpio(g_ledcfg[i], OUTPUT);
-      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%d as OUTPUT\n", g_ledcfg[i]);
+      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%u as OUTPUT\n", g_ledcfg[i]);
     }
 
   return BOARD_NLEDS;
