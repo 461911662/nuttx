@@ -76,7 +76,7 @@
 #define LED_STARTED       0
 #define LED_HEAPALLOCATE  0
 #define LED_IRQSENABLED   0
-#define LED_STACKCREATED  1
+#define LED_STACKCREATED  0
 #define LED_INIRQ         2
 #define LED_SIGNAL        2
 #define LED_ASSERTION     2
