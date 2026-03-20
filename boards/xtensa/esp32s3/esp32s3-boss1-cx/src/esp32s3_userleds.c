@@ -58,12 +58,12 @@ uint32_t board_userled_initialize(void)
 {
   uint8_t i;
 
-  syslog(LOG_INFO, "board_userled_initialize: Initializing %d LEDs\n", BOARD_NLEDS);
+  syslog(LOG_INFO, "board_userled_initialize: Initializing %" PRId16 " LEDs\n", BOARD_NLEDS);
 
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       esp32s3_configgpio(g_ledcfg[i], OUTPUT);
-      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%u as OUTPUT\n", g_ledcfg[i]);
+      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%" PRIu32 " as OUTPUT\n", g_ledcfg[i]);
     }
 
   return BOARD_NLEDS;
@@ -75,7 +75,7 @@ uint32_t board_userled_initialize(void)
 
 void board_userled(int led, bool ledon)
 {
-  syslog(LOG_INFO, "board_userled: led=%d, ledon=%d\n", led, ledon);
+  syslog(LOG_INFO, "board_userled: led=%" PRId16 ", ledon=%" PRIu8 "\n", led, ledon);
 
   if ((unsigned)led < BOARD_NLEDS)
     {
@@ -92,12 +92,12 @@ void board_userled_all(uint32_t ledset)
   bool ledon;
   uint8_t i;
 
-  syslog(LOG_INFO, "board_userled_all: ledset=0x%x\n", ledset);
+  syslog(LOG_INFO, "board_userled_all: ledset=0x%" PRIu32 "\n", ledset);
 
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       ledon = ((ledset & (1 << i)) != 0);
-      syslog(LOG_INFO, "board_userled_all: LED%d = %d\n", i, ledon);
+      syslog(LOG_INFO, "board_userled_all: LED%" PRIu8 " = %" PRIu8 "\n", i, ledon);
       esp32s3_gpiowrite(g_ledcfg[i], ledon);
     }
 }
