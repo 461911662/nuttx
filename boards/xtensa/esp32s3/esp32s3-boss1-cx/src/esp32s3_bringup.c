@@ -44,6 +44,10 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
+#ifdef CONFIG_ESP_RMT
+#  include <esp32s3_board_rmt.h>
+#endif
+
 #include "esp32s3-boss1-cx.h"
 
 /****************************************************************************
@@ -104,6 +108,16 @@ int esp32s3_bringup(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: userled_lower_initialize() failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_ESP_RMT
+  /* Initialize RMT TX for IR transmitter */
+
+  ret = board_rmt_txinitialize(BOARD_IR_TX_CHANNEL, BOARD_IR_TX_GPIO);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
     }
 #endif
 

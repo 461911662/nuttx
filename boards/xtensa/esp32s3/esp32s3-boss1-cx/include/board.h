@@ -51,6 +51,11 @@
 
 #define GPIO_LED1  15
 
+/* IR Transmitter definitions *************************************************/
+
+#define BOARD_IR_TX_GPIO       16
+#define BOARD_IR_TX_CHANNEL    0
+
 /* LED bits for use with board_userled_all() */
 
 #define BOARD_LED_1_BIT   (1 << BOARD_LED1)
