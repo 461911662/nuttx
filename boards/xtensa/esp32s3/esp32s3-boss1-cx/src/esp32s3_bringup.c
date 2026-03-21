@@ -142,6 +142,23 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESPRESSIF_I2S1
+  /* Initialize I2S1 for LMD4030 microphone (slave mode) */
+
+  bool i2s1_enable_tx = false;
+  bool i2s1_enable_rx = false;
+
+#ifdef CONFIG_ESP32S3_BOSS1_CX_I2S1_RX
+  i2s1_enable_rx = true;
+#endif
+
+  ret = board_i2sdev_initialize(1, i2s1_enable_tx, i2s1_enable_rx);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize I2S1 driver: %d\n", ret);
+    }
+#endif
+
   /* If we got here then perhaps not all initialization was successful, but
    * at least enough succeeded to bring-up NSH with perhaps reduced
    * capabilities.

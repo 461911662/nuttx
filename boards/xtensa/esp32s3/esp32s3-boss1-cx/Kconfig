@@ -23,4 +23,18 @@ config ESP32S3_BOSS1_CX_I2S0_RX
 
 endif
 
+config ESP32S3_BOSS1_CX_I2S1
+    bool "I2S1 Microphone (LMD4030)"
+    default n
+    help
+        Enable I2S1 for LMD4030 PDM microphone (slave mode)
+
+if ESP32S3_BOSS1_CX_I2S1
+
+config ESP32S3_BOSS1_CX_I2S1_RX
+    bool "I2S1 RX (Microphone Input)"
+    default y
+
+endif
+
 endif # ARCH_BOARD_ESP32S3_BOSS1_CX

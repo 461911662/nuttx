@@ -93,4 +93,9 @@
 #define BOARD_I2S0_WSPIN     9
 #define BOARD_I2S0_DOUTPIN    8
 
+/* I2S1 (LMD4030 Microphone) definitions ********************************/
+
+#define BOARD_I2S1_BCLKPIN   3
+#define BOARD_I2S1_DINPIN    42
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */
