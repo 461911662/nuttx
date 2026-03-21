@@ -51,11 +51,6 @@
 
 #define GPIO_LED1  15
 
-/* IR Transmitter definitions *************************************************/
-
-#define BOARD_IR_TX_GPIO       16
-#define BOARD_IR_TX_CHANNEL    0
-
 /* LED bits for use with board_userled_all() */
 
 #define BOARD_LED_1_BIT   (1 << BOARD_LED1)
@@ -86,5 +81,16 @@
 #define LED_SIGNAL        2
 #define LED_ASSERTION     2
 #define LED_PANIC         3
+
+/* IR Transmitter definitions *************************************************/
+
+#define BOARD_IR_TX_GPIO       16
+#define BOARD_IR_TX_CHANNEL    0
+
+/* I2S (NS4168 Audio) definitions ******************************************/
+
+#define BOARD_I2S0_BCLKPIN   46
+#define BOARD_I2S0_WSPIN     9
+#define BOARD_I2S0_DOUTPIN    8
 
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

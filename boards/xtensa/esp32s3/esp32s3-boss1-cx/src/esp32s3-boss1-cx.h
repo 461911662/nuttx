@@ -81,5 +81,9 @@ void esp32s3_led_initialize(void);
 int board_spiflash_init(void);
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_I2S
+int board_i2sdev_initialize(int port, bool enable_tx, bool enable_rx);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */
