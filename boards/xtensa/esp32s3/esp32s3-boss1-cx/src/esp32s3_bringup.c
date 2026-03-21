@@ -121,7 +121,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESPRESSIF_I2S
+#ifdef CONFIG_ESPRESSIF_I2S0
   /* Initialize I2S0 for NS4168 audio amplifier */
 
   bool i2s_enable_tx = false;
