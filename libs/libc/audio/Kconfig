@@ -4,3 +4,26 @@
 #
 
 source "libs/libc/audio/libsrc/Kconfig"
+
+if AUDIO
+
+config AUDIO_ALLOC_ALIGN
+    bool "Audio Enable aligned memory allocation for DMA buffers"
+    default n
+    ---help---
+        Enable aligned memory allocation for audio buffers.
+        Required for DMA operations on some platforms (e.g., ESP32).
+
+if AUDIO_ALLOC_ALIGN
+
+config AUDIO_ALLOC_ALIGN_SIZE
+    int "Alignment size in bytes"
+    default 32
+    range 16 256
+    ---help---
+        Memory alignment size for DMA buffers.
+        ESP32: 32 bytes (matches cache line size)
+
+endif
+
+endif

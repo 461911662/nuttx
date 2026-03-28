@@ -66,7 +66,13 @@ int apb_alloc(FAR struct audio_buf_desc_s *bufdesc)
   /* Perform a user mode allocation */
 
   bufsize = sizeof(struct ap_buffer_s) + bufdesc->numbytes;
+#ifdef CONFIG_AUDIO_ALLOC_ALIGN
+  /* Reserve extra space for alignment to ensure samp pointer is aligned */
+  bufsize += CONFIG_AUDIO_ALLOC_ALIGN_SIZE - 1;
+  apb = lib_umemalign(CONFIG_AUDIO_ALLOC_ALIGN_SIZE, bufsize);
+#else
   apb = lib_umalloc(bufsize);
+#endif
   *bufdesc->u.pbuffer = apb;
 
   /* Test if the allocation was successful or not */
@@ -85,7 +91,17 @@ int apb_alloc(FAR struct audio_buf_desc_s *bufdesc)
       apb->nmaxbytes  = bufdesc->numbytes;
       apb->nbytes     = 0;
       apb->flags      = 0;
-      apb->samp       = (FAR uint8_t *)(apb + 1);
+
+#ifdef CONFIG_AUDIO_ALLOC_ALIGN
+      /* Calculate aligned samp pointer */
+      uintptr_t samp_addr = (uintptr_t)(apb + 1);
+      samp_addr = (samp_addr + CONFIG_AUDIO_ALLOC_ALIGN_SIZE - 1)
+                  & ~(CONFIG_AUDIO_ALLOC_ALIGN_SIZE - 1);
+      apb->samp = (FAR uint8_t *)samp_addr;
+#else
+      apb->samp = (FAR uint8_t *)(apb + 1);
+#endif
+
 #ifdef CONFIG_AUDIO_MULTI_SESSION
       apb->session    = bufdesc->session;
 #endif
