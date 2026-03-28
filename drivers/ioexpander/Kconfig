@@ -484,6 +484,50 @@ config XL9555_RETRY
 
 endif # IOEXPANDER_XL9555
 
+config IOEXPANDER_XL9555_INT
+    bool "XL9555 I2C IO expander (with interrupt support)"
+    default n
+    depends on I2C
+    select IOEXPANDER_INT_ENABLE
+    ---help---
+        Enable support for the XL9555 IO Expander with full
+        interrupt support. This version includes interrupt
+        handling in the driver layer.
+        (16-bit I2C I/O expander with interrupt)
+
+if IOEXPANDER_XL9555_INT
+
+config XL9555_INT_MULTIPLE
+    bool "Multiple XL9555_INT Devices"
+    default n
+    ---help---
+        Can be defined to support multiple XL9555_INT devices.
+
+config XL9555_INT_SHADOW_MODE
+    bool "Use Shadow Mode instead of Read-Modify-Write Operations"
+    default n
+    ---help---
+        This setting enables a mode where the output and pin
+        configuration registers are held in RAM.
+        With this we do not need to read back the output register
+        every time we want to change one pin.
+
+config XL9555_INT_RETRY
+    bool "Retry to send commands and data at I2C communication errors"
+    default n
+    ---help---
+        Retry to send commands and data if a I2C-communication
+        error occurs (eg. caused by EMC).
+
+config XL9555_INT_NCALLBACKS
+    int "Number of interrupt callbacks"
+    default 4
+    range 1 16
+    ---help---
+        Maximum number of pin interrupt callbacks supported.
+
+endif # IOEXPANDER_XL9555_INT
+
 config IOEXPANDER_SX1509
 	bool "SX1509 I2C IO expander"
 	default n
