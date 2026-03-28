@@ -36,6 +36,7 @@
 #include <nuttx/ioexpander/gpio.h>
 
 #include <arch/board/board.h>
+#include <esp32s3/irq.h>
 #include "esp32s3_gpio.h"
 #include "esp32s3_i2c.h"
 #include "esp32s3-boss1-cx.h"
@@ -135,7 +136,7 @@ int esp32s3_gpioexp_initialize(void)
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
   /* Configure the interrupt pin */
 
-  g_gpioexp_irq = GPIO_EXP_IRQ_PIN + XTENSA_IRQ_FIRSTPERIPH;
+  g_gpioexp_irq = ESP32S3_PIN2IRQ(GPIO_EXP_IRQ_PIN);
   esp32s3_configgpio(GPIO_EXP_IRQ_PIN, INPUT_FUNCTION_2 | PULLUP);
 #endif
 
