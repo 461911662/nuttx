@@ -22,6 +22,11 @@
 
 CSRCS = esp32s3_boot.c esp32s3_bringup.c
 
+# GPIO expander (XL9555)
+ifeq ($(CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP),y)
+CSRCS += esp32s3_gpioexp.c
+endif
+
 # Native ESP32-S3 GPIO
 ifeq ($(CONFIG_DEV_GPIO),y)
 CSRCS += esp32s3_gpio.c

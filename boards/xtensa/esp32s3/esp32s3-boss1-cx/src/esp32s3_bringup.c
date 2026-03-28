@@ -121,6 +121,16 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP
+  /* Initialize GPIO expander (XL9555) */
+
+  ret = esp32s3_gpioexp_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize GPIO expander: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_ESPRESSIF_I2S0
   /* Initialize I2S0 for LMD4030 microphone (master mode) */
 
@@ -160,6 +170,16 @@ int esp32s3_bringup(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize I2S1 driver: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_DEV_GPIO
+  /* Initialize native ESP32-S3 GPIO */
+
+  ret = esp32s3_gpio_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize GPIO: %d\n", ret);
     }
 #endif
 

@@ -85,6 +85,10 @@ int board_spiflash_init(void);
 int board_i2sdev_initialize(int port, bool enable_tx, bool enable_rx);
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP
+int esp32s3_gpioexp_initialize(void);
+#endif
+
 #ifdef CONFIG_DEV_GPIO
 int esp32s3_gpio_initialize(void);
 #endif
