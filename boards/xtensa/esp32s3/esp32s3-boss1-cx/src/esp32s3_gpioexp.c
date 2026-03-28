@@ -58,7 +58,6 @@
 
 struct esp32s3_gpioexp_dev_s
 {
-  FAR struct ioexpander_dev_s *ioe;
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
   int irq;
 #endif
@@ -71,26 +70,6 @@ static struct esp32s3_gpioexp_dev_s g_gpioexp;
  ****************************************************************************/
 
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
-
-/****************************************************************************
- * Name: esp32s3_gpioexp_interrupt
- *
- * Description:
- *   Handle GPIO interrupt events from XL9555.
- *
- ****************************************************************************/
-
-static int esp32s3_gpioexp_interrupt(int irq, FAR void *context, FAR void *arg)
-{
-  FAR struct esp32s3_gpioexp_dev_s *dev = (FAR struct esp32s3_gpioexp_dev_s *)arg;
-
-  /* Interrupt is handled by the xl9555_int driver via its internal worker.
-   * This top-half just acknowledges the interrupt.
-   */
-
-  UNUSED(dev);
-  return OK;
-}
 
 /****************************************************************************
  * Name: esp32s3_gpioexp_attach
@@ -128,7 +107,7 @@ static void esp32s3_gpioexp_enable(FAR struct xl9555_int_config_s *config,
 {
   if (enable)
     {
-      esp32s3_gpioirqenable(g_gpioexp.irq, RISING);
+      esp32s3_gpioirqenable(g_gpioexp.irq, FALLING);
     }
   else
     {
@@ -194,8 +173,6 @@ int esp32s3_gpioexp_initialize(void)
       goto errout_i2c;
     }
 
-  g_gpioexp.ioe = ioe;
-
   /* Register all 16 pins as GPIO devices */
 
   for (i = 0; i < 16; i++)
@@ -226,7 +203,7 @@ int esp32s3_gpioexp_initialize(void)
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
   /* Enable interrupt */
 
-  esp32s3_gpioirqenable(g_gpioexp.irq, RISING);
+  esp32s3_gpioirqenable(g_gpioexp.irq, FALLING);
 #endif
 
   syslog(LOG_INFO, "GPIO expander initialized\n");
