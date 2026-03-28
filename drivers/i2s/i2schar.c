@@ -536,39 +536,39 @@ static int i2schar_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 
       case I2SIOC_SRXDATAWIDTH:
         {
-          *(FAR uint32_t *)arg = I2S_RXDATAWIDTH(priv->i2s, arg);
+          ret = I2S_RXDATAWIDTH(priv->i2s, (int)arg);
           break;
         }
 
       case I2SIOC_STXDATAWIDTH:
         {
-          *(FAR uint32_t *)arg = I2S_TXDATAWIDTH(priv->i2s, arg);
+          ret = I2S_TXDATAWIDTH(priv->i2s, (int)arg);
+          break;
         }
-        break;
 
       case I2SIOC_SRXCHANNELS:
         {
-          *(FAR int *)arg = I2S_RXCHANNELS(priv->i2s, arg);
+          ret = I2S_RXCHANNELS(priv->i2s, (int)arg);
+          break;
         }
-        break;
 
       case I2SIOC_STXCHANNELS:
         {
-          *(FAR int *)arg = I2S_TXCHANNELS(priv->i2s, arg);
+          ret = I2S_TXCHANNELS(priv->i2s, (int)arg);
+          break;
         }
-        break;
 
       case I2SIOC_SRXSAMPLERATE:
         {
-          *(FAR uint32_t *)arg = I2S_RXSAMPLERATE(priv->i2s, arg);
+          ret = I2S_RXSAMPLERATE(priv->i2s, (int)arg);
+          break;
         }
-        break;
 
       case I2SIOC_STXSAMPLERATE:
         {
-          *(FAR uint32_t *)arg = I2S_TXSAMPLERATE(priv->i2s, arg);
+          ret = I2S_TXSAMPLERATE(priv->i2s, (int)arg);
+          break;
         }
-        break;
 
       default:
         {
