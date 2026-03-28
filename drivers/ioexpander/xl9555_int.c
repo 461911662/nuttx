@@ -833,7 +833,7 @@ static int xl9555_int_interrupt(int irq, FAR void *context, FAR void *arg)
  *
  ****************************************************************************/
 
-FAR struct xl9555_int_dev_s *xl9555_int_initialize(
+FAR struct ioexpander_dev_s *xl9555_int_initialize(
                               FAR struct i2c_master_s *i2cdev,
                               FAR struct xl9555_int_config_s *config)
 {
@@ -884,7 +884,7 @@ FAR struct xl9555_int_dev_s *xl9555_int_initialize(
 
   xl9555_int_self_test(xl);
 
-  return xl;
+  return &xl->dev;
 }
 
 #endif /* CONFIG_IOEXPANDER_XL9555_INT */

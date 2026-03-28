@@ -32,13 +32,14 @@
 
 #include <nuttx/irq.h>
 #include <nuttx/i2c/i2c_master.h>
+#include <nuttx/ioexpander/ioexpander.h>
 #include <nuttx/ioexpander/xl9555_int.h>
 #include <nuttx/ioexpander/gpio.h>
 
 #include <arch/board/board.h>
-#include <esp32s3/irq.h>
-#include "esp32s3_gpio.h"
+
 #include "esp32s3_i2c.h"
+#include "esp32s3_gpio.h"
 #include "esp32s3-boss1-cx.h"
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP
@@ -47,8 +48,6 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define GPIO_EXP_SCL_PIN  CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_SCLPIN
-#define GPIO_EXP_SDA_PIN  CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_SDAPIN
 #define GPIO_EXP_IRQ_PIN  CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_IRQ_PIN
 #define GPIO_EXP_ADDR     CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_ADDR
 #define GPIO_EXP_FREQ     CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_FREQ
@@ -177,7 +176,7 @@ int esp32s3_gpioexp_initialize(void)
 
       /* Set pin direction to input by default */
 
-      ret = IOEXP_SETDIRECTION(ioe, i, IOEXPANDER_DIRECTION_IN_PULLUP);
+      ret = IOEXP_SETDIRECTION(ioe, i, IOEXPANDER_DIRECTION_IN);
       if (ret < 0)
         {
           syslog(LOG_ERR, "ERROR: Failed to set direction for pin %d: %d\n",
@@ -202,7 +201,6 @@ int esp32s3_gpioexp_initialize(void)
   esp32s3_gpioirqenable(g_gpioexp_irq, FALLING);
 #endif
 
-  syslog(LOG_INFO, "GPIO expander initialized\n");
   return OK;
 
 errout_i2c:

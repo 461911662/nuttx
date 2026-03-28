@@ -46,26 +46,13 @@ config ESP32S3_BOSS1_CX_GPIO_EXP
     select IOEXPANDER_XL9555_INT
     select IOEXPANDER_INT_ENABLE
     select ESP32S3_I2C0
+    select ESP32S3_GPIO_IRQ
     help
         Enable GPIO expander support using XL9555 with interrupt.
         This provides /dev/gpio0 through /dev/gpio15 for the 16
         GPIO pins on the XL9555 IO expander.
 
 if ESP32S3_BOSS1_CX_GPIO_EXP
-
-config ESP32S3_BOSS1_CX_GPIO_EXP_SCLPIN
-    int "GPIO Expander SCL Pin"
-    default 11
-    range 0 48
-    help
-        GPIO pin for XL9555 SCL (I2C clock).
-
-config ESP32S3_BOSS1_CX_GPIO_EXP_SDAPIN
-    int "GPIO Expander SDA Pin"
-    default 10
-    range 0 48
-    help
-        GPIO pin for XL9555 SDA (I2C data).
 
 config ESP32S3_BOSS1_CX_GPIO_EXP_IRQ_PIN
     int "GPIO Expander IRQ Pin"

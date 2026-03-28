@@ -403,8 +403,6 @@ int esp32s3_gpio_initialize(void)
     }
 #endif
 
-  syslog(LOG_INFO, "GPIO initialized: %d pins\n", pincount);
-
   UNUSED(i);
   UNUSED(ret);
   return OK;

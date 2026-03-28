@@ -34,6 +34,7 @@
 #include <nuttx/irq.h>
 #include <nuttx/i2c/i2c_master.h>
 #include <nuttx/ioexpander/ioexpander.h>
+#include <nuttx/ioexpander/xl9555_int.h>
 #include <nuttx/kmalloc.h>
 #include <nuttx/mutex.h>
 #include <nuttx/wdog.h>
@@ -149,8 +150,8 @@ struct xl9555_int_dev_s
  * Public Function Prototypes
  ****************************************************************************/
 
-FAR struct xl9555_int_dev_s *xl9555_int_initialize(FAR struct i2c_master_s *dev,
-                                           FAR struct xl9555_int_config_s *config);
+FAR struct ioexpander_dev_s *xl9555_int_initialize(FAR struct i2c_master_s *dev,
+                                         FAR struct xl9555_int_config_s *config);
 
 #endif /* CONFIG_IOEXPANDER && CONFIG_IOEXPANDER_XL9555_INT */
 #endif /* __DRIVERS_IOEXPANDER_XL9555_INT_H */

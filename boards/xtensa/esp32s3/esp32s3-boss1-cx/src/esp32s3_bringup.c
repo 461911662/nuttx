@@ -48,6 +48,10 @@
 #  include <esp32s3_board_rmt.h>
 #endif
 
+#ifdef CONFIG_ESP32S3_I2C
+#  include "esp32s3_i2c.h"
+#endif
+
 #include "esp32s3-boss1-cx.h"
 
 /****************************************************************************
@@ -118,6 +122,16 @@ int esp32s3_bringup(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_I2C_DRIVER
+  /* Configure I2C peripheral interfaces */
+
+  ret = board_i2c_init();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "Failed to initialize I2C driver: %d\n", ret);
     }
 #endif
 
