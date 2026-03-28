@@ -5,35 +5,39 @@
 
 if ARCH_BOARD_ESP32S3_BOSS1_CX
 
-config ESP32S3_BOSS1_CX_I2S
+config ESP32S3_BOSS1_CX_I2S0
+    bool "I2S Microphone (LMD4030)"
+    default n
+    help
+        Enable I2S for LMD4030 PDM microphone (master mode)
+
+if ESP32S3_BOSS1_CX_I2S0
+
+config ESP32S3_BOSS1_CX_I2S0_TX
+    bool "I2S0 TX (Output)"
+    default n
+
+config ESP32S3_BOSS1_CX_I2S0_RX
+    bool "I2S0 RX (Input)"
+    default y
+
+endif
+
+config ESP32S3_BOSS1_CX_I2S1
     bool "I2S Audio (NS4168)"
     default n
     help
         Enable I2S audio support for NS4168 amplifier
 
-if ESP32S3_BOSS1_CX_I2S
+if ESP32S3_BOSS1_CX_I2S1
 
-config ESP32S3_BOSS1_CX_I2S0_TX
+config ESP32S3_BOSS1_CX_I2S1_TX
     bool "I2S0 TX (Output)"
     default y
 
-config ESP32S3_BOSS1_CX_I2S0_RX
+config ESP32S3_BOSS1_CX_I2S1_RX
     bool "I2S0 RX (Input)"
     default n
-
-endif
-
-config ESP32S3_BOSS1_CX_I2S1
-    bool "I2S1 Microphone (LMD4030)"
-    default n
-    help
-        Enable I2S1 for LMD4030 PDM microphone (slave mode)
-
-if ESP32S3_BOSS1_CX_I2S1
-
-config ESP32S3_BOSS1_CX_I2S1_RX
-    bool "I2S1 RX (Microphone Input)"
-    default y
 
 endif
 

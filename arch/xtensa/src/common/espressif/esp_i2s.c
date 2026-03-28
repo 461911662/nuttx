@@ -96,7 +96,6 @@
 #define ESP_IRQ_PRIORITY_DEFAULT  ESP32S3_INT_PRIO_DEF
 #define ESP_IRQ_TRIGGER_LEVEL     ESP32S3_CPUINT_LEVEL
 #define ESPRESSIF_DMA_BUFLEN_MAX  ESP32S3_DMA_BUFLEN_MAX
-#define ESPRESSIF_DMA_PERIPH_I2S  ESP32S3_DMA_PERIPH_I2S1
 #define ESP_SOURCE2IRQ            ESP32S3_PERIPH2IRQ
 #define esp_dmadesc_s             esp32s3_dmadesc_s
 #elif defined(CONFIG_ARCH_CHIP_ESP32S2)
@@ -302,6 +301,14 @@
       cfg.sd_dither = 0,                                        \
       cfg.sd_dither2 = 1                                        \
 
+#  define I2S_PDM_RX_SLOT_DEFAULT_CONFIG(cfg)                  \
+      cfg.slot_mask = I2S_PDM_SLOT_RIGHT,                       \
+      cfg.data_fmt = I2S_PDM_DATA_FMT_PCM                      \
+
+/* PDM RX Down Sampling Ratio */
+#  define I2S_PDM_DSR_8S   0  /* 8:1 downsample, BCLK = rate × 64 */
+#  define I2S_PDM_DSR_16S  1  /* 16:1 downsample, BCLK = rate × 128 */
+
 #endif /* CONFIG_ARCH_CHIP_ESP32S3 */
 
 #if !SOC_RCC_IS_INDEPENDENT
@@ -381,6 +388,7 @@ struct esp_i2s_config_s
   uint32_t mclk_out_sig;            /* Master clock output index */
 
   uint8_t  audio_std_mode;          /* Select audio standard (i2s_audio_mode_t) */
+  uint8_t  dsr_mode;               /* PDM RX down sampling mode (DSR_8S or DSR_16S) */
 
   /* WS signal polarity, set true to enable high level first */
 
@@ -607,7 +615,11 @@ static const struct esp_i2s_config_s esp_i2s0_config =
 #else
   .mclk_pin         = I2S_GPIO_UNUSED,
 #endif /* CONFIG_ESPRESSIF_I2S0_MCLK */
+#ifdef CONFIG_ESPRESSIF_I2S0_PDM
+  .bclk_pin         = I2S_GPIO_UNUSED,
+#else
   .bclk_pin         = CONFIG_ESPRESSIF_I2S0_BCLKPIN,
+#endif /* CONFIG_ESPRESSIF_I2S0_PDM */
   .ws_pin           = CONFIG_ESPRESSIF_I2S0_WSPIN,
 #ifdef CONFIG_ESPRESSIF_I2S0_DOUTPIN
   .dout_pin         = CONFIG_ESPRESSIF_I2S0_DOUTPIN,
@@ -630,7 +642,12 @@ static const struct esp_i2s_config_s esp_i2s0_config =
   .din_insig        = I2S0I_SD_IN_IDX,
   .dout_outsig      = I2S0O_SD_OUT_IDX,
   .mclk_out_sig     = I2S0_MCLK_OUT_IDX,
+#ifdef CONFIG_ESPRESSIF_I2S0_PDM
+  .audio_std_mode   = I2S_PDM,
+  .dsr_mode         = I2S_PDM_DSR_16S,
+#else
   .audio_std_mode   = I2S_STD_PHILIPS,
+#endif /* CONFIG_ESPRESSIF_I2S0_PDM */
   .ctx              = &ctx_i2s0,
   .clk_info         = &clk_info_i2s0,
 };
@@ -667,7 +684,7 @@ static const struct esp_i2s_config_s esp_i2s1_config =
   .role             = I2S_ROLE_MASTER,
 #else
   .role             = I2S_ROLE_SLAVE,
-#endif /* CONFIG_ESPRESSIF_I2S1_ROLE_MASTER */
+#endif
   .data_width       = ESPRESSIF_I2S1_DATA_BIT_WIDTH,
   .rate             = CONFIG_ESPRESSIF_I2S1_SAMPLE_RATE,
   .total_slot       = 2,
@@ -680,19 +697,23 @@ static const struct esp_i2s_config_s esp_i2s1_config =
   .mclk_pin         = CONFIG_ESPRESSIF_I2S1_MCLKPIN,
 #else
   .mclk_pin         = I2S_GPIO_UNUSED,
-#endif /* CONFIG_ESPRESSIF_I2S1_MCLK */
+#endif
+#ifdef CONFIG_ESPRESSIF_I2S1_PDM
+  .bclk_pin         = I2S_GPIO_UNUSED,
+#else
   .bclk_pin         = CONFIG_ESPRESSIF_I2S1_BCLKPIN,
+#endif /* CONFIG_ESPRESSIF_I2S1_PDM */
   .ws_pin           = CONFIG_ESPRESSIF_I2S1_WSPIN,
 #ifdef CONFIG_ESPRESSIF_I2S1_DOUTPIN
   .dout_pin         = CONFIG_ESPRESSIF_I2S1_DOUTPIN,
 #else
   .dout_pin         = I2S_GPIO_UNUSED,
-#endif /* CONFIG_ESPRESSIF_I2S1_DOUTPIN */
+#endif
 #ifdef CONFIG_ESPRESSIF_I2S1_DINPIN
   .din_pin          = CONFIG_ESPRESSIF_I2S1_DINPIN,
 #else
   .din_pin          = I2S_GPIO_UNUSED,
-#endif /* CONFIG_ESPRESSIF_I2S1_DINPIN */
+#endif
   .bclk_in_insig    = I2S1I_BCK_IN_IDX,
   .bclk_in_outsig   = I2S1I_BCK_OUT_IDX,
   .bclk_out_insig   = I2S1O_BCK_IN_IDX,
@@ -704,7 +725,12 @@ static const struct esp_i2s_config_s esp_i2s1_config =
   .din_insig        = I2S1I_SD_IN_IDX,
   .dout_outsig      = I2S1O_SD_OUT_IDX,
   .mclk_out_sig     = I2S1_MCLK_OUT_IDX,
+#ifdef CONFIG_ESPRESSIF_I2S1_PDM
+  .audio_std_mode   = I2S_PDM,
+  .dsr_mode         = I2S_PDM_DSR_16S,
+#else
   .audio_std_mode   = I2S_STD_PHILIPS,
+#endif
   .ctx              = &ctx_i2s1,
   .clk_info         = &clk_info_i2s1,
 };
@@ -931,7 +957,7 @@ static int IRAM_ATTR i2s_txdma_start(struct esp_i2s_s *priv)
  ****************************************************************************/
 
 #ifdef I2S_HAVE_RX
-static int i2s_rxdma_start(struct esp_i2s_s *priv)
+static int IRAM_ATTR i2s_rxdma_start(struct esp_i2s_s *priv)
 {
   struct esp_buffer_s *bfcontainer;
   size_t eof_nbytes;
@@ -966,8 +992,8 @@ static int i2s_rxdma_start(struct esp_i2s_s *priv)
   i2s_ll_rx_set_eof_num(priv->config->ctx->dev, eof_nbytes);
 
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
-  esp_dma_load(bfcontainer->dma_link, priv->dma_channel, I2S_DIR_RX);
-  esp_dma_enable(priv->dma_channel, I2S_DIR_RX);
+  esp_dma_load(bfcontainer->dma_link, priv->dma_channel, false);
+  esp_dma_enable(priv->dma_channel, false);
 #else
   i2s_hal_rx_enable_dma(priv->config->ctx);
   i2s_hal_rx_enable_intr(priv->config->ctx);
@@ -1014,7 +1040,6 @@ static IRAM_ATTR int i2s_txdma_setup(struct esp_i2s_s *priv,
   apb_samp_t samp_size;
   irqstate_t flags;
   uint8_t *buf;
-  uint8_t padding;
   uint8_t *samp;
 
   DEBUGASSERT(bfcontainer && bfcontainer->apb);
@@ -1151,7 +1176,7 @@ static IRAM_ATTR int i2s_txdma_setup(struct esp_i2s_s *priv,
  ****************************************************************************/
 
 #ifdef I2S_HAVE_RX
-static int i2s_rxdma_setup(struct esp_i2s_s *priv,
+static IRAM_ATTR int i2s_rxdma_setup(struct esp_i2s_s *priv,
                            struct esp_buffer_s *bfcontainer)
 {
   int ret = OK;
@@ -1324,7 +1349,7 @@ static void IRAM_ATTR i2s_tx_schedule(struct esp_i2s_s *priv,
  ****************************************************************************/
 
 #ifdef I2S_HAVE_RX
-static void i2s_rx_schedule(struct esp_i2s_s *priv,
+static void IRAM_ATTR i2s_rx_schedule(struct esp_i2s_s *priv,
                             struct esp_dmadesc_s *inlink)
 {
   struct esp_buffer_s *bfcontainer;
@@ -1638,15 +1663,21 @@ static void i2s_configure(struct esp_i2s_s *priv)
         {
           /* For "tx + slave" mode, select TX signal index for ws and bck */
 
-          esp_gpiowrite(priv->config->ws_pin, 1);
-          esp_configgpio(priv->config->ws_pin, INPUT_FUNCTION_2);
-          esp_gpio_matrix_in(priv->config->ws_pin,
-                             priv->config->ws_out_insig, 0);
+          if (priv->config->ws_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->ws_pin, 1);
+              esp_configgpio(priv->config->ws_pin, INPUT_FUNCTION_2);
+              esp_gpio_matrix_in(priv->config->ws_pin,
+                                priv->config->ws_out_insig, 0);
+            }
 
-          esp_gpiowrite(priv->config->bclk_pin, 1);
-          esp_configgpio(priv->config->bclk_pin, INPUT_FUNCTION_2);
-          esp_gpio_matrix_in(priv->config->bclk_pin,
-                             priv->config->bclk_out_insig, 0);
+          if (priv->config->bclk_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->bclk_pin, 1);
+              esp_configgpio(priv->config->bclk_pin, INPUT_FUNCTION_2);
+              esp_gpio_matrix_in(priv->config->bclk_pin,
+                                 priv->config->bclk_out_insig, 0);
+            }
         }
       else
         {
@@ -1654,15 +1685,21 @@ static void i2s_configure(struct esp_i2s_s *priv)
            * index for ws and bck.
            */
 
-          esp_gpiowrite(priv->config->ws_pin, 1);
-          esp_configgpio(priv->config->ws_pin, INPUT_FUNCTION_2);
-          esp_gpio_matrix_in(priv->config->ws_pin,
-                             priv->config->ws_in_insig, 0);
+          if (priv->config->ws_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->ws_pin, 1);
+              esp_configgpio(priv->config->ws_pin, INPUT_FUNCTION_2);
+              esp_gpio_matrix_in(priv->config->ws_pin,
+                                priv->config->ws_in_insig, 0);
+            }
 
-          esp_gpiowrite(priv->config->bclk_pin, 1);
-          esp_configgpio(priv->config->bclk_pin, INPUT_FUNCTION_2);
-          esp_gpio_matrix_in(priv->config->bclk_pin,
-                             priv->config->bclk_in_insig, 0);
+          if (priv->config->bclk_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->bclk_pin, 1);
+              esp_configgpio(priv->config->bclk_pin, INPUT_FUNCTION_2);
+              esp_gpio_matrix_in(priv->config->bclk_pin,
+                                 priv->config->bclk_in_insig, 0);
+            }
         }
     }
   else
@@ -1679,22 +1716,28 @@ static void i2s_configure(struct esp_i2s_s *priv)
           esp_gpiowrite(priv->config->mclk_pin, 1);
           esp_configgpio(priv->config->mclk_pin, OUTPUT_FUNCTION_2);
           esp_gpio_matrix_out(priv->config->mclk_pin,
-                              priv->config->mclk_out_sig, 0, 0);
+                               priv->config->mclk_out_sig, 0, 0);
         }
 
       if (priv->config->rx_en && !priv->config->tx_en)
         {
           /* For "rx + master" mode, select RX signal index for ws and bck */
 
-          esp_gpiowrite(priv->config->ws_pin, 1);
-          esp_configgpio(priv->config->ws_pin, OUTPUT_FUNCTION_2);
-          esp_gpio_matrix_out(priv->config->ws_pin,
+          if (priv->config->ws_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->ws_pin, 1);
+              esp_configgpio(priv->config->ws_pin, OUTPUT_FUNCTION_2);
+              esp_gpio_matrix_out(priv->config->ws_pin,
                                   priv->config->ws_in_outsig, 0, 0);
+            }
 
-          esp_gpiowrite(priv->config->bclk_pin, 1);
-          esp_configgpio(priv->config->bclk_pin, OUTPUT_FUNCTION_2);
-          esp_gpio_matrix_out(priv->config->bclk_pin,
-                              priv->config->bclk_in_outsig, 0, 0);
+          if (priv->config->bclk_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->bclk_pin, 1);
+              esp_configgpio(priv->config->bclk_pin, OUTPUT_FUNCTION_2);
+              esp_gpio_matrix_out(priv->config->bclk_pin,
+                                  priv->config->bclk_in_outsig, 0, 0);
+            }
         }
       else
         {
@@ -1702,15 +1745,21 @@ static void i2s_configure(struct esp_i2s_s *priv)
            * index for ws and bck.
            */
 
-          esp_gpiowrite(priv->config->ws_pin, 1);
-          esp_configgpio(priv->config->ws_pin, OUTPUT_FUNCTION_2);
-          esp_gpio_matrix_out(priv->config->ws_pin,
-                              priv->config->ws_out_outsig, 0, 0);
+          if (priv->config->ws_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->ws_pin, 1);
+              esp_configgpio(priv->config->ws_pin, OUTPUT_FUNCTION_2);
+              esp_gpio_matrix_out(priv->config->ws_pin,
+                                  priv->config->ws_out_outsig, 0, 0);
+            }
 
-          esp_gpiowrite(priv->config->bclk_pin, 1);
-          esp_configgpio(priv->config->bclk_pin, OUTPUT_FUNCTION_2);
-          esp_gpio_matrix_out(priv->config->bclk_pin,
-                              priv->config->bclk_out_outsig, 0, 0);
+          if (priv->config->bclk_pin != I2S_GPIO_UNUSED)
+            {
+              esp_gpiowrite(priv->config->bclk_pin, 1);
+              esp_configgpio(priv->config->bclk_pin, OUTPUT_FUNCTION_2);
+              esp_gpio_matrix_out(priv->config->bclk_pin,
+                                  priv->config->bclk_out_outsig, 0, 0);
+            }
         }
     }
 
@@ -1818,6 +1867,7 @@ static void i2s_configure(struct esp_i2s_s *priv)
 
       rx_slot_cfg.data_bit_width = priv->config->data_width;
       rx_slot_cfg.slot_bit_width = I2S_SLOT_BIT_WIDTH_AUTO;
+      priv->data_width = priv->config->data_width;
 
       if (priv->config->audio_std_mode <= I2S_STD_PCM)
         {
@@ -1837,7 +1887,7 @@ static void i2s_configure(struct esp_i2s_s *priv)
             }
           else
             {
-              I2S_STD_PCM_SLOT_DEFAULT_CONFIG(tx_slot_cfg.std,
+              I2S_STD_PCM_SLOT_DEFAULT_CONFIG(rx_slot_cfg.std,
                                               priv->data_width,
                                               I2S_STD_SLOT_BOTH);
             }
@@ -1849,8 +1899,21 @@ static void i2s_configure(struct esp_i2s_s *priv)
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
       else
         {
-          i2serr("Due to the lack of `PDM to PCM` module, \
-                  PDM RX is not available\n");
+          i2sinfo("PDM RX: enabling PDM mode\n");
+          i2s_ll_rx_enable_pdm(priv->config->ctx->dev, true);
+
+          /* Set PDM DSR (Down Sampling Ratio) - critical for PDM RX! */
+          i2s_ll_rx_set_pdm_dsr(priv->config->ctx->dev,
+                                 (i2s_pdm_dsr_t)priv->config->dsr_mode);
+          i2sinfo("PDM RX: dsr_mode=%d\n", priv->config->dsr_mode);
+
+          I2S_PDM_RX_SLOT_DEFAULT_CONFIG(rx_slot_cfg.pdm_rx);
+          i2sinfo("PDM RX: slot_mask=%d, data_fmt=%d\n",
+                  rx_slot_cfg.pdm_rx.slot_mask,
+                  rx_slot_cfg.pdm_rx.data_fmt);
+          i2s_hal_pdm_set_rx_slot(priv->config->ctx,
+                                   priv->config->role == I2S_ROLE_SLAVE,
+                                   &rx_slot_cfg);
         }
 #endif
 
@@ -2032,8 +2095,24 @@ static void i2s_set_clock(struct esp_i2s_s *priv)
    * a is the fraction clock divider's denominator value
    */
 
-  if (priv->config->role == I2S_ROLE_MASTER)
+  /* PDM RX mode - use different clock formula */
+  if (priv->config->audio_std_mode == I2S_PDM && priv->config->rx_en)
     {
+      /* PDM RX clock: BCLK = rate × 64 × dsr_factor
+       * DSR_8S:  dsr_factor = 1, BCLK = rate × 64
+       * DSR_16S: dsr_factor = 2, BCLK = rate × 128
+       */
+      uint32_t dsr_factor = (priv->config->dsr_mode == I2S_PDM_DSR_16S) ? 2 : 1;
+      bclk = priv->rate * 64 * dsr_factor;
+      bclk_div = 8;
+      mclk = bclk * bclk_div;
+
+      i2sinfo("PDM RX: rate=%u, dsr=%u, bclk=%u\n",
+              priv->rate, dsr_factor, bclk);
+    }
+  else if (priv->config->role == I2S_ROLE_MASTER)
+    {
+      /* Standard I2S Master mode */
       bclk = priv->rate * priv->config->total_slot *
              priv->config->data_width;
       mclk = priv->mclk_freq;
@@ -2041,8 +2120,7 @@ static void i2s_set_clock(struct esp_i2s_s *priv)
     }
   else
     {
-      /* For slave mode, mclk >= bclk * 8, so fix bclk_div to 2 first */
-
+      /* Standard I2S Slave mode */
       bclk_div = 8;
       bclk = priv->rate * priv->config->total_slot *
               priv->config->data_width;
@@ -2177,6 +2255,8 @@ static void i2s_rx_channel_start(struct esp_i2s_s *priv)
 
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
       esp32s3_dma_reset_channel(priv->dma_channel, false);
+      /* wait for idle if rx link */
+      esp32s3_dma_wait_idle(priv->dma_channel, false);
 #else
       i2s_hal_rx_reset_dma(priv->config->ctx);
 #endif
@@ -2308,6 +2388,7 @@ static void i2s_rx_channel_stop(struct esp_i2s_s *priv)
 
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
       esp32s3_dma_disable(priv->dma_channel, false);
+      esp32s3_dma_wait_idle(priv->dma_channel, false);
       esp32s3_dma_enable_interrupt(priv->dma_channel, false,
                                    GDMA_LL_EVENT_RX_SUC_EOF, false);
 #else
@@ -2356,10 +2437,20 @@ static int i2s_interrupt(int irq, void *context, void *arg)
   esp32s3_dma_clear_interrupt(priv->dma_channel, false, status);
   if (priv->config->rx_en)
     {
+      i2sinfo("RX interrupt status: %08x\n", status);
       if (status & GDMA_LL_EVENT_RX_SUC_EOF)
         {
           cur = (struct esp_dmadesc_s *)
-                 esp32s3_dma_get_desc_addr(priv->dma_channel, true);
+                 esp32s3_dma_get_desc_addr(priv->dma_channel, false);
+
+#ifdef CONFIG_ARCH_DCACHE
+          uintptr_t buf_end = (uintptr_t)((uint8_t *)cur->pbuf + ((dma_descriptor_t *)cur)->dw0.size);
+          if (esp32s3_ptr_extram(cur->pbuf))
+            {
+              /* Invalidate the cache for the buffer */
+              up_invalidate_dcache((uintptr_t)cur->pbuf, buf_end);
+            }
+#endif
 
           /* Schedule completion of the transfer on the worker thread */
 
@@ -2569,7 +2660,7 @@ static int i2s_rxchannels(struct i2s_dev_s *dev, uint8_t channels)
           is_mono = false;
         }
 
-      i2s_ll_tx_enable_mono_mode(priv->config->ctx->dev,
+      i2s_ll_rx_enable_mono_mode(priv->config->ctx->dev,
                                  is_mono);
 
       i2s_rx_channel_start(priv);
@@ -2649,6 +2740,8 @@ static uint32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate)
   if (priv->config->rx_en)
     {
       i2s_rx_channel_stop(priv);
+
+      i2sinfo("old rate=%d, new rate=%d", priv->rate, rate);
 
       priv->rate = rate;
 
@@ -2731,6 +2824,7 @@ static uint32_t i2s_rxdatawidth(struct i2s_dev_s *dev, int bits)
     {
       i2s_rx_channel_stop(priv);
 
+      i2sinfo("old width=%d, new width=%d", priv->data_width, bits);
       priv->data_width = bits;
 
       i2s_set_datawidth(priv);
@@ -3041,6 +3135,20 @@ static int i2s_ioctl(struct i2s_dev_s *dev, int cmd, unsigned long arg)
         }
         break;
 
+#ifdef CONFIG_ARCH_CHIP_ESP32S3
+      case AUDIOIOC_GETBUFFERINFO:
+        {
+          struct ap_buffer_info_s *bufinfo = (struct ap_buffer_info_s *)arg;
+          i2sinfo("AUDIOIOC_GETBUFFERINFO\n");
+
+          /* reverse ESP32S3_DMA_EXT_MEMBLK_64B */
+          bufinfo->buffer_size = ESPRESSIF_DMA_BUFLEN_MAX - 63;
+          bufinfo->nbuffers = I2S_DMADESC_NUM;
+          ret = OK;
+        }
+        break;
+#endif
+
       default:
         break;
     }
@@ -3071,7 +3179,14 @@ static int i2s_dma_setup(struct esp_i2s_s *priv)
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
   int i2s_dma_dev;
 
-  i2s_dma_dev = ESPRESSIF_DMA_PERIPH_I2S;
+  if (priv->config->port == 0)
+    {
+      i2s_dma_dev = ESP32S3_DMA_PERIPH_I2S0;
+    }
+  else
+    {
+      i2s_dma_dev = ESP32S3_DMA_PERIPH_I2S1;
+    }
 
   /* Request a GDMA channel for the I2S peripheral */
 
@@ -3228,7 +3343,7 @@ struct i2s_dev_s *esp_i2sbus_initialize(int port)
   ret = i2s_buf_initialize(priv);
   if (ret < 0)
     {
-      goto err;
+      return NULL;
     }
 
   flags = spin_lock_irqsave(&priv->slock);

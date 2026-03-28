@@ -1280,8 +1280,15 @@ config ESPRESSIF_I2S_MAXINFLIGHT
 
 if ESPRESSIF_I2S0
 
+config ESPRESSIF_I2S0_PDM
+	bool "Enable I2S0 PDM mode"
+	default n
+	---help---
+		Enable PDM (Pulse Density Modulation) mode for I2S0.
+		This uses WS as clock and DATA pin for PDM communication.
+
 config ESPRESSIF_I2S0_RX
-	bool "Enable I2S receiver"
+	bool "Enable I2S0 receiver"
 	default ESP32_I2S0_RX if ESP32_I2S0
 	default ESP32S2_I2S_RX if ESP32S2_I2S
 	default ESP32S3_I2S0_RX if ESP32S3_I2S0
@@ -1290,7 +1297,7 @@ config ESPRESSIF_I2S0_RX
 		Enable I2S receiver (port 0)
 
 config ESPRESSIF_I2S0_TX
-	bool "Enable I2S transmitter"
+	bool "Enable I2S0 transmitter"
 	default ESP32_I2S0_TX if ESP32_I2S0
 	default ESP32S2_I2S_TX if ESP32S2_I2S
 	default ESP32S3_I2S0_TX if ESP32S3_I2S0
@@ -1403,7 +1410,7 @@ config ESPRESSIF_I2S0_DOUTPIN
 	range 0 33 if ARCH_CHIP_ESP32
 
 config ESPRESSIF_I2S0_MCLK
-	bool "Enable I2S Master Clock"
+	bool "Enable I2S0 Master Clock"
 	depends on ESPRESSIF_I2S0_ROLE_MASTER
 	default ESP32_I2S0_MCLK if ESP32_I2S0
 	default ESP32S2_I2S_MCLK if ESP32S2_I2S
@@ -1428,8 +1435,15 @@ endif # ESPRESSIF_I2S0
 
 if ESPRESSIF_I2S1
 
+config ESPRESSIF_I2S1_PDM
+	bool "Enable I2S1 PDM mode"
+	default n
+	---help---
+		Enable PDM (Pulse Density Modulation) mode for I2S1.
+		This uses WS as clock and DATA pin for PDM communication.
+
 config ESPRESSIF_I2S1_RX
-	bool "Enable I2S receiver"
+	bool "Enable I2S1 receiver"
 	default ESP32_I2S1_RX if ESP32_I2S1
 	default ESP32S3_I2S1_RX if ESP32S3_I2S1
 	default y
@@ -1437,7 +1451,7 @@ config ESPRESSIF_I2S1_RX
 		Enable I2S receiver (port 1)
 
 config ESPRESSIF_I2S1_TX
-	bool "Enable I2S transmitter"
+	bool "Enable I2S1 transmitter"
 	default ESP32_I2S1_TX if ESP32_I2S1
 	default ESP32S3_I2S1_TX if ESP32S3_I2S1
 	default y
@@ -1535,7 +1549,7 @@ config ESPRESSIF_I2S1_DOUTPIN
 	range 0 48 if ARCH_CHIP_ESP32S3
 
 config ESPRESSIF_I2S1_MCLK
-	bool "Enable I2S Master Clock"
+	bool "Enable I2S1 Master Clock"
 	depends on ESPRESSIF_I2S1_ROLE_MASTER
 	default ESP32_I2S1_MCLK if ESP32_I2S1
 	default ESP32S3_I2S1_MCLK if ESP32S3_I2S1

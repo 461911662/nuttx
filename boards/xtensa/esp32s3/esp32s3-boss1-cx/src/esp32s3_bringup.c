@@ -122,20 +122,20 @@ int esp32s3_bringup(void)
 #endif
 
 #ifdef CONFIG_ESPRESSIF_I2S0
-  /* Initialize I2S0 for NS4168 audio amplifier */
+  /* Initialize I2S0 for LMD4030 microphone (master mode) */
 
-  bool i2s_enable_tx = false;
-  bool i2s_enable_rx = false;
+  bool i2s0_enable_tx = false;
+  bool i2s0_enable_rx = false;
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_I2S0_TX
-  i2s_enable_tx = true;
+  i2s0_enable_tx = true;
 #endif
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_I2S0_RX
-  i2s_enable_rx = true;
+  i2s0_enable_rx = true;
 #endif
 
-  ret = board_i2sdev_initialize(0, i2s_enable_tx, i2s_enable_rx);
+  ret = board_i2sdev_initialize(0, i2s0_enable_tx, i2s0_enable_rx);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize I2S0 driver: %d\n", ret);
@@ -143,10 +143,14 @@ int esp32s3_bringup(void)
 #endif
 
 #ifdef CONFIG_ESPRESSIF_I2S1
-  /* Initialize I2S1 for LMD4030 microphone (slave mode) */
+  /* Initialize I2S1 for NS4168 audio amplifier */
 
   bool i2s1_enable_tx = false;
   bool i2s1_enable_rx = false;
+
+#ifdef CONFIG_ESP32S3_BOSS1_CX_I2S1_TX
+  i2s1_enable_tx = true;
+#endif
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_I2S1_RX
   i2s1_enable_rx = true;
