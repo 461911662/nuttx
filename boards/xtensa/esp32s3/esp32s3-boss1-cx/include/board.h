@@ -98,4 +98,10 @@
 #define BOARD_I2S1_BCLKPIN   3
 #define BOARD_I2S1_DINPIN    42
 
+/* GPIO pins used by the GPIO Subsystem */
+
+#define BOARD_NGPIOOUT    0 /* Amount of GPIO Output pins */
+#define BOARD_NGPIOIN     0
+#define BOARD_NGPIOINT    0
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

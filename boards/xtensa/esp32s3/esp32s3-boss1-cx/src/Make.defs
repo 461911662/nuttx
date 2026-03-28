@@ -22,6 +22,11 @@
 
 CSRCS = esp32s3_boot.c esp32s3_bringup.c
 
+# Native ESP32-S3 GPIO
+ifeq ($(CONFIG_DEV_GPIO),y)
+CSRCS += esp32s3_gpio.c
+endif
+
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)
