@@ -53,17 +53,12 @@
 #define GPIO_EXP_FREQ     CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP_FREQ
 
 /****************************************************************************
- * Private Types
+ * Private Data
  ****************************************************************************/
 
-struct esp32s3_gpioexp_dev_s
-{
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
-  int irq;
+static int g_gpioexp_irq;
 #endif
-};
-
-static struct esp32s3_gpioexp_dev_s g_gpioexp;
 
 /****************************************************************************
  * Private Functions
@@ -84,7 +79,7 @@ static int esp32s3_gpioexp_attach(FAR struct xl9555_int_config_s *config,
 {
   int ret;
 
-  ret = irq_attach(g_gpioexp.irq, isr, arg);
+  ret = irq_attach(g_gpioexp_irq, isr, arg);
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: irq_attach failed: %d\n", ret);
@@ -107,11 +102,11 @@ static void esp32s3_gpioexp_enable(FAR struct xl9555_int_config_s *config,
 {
   if (enable)
     {
-      esp32s3_gpioirqenable(g_gpioexp.irq, FALLING);
+      esp32s3_gpioirqenable(g_gpioexp_irq, FALLING);
     }
   else
     {
-      esp32s3_gpioirqdisable(g_gpioexp.irq);
+      esp32s3_gpioirqdisable(g_gpioexp_irq);
     }
 }
 
@@ -140,7 +135,7 @@ int esp32s3_gpioexp_initialize(void)
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
   /* Configure the interrupt pin */
 
-  g_gpioexp.irq = GPIO_EXP_IRQ_PIN + XTENSA_IRQ_FIRSTPERIPH;
+  g_gpioexp_irq = GPIO_EXP_IRQ_PIN + XTENSA_IRQ_FIRSTPERIPH;
   esp32s3_configgpio(GPIO_EXP_IRQ_PIN, INPUT_FUNCTION_2 | PULLUP);
 #endif
 
@@ -203,7 +198,7 @@ int esp32s3_gpioexp_initialize(void)
 #ifdef CONFIG_IOEXPANDER_INT_ENABLE
   /* Enable interrupt */
 
-  esp32s3_gpioirqenable(g_gpioexp.irq, FALLING);
+  esp32s3_gpioirqenable(g_gpioexp_irq, FALLING);
 #endif
 
   syslog(LOG_INFO, "GPIO expander initialized\n");
