@@ -43,6 +43,8 @@ endif
 
 config ESP32S3_BOSS1_CX_GPIO_EXP
     bool "GPIO Expander (XL9555)"
+    select I2C
+    select IOEXPANDER
     select IOEXPANDER_XL9555_INT
     select IOEXPANDER_INT_ENABLE
     select ESP32S3_I2C0
