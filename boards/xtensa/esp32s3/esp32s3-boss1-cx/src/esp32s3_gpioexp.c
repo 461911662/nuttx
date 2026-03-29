@@ -60,6 +60,8 @@
 static int g_gpioexp_irq;
 #endif
 
+static FAR struct ioexpander_dev_s *g_gpioexp_ioe;
+
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
@@ -168,6 +170,8 @@ int esp32s3_gpioexp_initialize(void)
       goto errout_i2c;
     }
 
+  g_gpioexp_ioe = ioe;
+
   /* Register all 16 pins as GPIO devices */
 
   for (i = 0; i < 16; i++)
@@ -206,6 +210,22 @@ int esp32s3_gpioexp_initialize(void)
 errout_i2c:
   esp32s3_i2cbus_uninitialize(i2c);
   return ret;
+}
+
+/****************************************************************************
+ * Name: esp32s3_gpioexp_getioe
+ *
+ * Description:
+ *   Get the ioexpander device handle for external modules.
+ *
+ * Returned Value:
+ *   Pointer to ioexpander device, or NULL if not initialized.
+ *
+ ****************************************************************************/
+
+FAR struct ioexpander_dev_s *esp32s3_gpioexp_getioe(void)
+{
+  return g_gpioexp_ioe;
 }
 
 #endif /* CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP */

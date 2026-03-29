@@ -30,6 +30,7 @@
 #include <nuttx/config.h>
 #include <nuttx/compiler.h>
 #include <stdint.h>
+#include <nuttx/ioexpander/ioexpander.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -87,6 +88,7 @@ int board_i2sdev_initialize(int port, bool enable_tx, bool enable_rx);
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP
 int esp32s3_gpioexp_initialize(void);
+FAR struct ioexpander_dev_s *esp32s3_gpioexp_getioe(void);
 #endif
 
 #ifdef CONFIG_DEV_GPIO
