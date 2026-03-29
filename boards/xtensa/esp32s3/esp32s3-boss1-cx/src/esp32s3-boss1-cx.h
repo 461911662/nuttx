@@ -91,6 +91,10 @@ int esp32s3_gpioexp_initialize(void);
 FAR struct ioexpander_dev_s *esp32s3_gpioexp_getioe(void);
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_SPEAKER
+int esp32s3_spk_initialize(void);
+#endif
+
 #ifdef CONFIG_DEV_GPIO
 int esp32s3_gpio_initialize(void);
 #endif

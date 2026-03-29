@@ -53,6 +53,7 @@
 #endif
 
 #include "esp32s3-boss1-cx.h"
+#include "esp32s3_spk.h"
 
 /****************************************************************************
  * Public Functions
@@ -166,24 +167,13 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ESPRESSIF_I2S1
-  /* Initialize I2S1 for NS4168 audio amplifier */
+#ifdef CONFIG_ESP32S3_BOSS1_CX_SPEAKER
+  /* Initialize speaker (NS4168) with power control via XL9555 */
 
-  bool i2s1_enable_tx = false;
-  bool i2s1_enable_rx = false;
-
-#ifdef CONFIG_ESP32S3_BOSS1_CX_I2S1_TX
-  i2s1_enable_tx = true;
-#endif
-
-#ifdef CONFIG_ESP32S3_BOSS1_CX_I2S1_RX
-  i2s1_enable_rx = true;
-#endif
-
-  ret = board_i2sdev_initialize(1, i2s1_enable_tx, i2s1_enable_rx);
+  ret = esp32s3_spk_initialize();
   if (ret < 0)
     {
-      syslog(LOG_ERR, "ERROR: Failed to initialize I2S1 driver: %d\n", ret);
+      syslog(LOG_ERR, "ERROR: Failed to initialize speaker: %d\n", ret);
     }
 #endif
 

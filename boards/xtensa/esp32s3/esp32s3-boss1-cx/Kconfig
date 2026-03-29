@@ -80,4 +80,12 @@ config ESP32S3_BOSS1_CX_I2S1_RX
 
 endif
 
+config ESP32S3_BOSS1_CX_SPEAKER
+    bool "Speaker Power Control (NS4168)"
+    depends on ESP32S3_BOSS1_CX_GPIO_EXP
+    select ESPRESSIF_I2S1
+    help
+        Enable speaker power control via XL9555 IO0 for NS4168 amplifier.
+        This wraps I2S1 audio with GPIO control to enable/disable the speaker.
+
 endif # ARCH_BOARD_ESP32S3_BOSS1_CX

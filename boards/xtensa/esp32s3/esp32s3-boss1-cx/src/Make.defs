@@ -27,6 +27,11 @@ ifeq ($(CONFIG_ESP32S3_BOSS1_CX_GPIO_EXP),y)
 CSRCS += esp32s3_gpioexp.c
 endif
 
+# Speaker driver (NS4168 with power control)
+ifeq ($(CONFIG_ESP32S3_BOSS1_CX_SPEAKER),y)
+CSRCS += esp32s3_spk.c
+endif
+
 # Native ESP32-S3 GPIO
 ifeq ($(CONFIG_DEV_GPIO),y)
 CSRCS += esp32s3_gpio.c
