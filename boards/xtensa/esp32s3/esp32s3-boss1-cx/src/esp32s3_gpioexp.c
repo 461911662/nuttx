@@ -187,7 +187,7 @@ int esp32s3_gpioexp_initialize(void)
       /* Register pin as GPIO device with gpio_exp prefix */
 
       snprintf(name, sizeof(name), "gpio_exp%d", i);
-      ret = gpio_lower_half_byname(ioe, i, GPIO_INPUT_PIN_PULLUP, name);
+      ret = gpio_lower_half_byname(ioe, i, GPIO_INPUT_PIN, name);
       if (ret < 0)
         {
           syslog(LOG_ERR, "ERROR: gpio_lower_half_byname failed for pin %d: %d\n",

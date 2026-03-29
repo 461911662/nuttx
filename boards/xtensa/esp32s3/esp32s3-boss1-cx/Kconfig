@@ -5,42 +5,6 @@
 
 if ARCH_BOARD_ESP32S3_BOSS1_CX
 
-config ESP32S3_BOSS1_CX_I2S0
-    bool "I2S Microphone (LMD4030)"
-    default n
-    help
-        Enable I2S for LMD4030 PDM microphone (master mode)
-
-if ESP32S3_BOSS1_CX_I2S0
-
-config ESP32S3_BOSS1_CX_I2S0_TX
-    bool "I2S0 TX (Output)"
-    default n
-
-config ESP32S3_BOSS1_CX_I2S0_RX
-    bool "I2S0 RX (Input)"
-    default y
-
-endif
-
-config ESP32S3_BOSS1_CX_I2S1
-    bool "I2S Audio (NS4168)"
-    default n
-    help
-        Enable I2S audio support for NS4168 amplifier
-
-if ESP32S3_BOSS1_CX_I2S1
-
-config ESP32S3_BOSS1_CX_I2S1_TX
-    bool "I2S0 TX (Output)"
-    default y
-
-config ESP32S3_BOSS1_CX_I2S1_RX
-    bool "I2S0 RX (Input)"
-    default n
-
-endif
-
 config ESP32S3_BOSS1_CX_GPIO_EXP
     bool "GPIO Expander (XL9555)"
     select I2C
@@ -76,6 +40,43 @@ config ESP32S3_BOSS1_CX_GPIO_EXP_FREQ
     default 400000
     help
         I2C bus frequency for XL9555 communication.
+
+endif
+
+config ESP32S3_BOSS1_CX_I2S0
+    bool "I2S Microphone (LMD4030)"
+    default n
+    help
+        Enable I2S for LMD4030 PDM microphone (master mode)
+
+if ESP32S3_BOSS1_CX_I2S0
+
+config ESP32S3_BOSS1_CX_I2S0_TX
+    bool "I2S0 TX (Output)"
+    default n
+
+config ESP32S3_BOSS1_CX_I2S0_RX
+    bool "I2S0 RX (Input)"
+    default y
+
+endif
+
+config ESP32S3_BOSS1_CX_I2S1
+    bool "I2S Audio (NS4168)"
+    depends on ESP32S3_BOSS1_CX_GPIO_EXP
+    default n
+    help
+        Enable I2S audio support for NS4168 amplifier
+
+if ESP32S3_BOSS1_CX_I2S1
+
+config ESP32S3_BOSS1_CX_I2S1_TX
+    bool "I2S0 TX (Output)"
+    default y
+
+config ESP32S3_BOSS1_CX_I2S1_RX
+    bool "I2S0 RX (Input)"
+    default n
 
 endif
 

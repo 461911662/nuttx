@@ -87,21 +87,26 @@
 #define BOARD_IR_TX_GPIO       16
 #define BOARD_IR_TX_CHANNEL    0
 
-/* I2S (NS4168 Audio) definitions ******************************************/
-
-#define BOARD_I2S0_BCLKPIN   46
-#define BOARD_I2S0_WSPIN     9
-#define BOARD_I2S0_DOUTPIN    8
-
-/* I2S1 (LMD4030 Microphone) definitions ********************************/
-
-#define BOARD_I2S1_BCLKPIN   3
-#define BOARD_I2S1_DINPIN    42
-
 /* GPIO pins used by the GPIO Subsystem */
 
 #define BOARD_NGPIOOUT    0 /* Amount of GPIO Output pins */
 #define BOARD_NGPIOIN     0
 #define BOARD_NGPIOINT    0
+
+/* I2C0 pins definitions ********************************************/
+
+#define BOARD_I2C0_SCL_GPIO     11
+#define BOARD_I2C0_SDA_GPIO     10
+
+/* I2S0 (LMD4030 Microphone) definitions ********************************/
+
+#define BOARD_I2S0_BCLKPIN   3
+#define BOARD_I2S0_DINPIN    42
+
+/* I2S1 (NS4168 Audio) definitions ******************************************/
+
+#define BOARD_I2S1_BCLKPIN   46
+#define BOARD_I2S1_WSPIN     9
+#define BOARD_I2S1_DOUTPIN    8
 
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

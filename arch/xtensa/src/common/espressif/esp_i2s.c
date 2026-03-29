@@ -2107,7 +2107,7 @@ static void i2s_set_clock(struct esp_i2s_s *priv)
       bclk_div = 8;
       mclk = bclk * bclk_div;
 
-      i2sinfo("PDM RX: rate=%u, dsr=%u, bclk=%u\n",
+      i2sinfo("PDM RX: rate=%" PRIu32 ", dsr=%" PRIu32 ", bclk=%" PRIu32 "\n",
               priv->rate, dsr_factor, bclk);
     }
   else if (priv->config->role == I2S_ROLE_MASTER)
@@ -2437,7 +2437,7 @@ static int i2s_interrupt(int irq, void *context, void *arg)
   esp32s3_dma_clear_interrupt(priv->dma_channel, false, status);
   if (priv->config->rx_en)
     {
-      i2sinfo("RX interrupt status: %08x\n", status);
+      i2sinfo("RX interrupt status: %08" PRIx32 "\n", status);
       if (status & GDMA_LL_EVENT_RX_SUC_EOF)
         {
           cur = (struct esp_dmadesc_s *)
@@ -2741,7 +2741,7 @@ static uint32_t i2s_rxsamplerate(struct i2s_dev_s *dev, uint32_t rate)
     {
       i2s_rx_channel_stop(priv);
 
-      i2sinfo("old rate=%d, new rate=%d", priv->rate, rate);
+      i2sinfo("old rate=%" PRId32 ", new rate=%" PRId32, priv->rate, rate);
 
       priv->rate = rate;
 
@@ -2824,7 +2824,7 @@ static uint32_t i2s_rxdatawidth(struct i2s_dev_s *dev, int bits)
     {
       i2s_rx_channel_stop(priv);
 
-      i2sinfo("old width=%d, new width=%d", priv->data_width, bits);
+      i2sinfo("old width=%" PRId32 ", new width=%d", priv->data_width, bits);
       priv->data_width = bits;
 
       i2s_set_datawidth(priv);

@@ -403,6 +403,7 @@ int esp32s3_gpio_initialize(void)
     }
 #endif
 
+  UNUSED(pincount);
   UNUSED(i);
   UNUSED(ret);
   return OK;
