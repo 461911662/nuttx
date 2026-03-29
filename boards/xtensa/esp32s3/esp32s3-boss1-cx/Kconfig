@@ -61,25 +61,6 @@ config ESP32S3_BOSS1_CX_I2S0_RX
 
 endif
 
-config ESP32S3_BOSS1_CX_I2S1
-    bool "I2S Audio (NS4168)"
-    depends on ESP32S3_BOSS1_CX_GPIO_EXP
-    default n
-    help
-        Enable I2S audio support for NS4168 amplifier
-
-if ESP32S3_BOSS1_CX_I2S1
-
-config ESP32S3_BOSS1_CX_I2S1_TX
-    bool "I2S0 TX (Output)"
-    default y
-
-config ESP32S3_BOSS1_CX_I2S1_RX
-    bool "I2S0 RX (Input)"
-    default n
-
-endif
-
 config ESP32S3_BOSS1_CX_SPEAKER
     bool "Speaker Power Control (NS4168)"
     depends on ESP32S3_BOSS1_CX_GPIO_EXP
