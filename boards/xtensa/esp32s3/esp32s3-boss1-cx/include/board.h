@@ -109,4 +109,9 @@
 #define BOARD_I2S1_WSPIN     9
 #define BOARD_I2S1_DOUTPIN    8
 
+/* Speaker (NS4168) definitions *******************************************/
+
+#define BOARD_SPK_ENABLE_PIN   0  /* XL9555 IO0 for speaker enable */
+#define BOARD_SPK_I2S_PORT    1  /* I2S1 for NS4168 */
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

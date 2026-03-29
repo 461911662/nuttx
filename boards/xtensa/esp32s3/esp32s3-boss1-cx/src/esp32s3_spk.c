@@ -49,8 +49,8 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-#define SPK_ENABLE_PIN  0  /* XL9555 IO0 for speaker enable */
-#define SPK_I2S_PORT    1  /* I2S1 for NS4168 */
+#define SPK_ENABLE_PIN  BOARD_SPK_ENABLE_PIN
+#define SPK_I2S_PORT    BOARD_SPK_I2S_PORT
 
 /****************************************************************************
  * Private Types
