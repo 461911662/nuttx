@@ -415,6 +415,18 @@ int esp32s3_spk_initialize(void)
       return -ENODEV;
     }
 
+#ifdef CONFIG_AUDIO_I2SCHAR
+  /* Register I2S character device for debugging */
+
+  ret = i2schar_register(i2s, SPK_I2S_PORT);
+  if (ret < 0)
+    {
+      auderr("ERROR: i2schar_register failed: %d\n", ret);
+      kmm_free(priv);
+      return ret;
+    }
+#endif
+
   /* Create audio I2S device for TX (playback) */
 
   audio_i2s = audio_i2s_initialize(i2s, true);
