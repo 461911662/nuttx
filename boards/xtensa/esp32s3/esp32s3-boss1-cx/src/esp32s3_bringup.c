@@ -53,7 +53,6 @@
 #endif
 
 #include "esp32s3-boss1-cx.h"
-#include "esp32s3_spk.h"
 
 /****************************************************************************
  * Public Functions
