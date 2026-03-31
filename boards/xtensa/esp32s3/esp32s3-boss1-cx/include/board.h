@@ -114,4 +114,11 @@
 #define BOARD_SPK_ENABLE_PIN   0  /* XL9555 IO0 for speaker enable */
 #define BOARD_SPK_I2S_PORT    1  /* I2S1 for NS4168 */
 
+/* SDMMC (SD Card) definitions *****************************************/
+
+#define BOARD_SDMMC_CD_GPIO     4   /* Card Detect */
+#define BOARD_SDMMC_CMD_GPIO    5   /* Command */
+#define BOARD_SDMMC_CLK_GPIO    6   /* Clock */
+#define BOARD_SDMMC_DATA0_GPIO  7   /* Data0 */
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */
