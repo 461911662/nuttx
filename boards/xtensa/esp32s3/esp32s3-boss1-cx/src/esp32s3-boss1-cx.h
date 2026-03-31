@@ -31,6 +31,7 @@
 #include <nuttx/compiler.h>
 #include <stdint.h>
 #include <nuttx/ioexpander/ioexpander.h>
+#include <nuttx/input/buttons.h>
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -97,6 +98,10 @@ int esp32s3_spk_initialize(void);
 
 #ifdef CONFIG_DEV_GPIO
 int esp32s3_gpio_initialize(void);
+#endif
+
+#ifdef CONFIG_ARCH_BUTTONS
+int board_button_initialize(void);
 #endif
 
 #endif /* __ASSEMBLY__ */

@@ -121,4 +121,21 @@
 #define BOARD_SDMMC_CLK_GPIO    6   /* Clock */
 #define BOARD_SDMMC_DATA0_GPIO  7   /* Data0 */
 
+/* Button definitions ***********************************************/
+
+/* Keys are on XL9555 IO1-IO4 */
+#define BUTTON_KEY0        0
+#define BUTTON_KEY1        1
+#define BUTTON_KEY2        2
+#define BUTTON_KEY3        3
+
+#define BUTTON_KEY0_BIT    (1 << BUTTON_KEY0)
+#define BUTTON_KEY1_BIT    (1 << BUTTON_KEY1)
+#define BUTTON_KEY2_BIT    (1 << BUTTON_KEY2)
+#define BUTTON_KEY3_BIT    (1 << BUTTON_KEY3)
+
+#define BOARD_BUTTON_FOUR  4
+
+#define BOARD_BUTTON_HMI   0
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */

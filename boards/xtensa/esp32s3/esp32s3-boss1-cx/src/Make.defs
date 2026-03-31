@@ -37,6 +37,11 @@ ifeq ($(CONFIG_DEV_GPIO),y)
 CSRCS += esp32s3_gpio.c
 endif
 
+# Button driver (XL9555)
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+CSRCS += esp32s3_buttons.c
+endif
+
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)

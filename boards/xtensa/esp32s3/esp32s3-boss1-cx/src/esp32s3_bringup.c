@@ -44,6 +44,10 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
+#ifdef CONFIG_ARCH_BUTTONS
+#  include <nuttx/input/buttons.h>
+#endif
+
 #ifdef CONFIG_ESP_RMT
 #  include <esp32s3_board_rmt.h>
 #endif
@@ -187,6 +191,16 @@ int esp32s3_bringup(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to initialize SDMMC: %d\n", ret);
+    }
+#endif
+
+#ifdef CONFIG_ARCH_BUTTONS
+  /* Initialize XL9555 button driver */
+
+  ret = board_button_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: board_button_initialize failed: %d\n", ret);
     }
 #endif
 
