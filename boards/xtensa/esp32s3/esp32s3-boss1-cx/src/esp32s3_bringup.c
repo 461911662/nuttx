@@ -44,7 +44,7 @@
 #  include <nuttx/leds/userled.h>
 #endif
 
-#ifdef CONFIG_ARCH_BUTTONS
+#ifdef CONFIG_INPUT_BUTTONS
 #  include <nuttx/input/buttons.h>
 #endif
 
@@ -194,7 +194,7 @@ int esp32s3_bringup(void)
     }
 #endif
 
-#ifdef CONFIG_ARCH_BUTTONS
+#ifdef CONFIG_INPUT_BUTTONS
   /* Initialize button driver using NuttX generic lower half */
 
   ret = btn_lower_initialize("/dev/buttons");

@@ -34,6 +34,7 @@
 
 #include <nuttx/arch.h>
 #include <nuttx/board.h>
+#include <arch/board/board.h>
 #include <nuttx/input/buttons.h>
 #include <nuttx/ioexpander/ioexpander.h>
 
@@ -158,10 +159,10 @@ int board_button_irq(int id, xcpt_t irqhandler, FAR void *arg)
                   IOEXPANDER_OPTION_INTCFG,
                   (FAR void *)IOEXPANDER_VAL_BOTH);
 
-  IOEXP_ATTACH(g_btn_ioe,
-               (1 << KEY_IO_PIN(id)),
-               irqhandler,
-               arg);
+  IOEP_ATTACH(g_btn_ioe,
+              (1 << KEY_IO_PIN(id)),
+              irqhandler,
+              arg);
 
   return OK;
 }
