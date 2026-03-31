@@ -195,12 +195,12 @@ int esp32s3_bringup(void)
 #endif
 
 #ifdef CONFIG_ARCH_BUTTONS
-  /* Initialize XL9555 button driver */
+  /* Initialize button driver using NuttX generic lower half */
 
-  ret = board_button_initialize();
+  ret = btn_lower_initialize("/dev/buttons");
   if (ret < 0)
     {
-      syslog(LOG_ERR, "ERROR: board_button_initialize failed: %d\n", ret);
+      syslog(LOG_ERR, "ERROR: btn_lower_initialize failed: %d\n", ret);
     }
 #endif
 

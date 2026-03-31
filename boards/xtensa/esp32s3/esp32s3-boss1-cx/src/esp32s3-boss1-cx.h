@@ -100,9 +100,5 @@ int esp32s3_spk_initialize(void);
 int esp32s3_gpio_initialize(void);
 #endif
 
-#ifdef CONFIG_ARCH_BUTTONS
-int board_button_initialize(void);
-#endif
-
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */
