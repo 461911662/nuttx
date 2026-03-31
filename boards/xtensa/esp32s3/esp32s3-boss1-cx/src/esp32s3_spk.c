@@ -40,8 +40,6 @@
 
 #include "espressif/esp_i2s.h"
 #include "esp32s3-boss1-cx.h"
-#include "esp32s3_spk.h"
-#include "esp32s3_gpioexp.h"
 
 #ifdef CONFIG_ESP32S3_BOSS1_CX_SPEAKER
 
@@ -116,6 +114,15 @@ static int spk_release(FAR struct audio_lowerhalf_s *dev,
                         FAR void *session);
 #else
 static int spk_release(FAR struct audio_lowerhalf_s *dev);
+#endif
+#ifdef CONFIG_AUDIO_MULTI_SESSION
+static void spk_callback(FAR void *arg, uint16_t reason,
+                          FAR struct ap_buffer_s *apb,
+                          uint16_t status, FAR void *session);
+#else
+static void spk_callback(FAR void *arg, uint16_t reason,
+                          FAR struct ap_buffer_s *apb,
+                          uint16_t status);
 #endif
 
 /****************************************************************************
@@ -326,6 +333,31 @@ static int spk_release(FAR struct audio_lowerhalf_s *dev)
 }
 
 /****************************************************************************
+ * Name: spk_callback
+ ****************************************************************************/
+
+#ifdef CONFIG_AUDIO_MULTI_SESSION
+static void spk_callback(FAR void *arg, uint16_t reason,
+                        FAR struct ap_buffer_s *apb,
+                        uint16_t status, FAR void *session)
+#else
+static void spk_callback(FAR void *arg, uint16_t reason,
+                        FAR struct ap_buffer_s *apb,
+                        uint16_t status)
+#endif
+{
+  FAR struct esp32s3_spk_dev_s *priv = (FAR struct esp32s3_spk_dev_s *)arg;
+
+  DEBUGASSERT(priv != NULL);
+
+#ifdef CONFIG_AUDIO_MULTI_SESSION
+  priv->dev.upper(priv->dev.priv, reason, apb, status, session);
+#else
+  priv->dev.upper(priv->dev.priv, reason, apb, status);
+#endif
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -449,6 +481,8 @@ int esp32s3_spk_initialize(void)
 
   /* Initialize our speaker wrapper */
 
+  pcm->upper = spk_callback;
+  pcm->priv = priv;
   priv->lower = pcm;
   priv->dev.ops = &g_spk_ops;
 
@@ -464,7 +498,6 @@ int esp32s3_spk_initialize(void)
       return ret;
     }
 
-  audinfo("Speaker driver initialized, /dev/%s registered\n", devname);
   return OK;
 }
 #endif /* CONFIG_ESP32S3_BOSS1_CX_SPEAKER */

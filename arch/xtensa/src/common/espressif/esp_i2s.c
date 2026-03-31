@@ -922,8 +922,8 @@ static int IRAM_ATTR i2s_txdma_start(struct esp_i2s_s *priv)
   bfcontainer = (struct esp_buffer_s *)sq_remfirst(&priv->tx.pend);
 
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
-  esp_dma_load(bfcontainer->dma_link, priv->dma_channel, I2S_DIR_TX);
-  esp_dma_enable(priv->dma_channel, I2S_DIR_TX);
+  esp_dma_load(bfcontainer->dma_link, priv->dma_channel, true);
+  esp_dma_enable(priv->dma_channel, true);
 #else
   i2s_hal_tx_enable_dma(priv->config->ctx);
   i2s_hal_tx_enable_intr(priv->config->ctx);
@@ -1058,7 +1058,12 @@ static IRAM_ATTR int i2s_txdma_setup(struct esp_i2s_s *priv,
    * carried from the last upper half audio buffer.
    */
 
+#if defined(CONFIG_ARCH_CHIP_ESP32S3) && defined(CONFIG_ESP32S3_DMA)
+  size_t cc_size = up_get_dcache_linesize();
+  bfcontainer->buf = memalign(cc_size, bfcontainer->nbytes);
+#else
   bfcontainer->buf = calloc(bfcontainer->nbytes, 1);
+#endif
   if (bfcontainer->buf == NULL)
     {
       i2serr("Failed to allocate the DMA internal buffer "
@@ -1120,6 +1125,14 @@ static IRAM_ATTR int i2s_txdma_setup(struct esp_i2s_s *priv,
   /* Configure DMA stream */
 
 #ifdef CONFIG_ARCH_CHIP_ESP32S3
+
+#ifdef CONFIG_ARCH_DCACHE
+  if (esp32s3_ptr_extram(bfcontainer->buf))
+    {
+      up_flush_dcache((uintptr_t)bfcontainer->buf, (uintptr_t)bfcontainer->buf + bfcontainer->nbytes);
+    }
+#endif
+
   bytes_queued = esp_dma_setup((struct esp_dmadesc_s *)outlink,
                                I2S_DMADESC_NUM,
                                (uint8_t *) bfcontainer->buf,
@@ -2464,12 +2477,23 @@ static int i2s_interrupt(int irq, void *context, void *arg)
   esp32s3_dma_clear_interrupt(priv->dma_channel, true, status);
   if (priv->config->tx_en)
     {
+      i2sinfo("TX interrupt status: %08" PRIx32 "\n", status);
       if (status & GDMA_LL_EVENT_TX_TOTAL_EOF)
         {
           cur = (struct esp_dmadesc_s *)
                 esp32s3_dma_get_desc_addr(priv->dma_channel, true);
 
           /* Schedule completion of the transfer on the worker thread */
+
+#ifdef CONFIG_ARCH_DCACHE
+          uintptr_t buf_end = (uintptr_t)((uint8_t *)cur->pbuf + ((dma_descriptor_t *)cur)->dw0.size);
+          if (esp32s3_ptr_extram(cur->pbuf))
+            {
+              /* Invalidate the cache for the buffer */
+              memset(cur->pbuf, 0, ((dma_descriptor_t *)cur)->dw0.size);
+              up_flush_dcache((uintptr_t)cur->pbuf, buf_end);
+            }
+#endif
 
           i2s_tx_schedule(priv, cur);
         }
