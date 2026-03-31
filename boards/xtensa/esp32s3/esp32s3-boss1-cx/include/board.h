@@ -134,7 +134,7 @@
 #define BUTTON_KEY2_BIT    (1 << BUTTON_KEY2)
 #define BUTTON_KEY3_BIT    (1 << BUTTON_KEY3)
 
-#define BOARD_BUTTON_FOUR  4
+#define BOARD_BUTTON_NUM   4
 
 #define BOARD_BUTTON_HMI   0
 

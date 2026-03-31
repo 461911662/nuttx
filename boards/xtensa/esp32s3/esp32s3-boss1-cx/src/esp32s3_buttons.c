@@ -56,7 +56,7 @@ struct xl9555_btn_lowerhalf_s
   FAR struct ioexpander_dev_s *ioe;
   btn_handler_t handler;
   FAR void *arg;
-  FAR void *attach_handle[BOARD_BUTTON_FOUR];
+  FAR void *attach_handle[BOARD_BUTTON_NUM];
 };
 
 typedef struct xl9555_btn_lowerhalf_s *xl9555_btn_lowerhalf_t;
@@ -137,7 +137,7 @@ static btn_buttonset_t xl9555_btn_buttons(
 
   DEBUGASSERT(priv->ioe != NULL);
 
-  for (i = 0; i < BOARD_BUTTON_FOUR; i++)
+  for (i = 0; i < BOARD_BUTTON_NUM; i++)
     {
       ret_val = IOEXP_READPIN(priv->ioe, KEY_IO_PIN(i), &value);
       if (ret_val == OK && value)
@@ -165,7 +165,7 @@ static void xl9555_btn_enable(FAR const struct btn_lowerhalf_s *lower,
 
   if (handler == NULL || either == 0)
     {
-      for (i = 0; i < BOARD_BUTTON_FOUR; i++)
+      for (i = 0; i < BOARD_BUTTON_NUM; i++)
         {
           if (priv->attach_handle[i] != NULL)
             {
@@ -177,7 +177,7 @@ static void xl9555_btn_enable(FAR const struct btn_lowerhalf_s *lower,
       return;
     }
 
-  for (i = 0; i < BOARD_BUTTON_FOUR; i++)
+  for (i = 0; i < BOARD_BUTTON_NUM; i++)
     {
       if ((either & (1 << i)) != 0)
         {
@@ -212,7 +212,7 @@ int xl9555_btn_initialize(void)
 
   g_xl9555_btn.ioe = ioe;
 
-  for (i = 0; i < BOARD_BUTTON_FOUR; i++)
+  for (i = 0; i < BOARD_BUTTON_NUM; i++)
     {
       ret = IOEXP_SETDIRECTION(ioe, KEY_IO_PIN(i), IOEXPANDER_DIRECTION_IN);
       if (ret < 0)
@@ -260,7 +260,7 @@ int board_button_initialize(void)
 #ifdef CONFIG_ARCH_IRQBUTTONS
 int board_button_irq(int id, xcpt_t irqhandler, FAR void *arg)
 {
-  if (id < 0 || id >= BOARD_BUTTON_FOUR)
+  if (id < 0 || id >= BOARD_BUTTON_NUM)
     {
       return -EINVAL;
     }
