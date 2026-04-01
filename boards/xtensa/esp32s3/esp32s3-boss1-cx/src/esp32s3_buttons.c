@@ -49,6 +49,16 @@
 #define KEY_IO_PIN(n) ((n) + 1)
 
 /****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+struct btn_ioe_callback_s
+{
+  xcpt_t handler;
+  FAR void *arg;
+};
+
+/****************************************************************************
  * Private Data
  ****************************************************************************/
 
@@ -57,6 +67,16 @@ static FAR struct ioexpander_dev_s *g_btn_ioe;
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+static int btn_ioe_irq_wrapper(FAR struct ioexpander_dev_s *dev,
+                               ioe_pinset_t pinset, FAR void *arg)
+{
+  FAR struct btn_ioe_callback_s *btn_cb =
+    (FAR struct btn_ioe_callback_s *)arg;
+  UNUSED(dev);
+  UNUSED(pinset);
+  return btn_cb->handler(0, NULL, btn_cb->arg);
+}
 
 static btn_buttonset_t xl9555_btn_buttons(void)
 {
@@ -149,6 +169,8 @@ uint32_t board_buttons(void)
  ****************************************************************************/
 
 #ifdef CONFIG_ARCH_IRQBUTTONS
+static struct btn_ioe_callback_s g_btn_cb;
+
 int board_button_irq(int id, xcpt_t irqhandler, FAR void *arg)
 {
   if (id < 0 || id >= BOARD_BUTTON_NUM)
@@ -160,10 +182,13 @@ int board_button_irq(int id, xcpt_t irqhandler, FAR void *arg)
                   IOEXPANDER_OPTION_INTCFG,
                   (FAR void *)IOEXPANDER_VAL_BOTH);
 
+  g_btn_cb.handler = irqhandler;
+  g_btn_cb.arg = arg;
+
   IOEP_ATTACH(g_btn_ioe,
               (1 << KEY_IO_PIN(id)),
-              irqhandler,
-              arg);
+              btn_ioe_irq_wrapper,
+              &g_btn_cb);
 
   return OK;
 }
