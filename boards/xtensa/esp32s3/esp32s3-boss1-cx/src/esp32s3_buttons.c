@@ -112,9 +112,10 @@ uint32_t board_button_initialize(void)
           return ret;
         }
 
+      /* invert pin state refs to boss1-cx board */
       ret = IOEXP_SETOPTION(g_btn_ioe, KEY_IO_PIN(i),
                            IOEXPANDER_OPTION_INVERT,
-                           (FAR void *)IOEXPANDER_VAL_NORMAL);
+                           (FAR void *)IOEXPANDER_VAL_INVERT);
       if (ret < 0)
         {
           syslog(LOG_ERR, "ERROR: Failed to set invert option for pin %d: %d\n",
