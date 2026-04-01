@@ -143,6 +143,8 @@ struct xl9555_int_dev_s
   /* Saved callback information for each I/O expander client */
 
   struct xl9555_int_callback_s cb[CONFIG_XL9555_INT_NCALLBACKS];
+
+  ioe_pinset_t                    last_pinset;  /* Previous pin state for edge detection */
 #endif
 };
 
