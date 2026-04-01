@@ -42,6 +42,11 @@ ifeq ($(CONFIG_ARCH_BUTTONS),y)
 CSRCS += esp32s3_buttons.c
 endif
 
+# RMT driver (IR TX and WS2812)
+ifeq ($(CONFIG_ESP_RMT),y)
+CSRCS += esp32s3_rmt.c
+endif
+
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)

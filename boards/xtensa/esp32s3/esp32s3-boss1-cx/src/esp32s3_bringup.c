@@ -49,7 +49,7 @@
 #endif
 
 #ifdef CONFIG_ESP_RMT
-#  include <esp32s3_board_rmt.h>
+#  include "esp32s3_board_rmt.h"
 #endif
 
 #ifdef CONFIG_ESP32S3_I2C
@@ -126,11 +126,23 @@ int esp32s3_bringup(void)
 #ifdef CONFIG_ESP_RMT
   /* Initialize RMT TX for IR transmitter */
 
-  ret = board_rmt_txinitialize(BOARD_IR_TX_CHANNEL, BOARD_IR_TX_GPIO);
+  ret = board_rmt_tx_init(BOARD_IR_TX_CHANNEL, BOARD_IR_TX_GPIO);
   if (ret < 0)
     {
-      syslog(LOG_ERR, "ERROR: board_rmt_txinitialize() failed: %d\n", ret);
+      syslog(LOG_ERR, "ERROR: board_rmt_tx_init() failed: %d\n", ret);
     }
+
+#ifdef CONFIG_WS2812_NON_SPI_DRIVER
+  /* Initialize RMT TX for WS2812 LED strip */
+
+  ret = board_ws2812_init(BOARD_WS2812_RMT_CHANNEL,
+                          BOARD_WS2812_GPIO,
+                          CONFIG_WS2812_LED_COUNT);
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: board_ws2812_init() failed: %d\n", ret);
+    }
+#endif
 #endif
 
 #ifdef CONFIG_I2C_DRIVER

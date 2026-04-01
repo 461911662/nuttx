@@ -87,6 +87,11 @@
 #define BOARD_IR_TX_GPIO       16
 #define BOARD_IR_TX_CHANNEL    0
 
+/* WS2812 LED Strip definitions ***********************************************/
+
+#define BOARD_WS2812_GPIO          18
+#define BOARD_WS2812_RMT_CHANNEL    1
+
 /* GPIO pins used by the GPIO Subsystem */
 
 #define BOARD_NGPIOOUT    0 /* Amount of GPIO Output pins */
