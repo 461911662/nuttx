@@ -2490,7 +2490,7 @@ static int i2s_interrupt(int irq, void *context, void *arg)
           if (esp32s3_ptr_extram(cur->pbuf))
             {
               /* Invalidate the cache for the buffer */
-              memset(cur->pbuf, 0, ((dma_descriptor_t *)cur)->dw0.size);
+              memset((void *)cur->pbuf, 0, ((dma_descriptor_t *)cur)->dw0.size);
               up_flush_dcache((uintptr_t)cur->pbuf, buf_end);
             }
 #endif
