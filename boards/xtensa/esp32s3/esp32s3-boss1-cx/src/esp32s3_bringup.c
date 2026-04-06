@@ -165,6 +165,16 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_LCD_I80
+  /* Initialize LCD I80 */
+
+  ret = board_lcd_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize LCD I80: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_ESPRESSIF_I2S0
   /* Initialize I2S0 for LMD4030 microphone (master mode) */
 

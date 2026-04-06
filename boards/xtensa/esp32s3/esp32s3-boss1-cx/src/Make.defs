@@ -47,6 +47,11 @@ ifeq ($(CONFIG_ESP_RMT),y)
 CSRCS += esp32s3_rmt.c
 endif
 
+# LCD ST7789 driver (8-bit parallel I80)
+ifeq ($(CONFIG_ESP32S3_BOSS1_CX_LCD_I80),y)
+CSRCS += board_lcd_st7789.c
+endif
+
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)

@@ -2719,6 +2719,14 @@ config ESP32S3_LCD_REGDEBUG
 	bool "LCD Debug Registers"
 	default n
 
+config ESP32S3_LCD_I80
+	bool "LCD I80 (8-bit parallel ST7789)"
+	select ESP32S3_DMA
+	---help---
+		Enable I80 LCD support using ST7789V in 8-bit parallel mode
+		via ESP32-S3 LCD_CAM controller. This uses a simple 8-bit
+		data bus interface instead of RGB mode.
+
 endmenu
 
 menu "SD/MMC Configuration"

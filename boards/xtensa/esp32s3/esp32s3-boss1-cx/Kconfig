@@ -69,4 +69,99 @@ config ESP32S3_BOSS1_CX_SPEAKER
         Enable speaker power control via XL9555 IO0 for NS4168 amplifier.
         This wraps I2S1 audio with GPIO control to enable/disable the speaker.
 
+config ESP32S3_BOSS1_CX_LCD_I80
+    bool "LCD I80 (ST7789 8-bit parallel)"
+    depends on ESP32S3_BOSS1_CX_GPIO_EXP
+    depends on ESP32S3_LCD_I80
+    select IOEXPANDER
+    select IOEXPANDER_XL9555
+    help
+        Enable I80 LCD support for BOSS1-CX board using ST7789V
+        in 8-bit parallel mode via ESP32-S3 LCD_CAM controller.
+
+if ESP32S3_BOSS1_CX_LCD_I80
+
+config ESP32S3_BOSS1_CX_LCD_I80_WIDTH
+    int "LCD Width (pixels)"
+    default 320
+
+config ESP32S3_BOSS1_CX_LCD_I80_HEIGHT
+    int "LCD Height (pixels)"
+    default 240
+
+config ESP32S3_BOSS1_CX_LCD_I80_BPP
+    int "LCD Bits Per Pixel"
+    default 16
+
+config ESP32S3_BOSS1_CX_LCD_I80_BL_XL9555_PIN
+    int "Backlight XL9555 Pin"
+    default 12
+    range 0 15
+    help
+        XL9555 GPIO pin number for LCD backlight control.
+
+config ESP32S3_BOSS1_CX_LCD_I80_RST_XL9555_PIN
+    int "Reset XL9555 Pin"
+    default 13
+    range 0 15
+    help
+        XL9555 GPIO pin number for LCD reset control.
+
+config ESP32S3_BOSS1_CX_LCD_I80_D0_PIN
+    int "LCD D0 Pin"
+    default 40
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D1_PIN
+    int "LCD D1 Pin"
+    default 38
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D2_PIN
+    int "LCD D2 Pin"
+    default 39
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D3_PIN
+    int "LCD D3 Pin"
+    default 48
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D4_PIN
+    int "LCD D4 Pin"
+    default 45
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D5_PIN
+    int "LCD D5 Pin"
+    default 21
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D6_PIN
+    int "LCD D6 Pin"
+    default 47
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_D7_PIN
+    int "LCD D7 Pin"
+    default 14
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_DC_PIN
+    int "LCD DC Pin"
+    default 1
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_CS_PIN
+    int "LCD CS Pin"
+    default 2
+    range 0 48
+
+config ESP32S3_BOSS1_CX_LCD_I80_WR_PIN
+    int "LCD WR (PCLK) Pin"
+    default 41
+    range 0 48
+
+endif # ESP32S3_BOSS1_CX_LCD_I80
+
 endif # ARCH_BOARD_ESP32S3_BOSS1_CX

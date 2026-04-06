@@ -108,5 +108,9 @@ int board_rmt_tx_init(int channel, int gpio);
 int board_ws2812_init(int channel, int gpio, int led_count);
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_LCD_I80
+int board_lcd_initialize(void);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */
