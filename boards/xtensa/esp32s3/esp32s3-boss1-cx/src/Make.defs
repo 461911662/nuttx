@@ -52,6 +52,11 @@ ifeq ($(CONFIG_ESP32S3_BOSS1_CX_LCD_I80),y)
 CSRCS += board_lcd_st7789.c
 endif
 
+# FT6336U touchscreen driver
+ifeq ($(CONFIG_ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U),y)
+CSRCS += board_touchscreen_ft6336u.c
+endif
+
 ifeq ($(CONFIG_BOARDCTL),y)
 CSRCS += esp32s3_appinit.c
 ifeq ($(CONFIG_BOARDCTL_RESET),y)

@@ -165,6 +165,16 @@ int esp32s3_bringup(void)
     }
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+  /* Initialize FT6336U touchscreen */
+
+  ret = board_touchscreen_initialize();
+  if (ret < 0)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to initialize touchscreen: %d\n", ret);
+    }
+#endif
+
 #ifdef CONFIG_ESP32S3_BOSS1_CX_LCD_I80
   /* Initialize LCD I80 */
 

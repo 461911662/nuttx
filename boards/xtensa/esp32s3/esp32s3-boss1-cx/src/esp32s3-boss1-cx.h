@@ -112,5 +112,9 @@ int board_ws2812_init(int channel, int gpio, int led_count);
 int board_lcd_initialize(void);
 #endif
 
+#ifdef CONFIG_ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+int board_touchscreen_initialize(void);
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_SRC_ESP32S3_BOSS1_CX_H */

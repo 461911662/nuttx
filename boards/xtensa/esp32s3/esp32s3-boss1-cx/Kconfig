@@ -164,4 +164,34 @@ config ESP32S3_BOSS1_CX_LCD_I80_WR_PIN
 
 endif # ESP32S3_BOSS1_CX_LCD_I80
 
+config ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+    bool "FT6336U Touchscreen"
+    depends on ESP32S3_BOSS1_CX_GPIO_EXP
+    select INPUT
+    select INPUT_FT5X06
+    select ESP32S3_I2C1
+    help
+        Enable FT6336U touchscreen on BOSS1-CX board via I2C1.
+        The touchscreen INT signal is connected to XL9555 IO9,
+        and the RST signal is connected to XL9555 IO8.
+
+if ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+
+config ESP32S3_BOSS1_CX_TOUCH_XL9555_RST_PIN
+    int "Touch RST XL9555 Pin"
+    default 8
+    range 0 15
+    help
+        XL9555 GPIO pin number for FT6336U reset control (active low).
+
+config ESP32S3_BOSS1_CX_TOUCH_XL9555_INT_PIN
+    int "Touch INT XL9555 Pin"
+    default 9
+    range 0 15
+    help
+        XL9555 GPIO pin number connected to FT6336U INT output.
+        This pin detects touch events (active low, falling edge).
+
+endif # ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+
 endif # ARCH_BOARD_ESP32S3_BOSS1_CX
