@@ -141,4 +141,29 @@
 
 #define BOARD_BUTTON_NUM   4
 
+/* LCD (ST7789 I80) definitions ***********************************************/
+
+#ifdef CONFIG_ESP32S3_BOSS1_CX_LCD_I80
+#define BOARD_LCD_I80_D0_GPIO     40
+#define BOARD_LCD_I80_D1_GPIO     38
+#define BOARD_LCD_I80_D2_GPIO     39
+#define BOARD_LCD_I80_D3_GPIO     48
+#define BOARD_LCD_I80_D4_GPIO     45
+#define BOARD_LCD_I80_D5_GPIO     21
+#define BOARD_LCD_I80_D6_GPIO     47
+#define BOARD_LCD_I80_D7_GPIO     14
+#define BOARD_LCD_I80_DC_GPIO      1
+#define BOARD_LCD_I80_CS_GPIO      2
+#define BOARD_LCD_I80_WR_GPIO     41
+#define BOARD_LCD_I80_RST_XL9555_PIN  11
+#define BOARD_LCD_I80_BL_XL9555_PIN  10
+#endif
+
+/* Touchscreen (FT6336U) definitions *****************************************/
+
+#ifdef CONFIG_ESP32S3_BOSS1_CX_TOUCHSCREEN_FT6336U
+#define BOARD_TOUCH_RST_XL9555_PIN   8
+#define BOARD_TOUCH_INT_XL9555_PIN   9
+#endif
+
 #endif /* __BOARDS_XTENSA_ESP32S3_ESP32S3_BOSS1_CX_INCLUDE_BOARD_H */
