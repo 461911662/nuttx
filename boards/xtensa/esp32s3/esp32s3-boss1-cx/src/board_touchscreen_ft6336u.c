@@ -33,6 +33,7 @@
 #include <unistd.h>
 
 #include <nuttx/irq.h>
+#include <nuttx/sched.h>
 #include <nuttx/input/ft5x06.h>
 #include <nuttx/ioexpander/ioexpander.h>
 
