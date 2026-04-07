@@ -270,7 +270,7 @@ static void esp32s3_ft5x06_reset(void)
       return;
     }
 
-  usleep(5000);
+  nxsched_usleep(5000);
 
   ret = IOEXP_WRITEPIN(g_ft5x06_priv.ioe, FT6336U_RST_XL9555_PIN, true);
   if (ret < 0)
@@ -278,7 +278,7 @@ static void esp32s3_ft5x06_reset(void)
       ierr("ERROR: Failed to deassert RST: %d\n", ret);
     }
 
-  usleep(100000);
+  nxsched_usleep(100000);
 }
 #endif
 

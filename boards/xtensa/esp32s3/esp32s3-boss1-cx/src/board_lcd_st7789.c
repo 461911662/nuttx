@@ -503,7 +503,7 @@ int board_lcd_initialize(void)
       return ret;
     }
 
-  nxsig_usleep(10 * 1000);
+  nxsched_usleep(10 * 1000);
 
   ret = IOEXP_WRITEPIN(priv->ioe, XL9555_IO_RST, 1);
   if (ret < 0)
@@ -512,7 +512,7 @@ int board_lcd_initialize(void)
       return ret;
     }
 
-  nxsig_usleep(120 * 1000);
+  nxsched_usleep(120 * 1000);
 
   priv->lcd_i80 = lcd_i80_init(CONFIG_ESP32S3_BOSS1_CX_LCD_I80_WIDTH,
                                 CONFIG_ESP32S3_BOSS1_CX_LCD_I80_HEIGHT,
