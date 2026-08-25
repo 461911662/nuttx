@@ -39,7 +39,7 @@
 #elif CONFIG_ARCH_CHIP_ESP32S2
 #include "esp_attr.h"
 #include "esp32s2_rt_timer.h"
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
 #include "esp_attr.h"
 #include "esp32s3_rt_timer.h"
 #endif

@@ -57,7 +57,7 @@
 #elif CONFIG_ARCH_CHIP_ESP32S2
 #  include "esp32s2_wifi_adapter.h"
 #  include "esp32s2_systemreset.h"
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
 #  include "esp32s3_wifi_adapter.h"
 #  include "esp32s3_systemreset.h"
 #endif
@@ -72,7 +72,7 @@
 #elif CONFIG_ARCH_CHIP_ESP32S2
 #  define esp_register_shutdown_handler esp32s2_register_shutdown_handler
 #  define esp_unregister_shutdown_handler esp32s2_unregister_shutdown_handler
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
 #  define esp_register_shutdown_handler esp32s3_register_shutdown_handler
 #  define esp_unregister_shutdown_handler esp32s3_unregister_shutdown_handler
 #endif

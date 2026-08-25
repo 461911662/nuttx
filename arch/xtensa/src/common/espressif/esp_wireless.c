@@ -48,7 +48,7 @@
 #include "hardware/esp32s2_system.h"
 #include "esp32s2_irq.h"
 /* #include "esp32s2_partition.h" */
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
 #include "hardware/esp32s3_efuse.h"
 #include "hardware/esp32s3_rtccntl.h"
 #include "hardware/esp32s3_soc.h"
@@ -94,7 +94,7 @@
 #  define esp_partition_write esp32s2_partition_write
 #  define esp_setup_irq       esp32s2_setup_irq
 #  define esp_teardown_irq    esp32s2_teardown_irq
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
 #  define SWI_IRQ             ESP32S3_IRQ_INT_FROM_CPU2
 #  define SWI_PERIPH          ESP32S3_PERIPH_INT_FROM_CPU2
 #  define esp_partition_read  esp32s3_partition_read
@@ -1277,7 +1277,7 @@ int esp_wireless_init(void)
   priv->cpuint = esp_setup_irq(0, SWI_PERIPH, 1, ESP32_CPUINT_LEVEL);
 #elif CONFIG_ARCH_CHIP_ESP32S2
   priv->cpuint = esp_setup_irq(SWI_PERIPH, ESP32S2_INT_PRIO_DEF, 0);
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
   priv->cpuint = esp_setup_irq(0, SWI_PERIPH, ESP32S3_INT_PRIO_DEF, 0);
 #endif
   if (priv->cpuint < 0)
@@ -1298,7 +1298,7 @@ int esp_wireless_init(void)
       esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #elif CONFIG_ARCH_CHIP_ESP32S2
       esp_teardown_irq(SWI_PERIPH, priv->cpuint);
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
       esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #endif
       leave_critical_section(flags);
@@ -1354,7 +1354,7 @@ int esp_wireless_deinit(void)
           esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #elif CONFIG_ARCH_CHIP_ESP32S2
           esp_teardown_irq(SWI_PERIPH, priv->cpuint);
-#elif CONFIG_ARCH_CHIP_ESP32S3 || CONFIG_ARCH_CHIP_BOSS1_ESP32S3
+#elif CONFIG_ARCH_CHIP_ESP32S3
           esp_teardown_irq(0, SWI_PERIPH, priv->cpuint);
 #endif
         }
