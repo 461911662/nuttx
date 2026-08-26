@@ -787,9 +787,6 @@ static void xl9555_int_irqworker(void *arg)
       press   = change & pinset;
       release = change & ~pinset;
 
-      printf("xl9555_int_irqworker: pinset=0x%04x change=0x%04x press=0x%04x release=0x%04x\n",
-             pinset, change, press, release);
-
       for (i = 0; i < CONFIG_XL9555_INT_NCALLBACKS; i++)
         {
           if (xl->cb[i].cbfunc != NULL)
@@ -797,14 +794,12 @@ static void xl9555_int_irqworker(void *arg)
               ioe_pinset_t match_press = press & xl->cb[i].pinset;
               if (match_press != 0)
                 {
-                  printf("  -> press callback, match=0x%04x\n", match_press);
                   xl->cb[i].cbfunc(&xl->dev, match_press, xl->cb[i].cbarg);
                 }
 
               ioe_pinset_t match_release = release & xl->cb[i].pinset;
               if (match_release != 0)
                 {
-                  printf("  -> release callback, match=0x%04x\n", match_release);
                   xl->cb[i].cbfunc(&xl->dev, match_release, xl->cb[i].cbarg);
                 }
             }

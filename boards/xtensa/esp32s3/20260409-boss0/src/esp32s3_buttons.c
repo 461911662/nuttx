@@ -63,6 +63,7 @@ struct btn_ioe_callback_s
  ****************************************************************************/
 
 static FAR struct ioexpander_dev_s *g_btn_ioe;
+static struct btn_ioe_callback_s g_btn_cb;
 
 /****************************************************************************
  * Private Functions
@@ -73,8 +74,15 @@ static int btn_ioe_irq_wrapper(FAR struct ioexpander_dev_s *dev,
 {
   FAR struct btn_ioe_callback_s *btn_cb =
     (FAR struct btn_ioe_callback_s *)arg;
+
   UNUSED(dev);
   UNUSED(pinset);
+
+  if (btn_cb == NULL || btn_cb->handler == NULL)
+    {
+      return -EINVAL;
+    }
+
   return btn_cb->handler(0, NULL, btn_cb->arg);
 }
 
@@ -101,16 +109,6 @@ uint32_t board_button_initialize(void)
   if (ret < 0)
     {
       syslog(LOG_ERR, "ERROR: Failed to set direction for pin %d: %d\n",
-             BUTTON_PIN, ret);
-      return ret;
-    }
-
-  ret = IOEXP_SETOPTION(g_btn_ioe, BUTTON_PIN,
-                        IOEXPANDER_OPTION_INVERT,
-                        (FAR void *)IOEXPANDER_VAL_INVERT);
-  if (ret < 0)
-    {
-      syslog(LOG_ERR, "ERROR: Failed to set invert option for pin %d: %d\n",
              BUTTON_PIN, ret);
       return ret;
     }
@@ -146,8 +144,6 @@ uint32_t board_buttons(void)
  ****************************************************************************/
 
 #ifdef CONFIG_ARCH_IRQBUTTONS
-static struct btn_ioe_callback_s g_btn_cb;
-
 int board_button_irq(int id, xcpt_t irqhandler, FAR void *arg)
 {
   if (id < 0 || id >= BOARD_BUTTON_NUM)

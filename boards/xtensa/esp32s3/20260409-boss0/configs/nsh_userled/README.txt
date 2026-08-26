@@ -12,6 +12,7 @@ This configuration is used to test USERLED functionality on the 20260409-boss0 b
 - `CONFIG_USERLED_LOWER=y` - Generic lower half LED driver
 - `CONFIG_TESTING_LEDTEST=y` - LED test application
 - `CONFIG_20260409_BOSS0_GPIO_EXP=y` - XL9555 GPIO Expander
+- `CONFIG_BOARDCTL_RESET=y` - Board reset support
 
 ## Hardware
 - **SYSLED:** XL9555 P14 (Active High)
