@@ -1,0 +1,57 @@
+############################################################################
+# boards/xtensa/esp32s3/20260409-boss0/src/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.  The
+# ASF licenses this file to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance with the
+# License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+############################################################################
+
+CSRCS = esp32s3_boot.c esp32s3_bringup.c
+
+# GPIO expander (XL9555)
+ifeq ($(CONFIG_20260409_BOSS0_GPIO_EXP),y)
+CSRCS += esp32s3_gpioexp.c
+endif
+
+# Native ESP32-S3 GPIO
+ifeq ($(CONFIG_DEV_GPIO),y)
+CSRCS += esp32s3_gpio.c
+endif
+
+# Button driver (XL9555)
+ifeq ($(CONFIG_ARCH_BUTTONS),y)
+CSRCS += esp32s3_buttons.c
+endif
+
+ifeq ($(CONFIG_BOARDCTL),y)
+CSRCS += esp32s3_appinit.c
+ifeq ($(CONFIG_BOARDCTL_RESET),y)
+CSRCS += esp32s3_reset.c
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_LEDS),y)
+CSRCS += esp32s3_autoleds.c
+endif
+
+ifeq ($(CONFIG_USERLED),y)
+CSRCS += esp32s3_userleds.c
+endif
+
+DEPPATH += --dep-path board
+VPATH += :board
+CFLAGS += ${INCDIR_PREFIX}$(TOPDIR)$(DELIM)arch$(DELIM)$(CONFIG_ARCH)$(DELIM)src$(DELIM)board$(DELIM)board
