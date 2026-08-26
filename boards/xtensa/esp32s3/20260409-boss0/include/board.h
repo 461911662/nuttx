@@ -43,11 +43,9 @@
 
 #define BOARD_NLEDS         1
 
-#define BOARD_LED1
+#define BOARD_LED1          0
 
-#define GPIO_LED1  15
-
-#define BOARD_LED_1_BIT   (1 << BOARD_LED1)
+#define BOARD_LED_1_BIT     (1 << BOARD_LED1)
 
 #define LED_STARTED       0
 #define LED_HEAPALLOCATE  0

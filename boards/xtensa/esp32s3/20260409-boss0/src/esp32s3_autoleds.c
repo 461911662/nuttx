@@ -32,8 +32,8 @@
 
 #include <nuttx/board.h>
 #include <arch/board/board.h>
+#include <nuttx/ioexpander/ioexpander.h>
 
-#include "esp32s3_gpio.h"
 #include "esp32s3-20260409-boss0.h"
 
 #ifdef CONFIG_ARCH_LEDS
@@ -44,9 +44,9 @@
 
 /* There is one LED on the 20260409-boss0 board:
  *
- *     LED              GPIO
- *     ---------------- -----
- *     LED1              15
+ *     LED              XL9555 Pin
+ *     ---------------- ---------
+ *     LED1              P14
  *
  * The LED is not used by the board port unless CONFIG_ARCH_LEDS is
  * defined. In that case, the usage by the board port is defined in
@@ -66,6 +66,12 @@
  */
 
 /****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static FAR struct ioexpander_dev_s *g_aled_ioe;
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -75,9 +81,7 @@
 
 void esp32s3_led_initialize(void)
 {
-  /* Configure LED GPIO for output */
-
-  esp32s3_configgpio(GPIO_LED1, OUTPUT);
+  g_aled_ioe = esp32s3_gpioexp_getioe();
 }
 
 /****************************************************************************
@@ -102,9 +106,10 @@ void board_autoled_on(int led)
         break;
     }
 
-  /* High illuminates */
-
-  esp32s3_gpiowrite(GPIO_LED1, ledon);
+  if (g_aled_ioe != NULL)
+    {
+      IOEXP_WRITEPIN(g_aled_ioe, BOARD_XL9555_IO_P14, ledon ? 1 : 0);
+    }
 }
 
 /****************************************************************************
@@ -124,9 +129,10 @@ void board_autoled_off(int led)
         return;
     }
 
-  /* High illuminates */
-
-  esp32s3_gpiowrite(GPIO_LED1, false);
+  if (g_aled_ioe != NULL)
+    {
+      IOEXP_WRITEPIN(g_aled_ioe, BOARD_XL9555_IO_P14, 0);
+    }
 }
 
 #endif /* CONFIG_ARCH_LEDS */

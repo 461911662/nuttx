@@ -33,17 +33,21 @@
 
 #include <nuttx/board.h>
 #include <arch/board/board.h>
+#include <nuttx/ioexpander/ioexpander.h>
 
-#include "esp32s3_gpio.h"
 #include "esp32s3-20260409-boss0.h"
+
+#ifdef CONFIG_USERLED
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
+static FAR struct ioexpander_dev_s *g_led_ioe;
+
 static const uint32_t g_ledcfg[BOARD_NLEDS] =
 {
-  GPIO_LED1,
+  BOARD_XL9555_IO_P14,
 };
 
 /****************************************************************************
@@ -60,10 +64,16 @@ uint32_t board_userled_initialize(void)
 
   syslog(LOG_INFO, "board_userled_initialize: Initializing %" PRId16 " LEDs\n", BOARD_NLEDS);
 
+  g_led_ioe = esp32s3_gpioexp_getioe();
+  if (g_led_ioe == NULL)
+    {
+      syslog(LOG_ERR, "ERROR: Failed to get XL9555 device\n");
+      return 0;
+    }
+
   for (i = 0; i < BOARD_NLEDS; i++)
     {
-      esp32s3_configgpio(g_ledcfg[i], OUTPUT);
-      syslog(LOG_INFO, "board_userled_initialize: Configured GPIO%" PRIu32 " as OUTPUT\n", g_ledcfg[i]);
+      IOEXP_SETDIRECTION(g_led_ioe, g_ledcfg[i], IOEXPANDER_DIRECTION_OUT);
     }
 
   return BOARD_NLEDS;
@@ -77,9 +87,9 @@ void board_userled(int led, bool ledon)
 {
   syslog(LOG_INFO, "board_userled: led=%" PRId16 ", ledon=%" PRIu8 "\n", led, ledon);
 
-  if ((unsigned)led < BOARD_NLEDS)
+  if ((unsigned)led < BOARD_NLEDS && g_led_ioe != NULL)
     {
-      esp32s3_gpiowrite(g_ledcfg[led], ledon);
+      IOEXP_WRITEPIN(g_led_ioe, g_ledcfg[led], ledon ? 1 : 0);
     }
 }
 
@@ -94,10 +104,17 @@ void board_userled_all(uint32_t ledset)
 
   syslog(LOG_INFO, "board_userled_all: ledset=0x%" PRIu32 "\n", ledset);
 
+  if (g_led_ioe == NULL)
+    {
+      return;
+    }
+
   for (i = 0; i < BOARD_NLEDS; i++)
     {
       ledon = ((ledset & (1 << i)) != 0);
       syslog(LOG_INFO, "board_userled_all: LED%" PRIu8 " = %" PRIu8 "\n", i, ledon);
-      esp32s3_gpiowrite(g_ledcfg[i], ledon);
+      IOEXP_WRITEPIN(g_led_ioe, g_ledcfg[i], ledon ? 1 : 0);
     }
 }
+
+#endif /* CONFIG_USERLED */
