@@ -1,4 +1,4 @@
 [submodule "vendor"]
 	path = vendor
 	url = https://github.com/461911662/vendor.git
-	branch = boss1-dev
+	branch = main
